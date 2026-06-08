@@ -208,23 +208,32 @@ export async function updateStaffSecurity(
     encryptedQuestion: string;
     answerHash: string;
     encryptedGmail: string;
+    needSetup?: "0" | "1";
   }
 ) {
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
   return enqueueStaffWrite(async () => {
-    await sheets.spreadsheets.values.update({
+    await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId,
-      range: `${SHEET_NAME}!F${rowNumber}:I${rowNumber}`,
-      valueInputOption: "USER_ENTERED",
       requestBody: {
-        values: [[
-          data.passwordHash,
-          data.encryptedQuestion,
-          data.answerHash,
-          data.encryptedGmail,
-        ]],
+        valueInputOption: "USER_ENTERED",
+        data: [
+          {
+            range: `${SHEET_NAME}!F${rowNumber}:I${rowNumber}`,
+            values: [[
+              data.passwordHash,
+              data.encryptedQuestion,
+              data.answerHash,
+              data.encryptedGmail,
+            ]],
+          },
+          {
+            range: `${SHEET_NAME}!O${rowNumber}:O${rowNumber}`,
+            values: [[data.needSetup ?? "0"]],
+          },
+        ],
       },
     });
   });

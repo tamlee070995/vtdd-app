@@ -793,6 +793,44 @@ function ProductPicker({ label, value, placeholder, options, disabled = false, o
   );
 }
 
+
+type ProfilePasswordInputProps = {
+  value: string;
+  placeholder: string;
+  autoComplete?: string;
+  onChange: (value: string) => void;
+};
+
+function ProfilePasswordInput({
+  value,
+  placeholder,
+  autoComplete = "current-password",
+  onChange,
+}: ProfilePasswordInputProps) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="profile-v3-password-field">
+      <input
+        type={visible ? "text" : "password"}
+        value={value}
+        autoComplete={autoComplete}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
+
+      <button
+        type="button"
+        className="profile-v3-eye"
+        onClick={() => setVisible((current) => !current)}
+        aria-label={visible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+      >
+        {visible ? "Ẩn" : "Hiện"}
+      </button>
+    </div>
+  );
+}
+
 export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = false }: StaffTradeInAppProps) {
   const [loading, setLoading] = useState(true);
   const [loadMsg, setLoadMsg] = useState("Đang tải dữ liệu bảng giá.");
@@ -1463,6 +1501,7 @@ async function submitProfileUpdate() {
       },
       body: JSON.stringify({
         currentPassword: profileCurrentPassword,
+        changePassword: profileChangePassword || mustSetup,
         newPassword: (profileChangePassword || mustSetup) ? profileNewPassword : "",
         confirmPassword: (profileChangePassword || mustSetup) ? profileConfirmPassword : "",
         question: finalQuestion,
@@ -1535,10 +1574,10 @@ function renderProfilePanel(modeView: "modal" | "setup") {
 
         <div className="profile-v3-body">
           <label>Mật khẩu hiện tại</label>
-          <input
-            type="password"
+          <ProfilePasswordInput
             value={profileCurrentPassword}
-            onChange={(e) => setProfileCurrentPassword(e.target.value)}
+            onChange={setProfileCurrentPassword}
+            autoComplete="current-password"
             placeholder={isSetup ? "Nhập mật khẩu mặc định 123123" : "Nhập mật khẩu hiện tại"}
           />
 
@@ -1566,20 +1605,20 @@ function renderProfilePanel(modeView: "modal" | "setup") {
             <div className="profile-v3-password-box">
               <div>
                 <label>Mật khẩu mới</label>
-                <input
-                  type="password"
+                <ProfilePasswordInput
                   value={profileNewPassword}
-                  onChange={(e) => setProfileNewPassword(e.target.value)}
+                  onChange={setProfileNewPassword}
+                  autoComplete="new-password"
                   placeholder="Nhập mật khẩu mới"
                 />
               </div>
 
               <div>
                 <label>Xác nhận mật khẩu mới</label>
-                <input
-                  type="password"
+                <ProfilePasswordInput
                   value={profileConfirmPassword}
-                  onChange={(e) => setProfileConfirmPassword(e.target.value)}
+                  onChange={setProfileConfirmPassword}
+                  autoComplete="new-password"
                   placeholder="Nhập lại mật khẩu mới"
                 />
               </div>

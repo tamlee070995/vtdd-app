@@ -5331,841 +5331,283 @@ a {
 }
 
 /* =========================================================
-   ADMIN ENTERPRISE SAAS CONSOLE V5
-========================================================= */
-.admin-saas-page,
-.admin-login-v5-page {
-  min-height: 100vh;
-  padding: max(16px, env(safe-area-inset-top)) 12px max(24px, env(safe-area-inset-bottom));
-  background:
-    radial-gradient(circle at 18% 0%, rgba(255, 212, 0, .22), transparent 34%),
-    radial-gradient(circle at 88% 14%, rgba(37, 99, 235, .12), transparent 30%),
-    linear-gradient(180deg, #ffffff 0%, #f8fafc 48%, #eef2f7 100%);
-  color: #0f172a;
-}
-
-.admin-saas-shell,
-.admin-login-v5-shell {
-  width: min(100%, 1180px);
-  margin: 0 auto;
-  display: grid;
-  gap: 14px;
-}
-
-.admin-login-v5-shell {
-  width: min(100%, 460px);
-}
-
-.admin-login-v5-brand {
-  display: flex;
+   VTDD PROFILE SECURITY MODAL - DESKTOP/MOBILE + EYE BUTTON
+   ========================================================= */
+.profile-v3-layer {
   align-items: center;
-  gap: 10px;
-  padding: 8px 4px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
-.admin-login-v5-hero,
-.admin-saas-hero {
-  position: relative;
+.profile-v3-card {
+  width: min(960px, calc(100vw - 36px));
+  max-height: min(86vh, 860px);
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
   overflow: hidden;
-  border-radius: 34px;
-  color: #ffffff;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, .62);
   background:
-    radial-gradient(circle at 92% 8%, rgba(255, 212, 0, .56), transparent 30%),
-    linear-gradient(135deg, #0f172a, #111827 58%, #020617);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, .22);
+    radial-gradient(circle at 12% 0%, rgba(255, 212, 0, .24), transparent 34%),
+    linear-gradient(135deg, #0f172a 0 36%, #ffffff 36% 100%);
+  box-shadow: 0 34px 90px rgba(15, 23, 42, .30);
 }
 
-.admin-login-v5-hero {
-  min-height: 250px;
-  padding: 22px;
-}
-
-.admin-saas-hero {
-  min-height: 280px;
-  padding: 24px;
+.profile-v3-head {
+  padding: 30px 28px;
+  min-height: 100%;
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 20px;
-}
-
-.admin-login-v5-hero::after,
-.admin-saas-hero::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 92px;
-  background:
-    linear-gradient(90deg, rgba(255, 212, 0, .14), rgba(37, 99, 235, .10)),
-    repeating-linear-gradient(90deg, rgba(255,255,255,.10) 0 1px, transparent 1px 13px);
-  mask-image: linear-gradient(180deg, transparent, #000 45%);
-}
-
-.admin-login-v5-hero h1,
-.admin-saas-hero h1 {
-  position: relative;
-  z-index: 2;
-  margin-top: 32px;
+  gap: 22px;
   color: #ffffff;
-  font-size: clamp(42px, 10vw, 70px);
-  line-height: .88;
-  letter-spacing: -0.075em;
-  font-weight: 900;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, .08), rgba(15, 23, 42, .38)),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.08) 0 1px, transparent 1px 14px);
 }
 
-.admin-login-v5-hero h1 span,
-.admin-saas-hero h1 span {
-  display: block;
-  color: #ffd400;
-}
-
-.admin-login-v5-hero p,
-.admin-saas-hero p {
-  position: relative;
-  z-index: 2;
-  max-width: 540px;
-  margin-top: 14px;
-  color: rgba(255,255,255,.72);
-  font-size: 13px;
-  line-height: 1.5;
-  font-weight: 750;
-}
-
-.admin-login-v5-card {
-  padding: 16px;
-  border-radius: 28px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, .07);
-}
-
-.admin-login-v5-card label {
-  display: block;
-  margin-bottom: 7px;
-  color: #64748b;
-  font-size: 10.5px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.admin-login-v5-card input {
+.profile-v3-head > div {
   width: 100%;
-  min-height: 54px;
-  padding: 14px;
-  border-radius: 18px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  color: #0f172a;
-  font-size: 15px;
-  font-weight: 900;
-  outline: none;
 }
 
-.admin-login-v5-card input:focus {
-  border-color: #facc15;
-  background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(250, 204, 21, .16);
-}
-
-.admin-login-v5-card button[type="submit"] {
-  width: 100%;
-  min-height: 54px;
-  margin-top: 14px;
-  border: 0;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #ffd400, #facc15);
-  color: #111827;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  box-shadow: 0 14px 24px rgba(245, 158, 11, .20);
-}
-
-.admin-saas-hero-left {
-  position: relative;
-  z-index: 2;
-  min-width: 0;
-}
-
-.admin-saas-kicker {
-  width: fit-content;
-  padding: 8px 11px;
+.profile-v3-head span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 14px;
   border-radius: 999px;
-  background: rgba(255,255,255,.10);
-  border: 1px solid rgba(255,255,255,.14);
-  color: rgba(255,255,255,.78);
+  border: 1px solid rgba(255, 255, 255, .22);
+  background: rgba(255, 255, 255, .10);
+  color: #ffd400;
   font-size: 10px;
-  line-height: 1;
-  font-weight: 900;
+  font-weight: 1000;
   letter-spacing: .12em;
 }
 
-.admin-saas-hero-meta {
-  position: relative;
-  z-index: 2;
-  margin-top: 17px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.admin-saas-hero-meta span {
-  padding: 8px 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.10);
-  border: 1px solid rgba(255,255,255,.12);
-  color: rgba(255,255,255,.78);
-  font-size: 11px;
-  font-weight: 900;
-}
-
-.admin-saas-hero-actions {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.admin-saas-ghost-link,
-.admin-saas-logout {
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  display: inline-grid;
-  place-items: center;
-  text-transform: uppercase;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: .04em;
-}
-
-.admin-saas-ghost-link {
+.profile-v3-head h2 {
+  margin: 22px 0 10px;
   color: #ffffff;
-  background: rgba(255,255,255,.10);
-  border: 1px solid rgba(255,255,255,.14);
+  font-size: clamp(34px, 4.2vw, 56px);
+  line-height: .92;
+  font-weight: 1000;
+  letter-spacing: -.06em;
 }
 
-.admin-saas-logout {
-  color: #0f172a;
-  background: #ffd400;
+.profile-v3-head p {
+  max-width: 260px;
+  margin: 0;
+  color: rgba(255, 255, 255, .80);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 850;
 }
 
-.admin-saas-console {
-  display: grid;
-  gap: 12px;
-}
-
-.admin-saas-tabs {
-  padding: 8px;
-  border-radius: 24px;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
-  background: rgba(255,255,255,.76);
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 14px 32px rgba(15, 23, 42, .06);
-  backdrop-filter: blur(10px);
-}
-
-.admin-saas-tabs button {
-  min-height: 62px;
-  padding: 10px;
-  border: 0;
-  border-radius: 18px;
-  background: transparent;
-  color: #64748b;
-  text-align: left;
-}
-
-.admin-saas-tabs button.active {
-  background: #0f172a;
-  color: #ffffff;
-  box-shadow: 0 14px 28px rgba(15, 23, 42, .18);
-}
-
-.admin-saas-tabs b {
-  display: block;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.admin-saas-tabs span {
-  display: block;
-  margin-top: 4px;
-  font-size: 10.5px;
-  line-height: 1.2;
-  font-weight: 750;
-  opacity: .78;
-}
-
-.admin-saas-panel {
-  padding: 16px;
-  border-radius: 30px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 18px 44px rgba(15, 23, 42, .07);
-}
-
-.admin-saas-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.admin-saas-panel-head span {
-  width: fit-content;
-  display: inline-flex;
-  padding: 7px 10px;
+.profile-v3-close {
+  width: 46px;
+  height: 46px;
   border-radius: 999px;
-  background: #0f172a;
-  color: #ffd400;
-  font-size: 9.5px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  background: rgba(255, 255, 255, .12);
+  color: #ffffff;
+  font-size: 28px;
   line-height: 1;
   font-weight: 900;
-  letter-spacing: .1em;
 }
 
-.admin-saas-panel-head h2 {
-  margin-top: 10px;
-  color: #0f172a;
-  font-size: 24px;
-  line-height: 1.05;
-  font-weight: 900;
-  letter-spacing: -0.045em;
+.profile-v3-body {
+  min-width: 0;
+  max-height: min(86vh, 860px);
+  overflow: auto;
+  padding: 28px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
-.admin-saas-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-
-.admin-saas-metric-card,
-.admin-saas-status-card,
-.admin-saas-analytics-card {
-  padding: 14px;
-  border-radius: 22px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.admin-saas-metric-card span,
-.admin-saas-status-card span {
-  display: block;
+.profile-v3-body label:not(.profile-v3-switch) {
+  margin: 14px 0 7px;
   color: #64748b;
   font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .08em;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .10em;
   text-transform: uppercase;
 }
 
-.admin-saas-metric-card b {
-  display: block;
-  margin-top: 9px;
-  color: #0f172a;
-  font-size: 36px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: -0.06em;
-}
-
-.admin-saas-metric-card em,
-.admin-saas-status-card p {
-  display: block;
-  margin-top: 7px;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.35;
-  font-style: normal;
-  font-weight: 750;
-}
-
-.admin-saas-metric-card.success {
-  background: #ecfdf5;
-  border-color: #bbf7d0;
-}
-
-.admin-saas-metric-card.warning {
-  background: #fffbea;
-  border-color: rgba(250, 204, 21, .5);
-}
-
-.admin-saas-metric-card.danger {
-  background: #fef2f2;
-  border-color: #fecaca;
-}
-
-.admin-saas-status-grid,
-.admin-saas-dashboard-grid {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.admin-saas-dashboard-grid {
-  grid-template-columns: 1fr 1.4fr;
-}
-
-.admin-saas-status-card b {
-  display: block;
-  margin-top: 8px;
-  color: #0f172a;
-  font-size: 18px;
-  line-height: 1.1;
-  font-weight: 900;
-}
-
-.admin-saas-status-card.danger {
-  background: #fef2f2;
-  border-color: #fecaca;
-}
-
-.admin-saas-filter-group,
-.admin-saas-head-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.admin-saas-filter-group input,
-.admin-saas-filter-group select,
-.admin-saas-form-grid input,
-.admin-saas-form-grid textarea,
-.admin-saas-form-grid select,
-.admin-saas-panel input,
-.admin-saas-panel textarea,
-.admin-saas-panel select {
-  width: 100%;
-  min-height: 48px;
-  padding: 12px 13px;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
+.profile-v3-body input,
+.profile-v3-body select {
+  height: 54px;
+  border-radius: 18px;
+  border: 1px solid #dbe3ef;
   background: #f8fafc;
   color: #0f172a;
-  font-size: 13.5px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 900;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.80);
+}
+
+.profile-v3-body input:focus,
+.profile-v3-body select:focus {
+  border-color: rgba(255, 212, 0, .95);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(255, 212, 0, .20);
   outline: none;
 }
 
-.admin-saas-filter-group input {
-  min-width: 280px;
+.profile-v3-password-field {
+  position: relative;
+  width: 100%;
 }
 
-.admin-saas-filter-group select {
-  width: 150px;
+.profile-v3-password-field input {
+  width: 100%;
+  padding-right: 82px !important;
 }
 
-.admin-saas-form-grid textarea,
-.admin-saas-panel textarea {
-  min-height: 96px;
-  resize: vertical;
-}
-
-.admin-saas-form-grid input:focus,
-.admin-saas-form-grid textarea:focus,
-.admin-saas-filter-group input:focus,
-.admin-saas-filter-group select:focus,
-.admin-saas-panel input:focus,
-.admin-saas-panel textarea:focus {
-  border-color: #facc15;
-  background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(250, 204, 21, .16);
-}
-
-.admin-saas-staff-list {
-  display: grid;
-  gap: 10px;
-}
-
-.admin-saas-staff-card {
-  padding: 13px;
-  border-radius: 22px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.admin-saas-badge {
-  width: fit-content;
-  display: inline-flex;
-  padding: 6px 9px;
-  border-radius: 999px;
-  font-size: 9.5px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.admin-saas-badge.active {
-  color: #047857;
-  background: #d1fae5;
-}
-
-.admin-saas-badge.standby {
-  color: #854d0e;
-  background: #fef3c7;
-}
-
-.admin-saas-staff-card h3 {
-  margin-top: 8px;
-  color: #0f172a;
-  font-size: 17px;
-  line-height: 1.1;
-  font-weight: 900;
-}
-
-.admin-saas-staff-card p,
-.admin-saas-staff-card small {
-  display: block;
-  margin-top: 5px;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.35;
-  font-weight: 750;
-}
-
-.admin-saas-staff-actions {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 7px;
-  width: 240px;
-}
-
-.admin-saas-staff-actions button,
-.admin-saas-primary-btn,
-.admin-saas-secondary-btn {
-  min-height: 42px;
+.profile-v3-eye {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 64px;
+  height: 38px;
   border: 0;
   border-radius: 14px;
-  padding: 0 12px;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.admin-saas-staff-actions button {
-  background: #ffffff;
-  color: #0f172a;
-  border: 1px solid #e2e8f0;
-}
-
-.admin-saas-staff-actions button.danger {
-  color: #dc2626;
-  background: #fff1f2;
-  border-color: #fecdd3;
-}
-
-.admin-saas-staff-actions button:disabled,
-.admin-saas-primary-btn:disabled,
-.admin-saas-secondary-btn:disabled {
-  opacity: .5;
-  cursor: wait;
-}
-
-.admin-saas-primary-btn {
-  background: linear-gradient(135deg, #ffd400, #facc15);
-  color: #111827;
-  box-shadow: 0 12px 22px rgba(245, 158, 11, .18);
-}
-
-.admin-saas-primary-btn.full {
-  width: 100%;
-  margin-top: 14px;
-}
-
-.admin-saas-secondary-btn {
   background: #0f172a;
-  color: #ffffff;
-}
-
-.admin-saas-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.admin-saas-form-grid.one {
-  margin-top: 12px;
-  grid-template-columns: 1fr;
-}
-
-.admin-saas-form-grid label span {
-  display: block;
-  margin-bottom: 7px;
-  color: #64748b;
-  font-size: 10px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.admin-saas-lock-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.admin-saas-toggle-row {
-  position: relative;
-  min-height: 72px;
-  padding: 12px 66px 12px 13px;
-  border-radius: 20px;
-  display: block;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.admin-saas-toggle-row b {
-  display: block;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.admin-saas-toggle-row span {
-  display: block;
-  margin-top: 4px;
-  color: #64748b;
-  font-size: 11.5px;
-  line-height: 1.35;
-  font-weight: 750;
-}
-
-.admin-saas-toggle-row input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.admin-saas-toggle-row i {
-  position: absolute;
-  right: 13px;
-  top: 50%;
-  width: 46px;
-  height: 27px;
-  transform: translateY(-50%);
-  border-radius: 999px;
-  background: #cbd5e1;
-  box-shadow: inset 0 2px 5px rgba(15, 23, 42, .16);
-}
-
-.admin-saas-toggle-row i::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 4px;
-  width: 19px;
-  height: 19px;
-  border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 2px 7px rgba(15, 23, 42, .2);
-  transition: .18s ease;
-}
-
-.admin-saas-toggle-row input:checked + i {
-  background: #ffd400;
-}
-
-.admin-saas-toggle-row input:checked + i::after {
-  transform: translateX(19px);
-  background: #111827;
-}
-
-.admin-saas-analytics-card h3 {
-  color: #0f172a;
-  font-size: 15px;
-  font-weight: 900;
-}
-
-.admin-saas-ranking-list,
-.admin-saas-log-list {
-  margin-top: 10px;
-  display: grid;
-  gap: 8px;
-}
-
-.admin-saas-ranking-list div,
-.admin-saas-log-list div {
-  min-height: 48px;
-  padding: 10px;
-  border-radius: 16px;
-  display: grid;
-  grid-template-columns: 38px 1fr auto;
-  gap: 9px;
-  align-items: center;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-}
-
-.admin-saas-log-list div {
-  grid-template-columns: 110px 1fr;
-}
-
-.admin-saas-ranking-list span,
-.admin-saas-log-list span {
-  color: #64748b;
+  color: #ffd400;
   font-size: 11px;
-  line-height: 1.25;
-  font-weight: 900;
+  font-weight: 1000;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, .16);
 }
 
-.admin-saas-ranking-list b,
-.admin-saas-log-list b {
+.profile-v3-eye:active {
+  transform: translateY(-50%) scale(.96);
+}
+
+.profile-v3-password-box {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 212, 0, .46);
+  background: linear-gradient(180deg, #fffbea 0%, #ffffff 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.profile-v3-switch {
+  min-height: 70px;
+  margin: 16px 0;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 212, 0, .55);
+  background: linear-gradient(135deg, #fff7cc, #ffffff);
+}
+
+.profile-v3-switch b {
   color: #0f172a;
-  font-size: 12.5px;
-  line-height: 1.25;
-  font-weight: 900;
+  font-weight: 1000;
 }
 
-.admin-saas-ranking-list em,
-.admin-saas-log-list em {
-  color: #64748b;
-  font-size: 11.5px;
-  line-height: 1.25;
-  font-style: normal;
-  font-weight: 750;
-}
-
-.admin-saas-log-list em {
-  grid-column: 2;
-}
-
-.admin-saas-mini-stat {
-  padding: 10px 12px;
-  border-radius: 999px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.admin-saas-mini-stat b {
+.profile-v3-save {
+  height: 58px;
+  margin-top: 20px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #ffd400, #ffb800);
   color: #0f172a;
+  font-weight: 1000;
+  letter-spacing: .04em;
+  box-shadow: 0 18px 36px rgba(255, 184, 0, .28);
 }
 
-.admin-saas-toast {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 999999;
-  width: min(360px, calc(100vw - 32px));
-  padding: 13px 14px;
-  border-radius: 18px;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 900;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, .22);
+.profile-v3-setup-card {
+  width: min(980px, calc(100vw - 36px));
 }
 
-.admin-saas-toast.ok {
-  background: #ecfdf5;
-  border: 1px solid #bbf7d0;
-  color: #047857;
-}
-
-.admin-saas-toast.error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-}
-
-@media screen and (max-width: 900px) {
-  .admin-saas-hero {
-    display: block;
+@media (max-width: 768px) {
+  .profile-v3-layer {
+    align-items: flex-end;
+    padding: 0;
   }
 
-  .admin-saas-hero-actions {
-    margin-top: 18px;
-  }
-
-  .admin-saas-tabs {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .admin-saas-metric-grid,
-  .admin-saas-status-grid,
-  .admin-saas-dashboard-grid,
-  .admin-saas-form-grid,
-  .admin-saas-lock-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-saas-staff-card {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-saas-staff-actions {
+  .profile-v3-card,
+  .profile-v3-setup-card {
     width: 100%;
-  }
-
-  .admin-saas-panel-head {
-    display: block;
-  }
-
-  .admin-saas-filter-group,
-  .admin-saas-head-actions {
-    margin-top: 12px;
-    display: grid;
+    max-height: 92dvh;
     grid-template-columns: 1fr;
+    border-radius: 28px 28px 0 0;
+    background: #ffffff;
+    box-shadow: 0 -24px 70px rgba(15, 23, 42, .38);
   }
 
-  .admin-saas-filter-group input,
-  .admin-saas-filter-group select {
-    min-width: 0;
-    width: 100%;
+  .profile-v3-head {
+    min-height: auto;
+    padding: 22px 20px 18px;
+    flex-direction: row;
+    align-items: flex-start;
+    background:
+      radial-gradient(circle at 88% 0%, rgba(255, 212, 0, .32), transparent 38%),
+      linear-gradient(135deg, #0f172a, #101827);
   }
 
-  .admin-saas-log-list div {
+  .profile-v3-head h2 {
+    margin: 14px 0 6px;
+    font-size: 25px;
+    line-height: 1.02;
+    letter-spacing: -.05em;
+  }
+
+  .profile-v3-head p {
+    max-width: 310px;
+    font-size: 12px;
+  }
+
+  .profile-v3-close {
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    font-size: 23px;
+  }
+
+  .profile-v3-body {
+    max-height: calc(92dvh - 124px);
+    padding: 18px 16px max(18px, env(safe-area-inset-bottom));
+  }
+
+  .profile-v3-body input,
+  .profile-v3-body select {
+    height: 52px;
+    border-radius: 17px;
+    font-size: 13px;
+  }
+
+  .profile-v3-password-box {
     grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 10px;
   }
 
-  .admin-saas-log-list em {
-    grid-column: auto;
-  }
-}
-
-@media screen and (max-width: 430px) {
-  .admin-saas-page,
-  .admin-login-v5-page {
-    padding-left: 10px;
-    padding-right: 10px;
+  .profile-v3-eye {
+    width: 58px;
+    height: 36px;
+    right: 7px;
+    border-radius: 13px;
+    font-size: 10px;
   }
 
-  .admin-saas-hero,
-  .admin-login-v5-hero {
-    border-radius: 30px;
-    padding: 20px;
+  .profile-v3-password-field input {
+    padding-right: 74px !important;
   }
 
-  .admin-saas-hero h1,
-  .admin-login-v5-hero h1 {
-    font-size: 44px;
+  .profile-v3-switch {
+    min-height: 66px;
+    align-items: center;
   }
 
-  .admin-saas-panel {
-    padding: 13px;
-    border-radius: 26px;
-  }
-
-  .admin-saas-tabs {
-    padding: 7px;
-    border-radius: 22px;
-  }
-
-  .admin-saas-tabs button {
-    min-height: 56px;
-    border-radius: 16px;
+  .profile-v3-save {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    height: 56px;
   }
 }

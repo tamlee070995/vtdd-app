@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findStaffByMaNV, updateStaffNeedSetup, updateStaffSecurity } from "@/lib/staff-store";
+import { findStaffByMaNV, updateStaffSecurity } from "@/lib/staff-store";
 import {
   decryptText,
   encryptText,
@@ -10,6 +10,30 @@ import {
 } from "@/lib/staff-security";
 
 export const dynamic = "force-dynamic";
+
+function isGmail(value: string) {
+  return /^[^\s@]+@gmail\.com$/i.test(value);
+}
+
+function isStrongEnough(password: string) {
+  if (password.length < 6) return false;
+  if (!/[A-Z]/.test(password)) return false;
+  if (!/[a-z]/.test(password)) return false;
+  if (!/\d/.test(password)) return false;
+  if (!/[!@#]/.test(password)) return false;
+  return true;
+}
+
+function safeDecrypt(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  try {
+    return decryptText(raw) || raw;
+  } catch {
+    return raw;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,15 +46,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+
+    if (!body) {
+      return NextResponse.json(
+        { success: false, message: "Dữ liệu gửi lên không hợp lệ." },
+        { status: 400 }
+      );
+    }
 
     const currentPassword = normalizeText(body.currentPassword);
-    const changePassword = body.changePassword === true;
     const newPassword = normalizeText(body.newPassword);
     const confirmPassword = normalizeText(body.confirmPassword);
     const question = normalizeText(body.question);
     const answer = normalizeText(body.answer);
-    const gmail = normalizeText(body.gmail);
+    const gmail = normalizeText(body.gmail).toLowerCase();
+
+    // Fix lỗi cũ: client có gửi mật khẩu mới nhưng thiếu flag changePassword thì server không đổi mật khẩu.
+    const changePassword =
+      body.changePassword === true || Boolean(newPassword) || Boolean(confirmPassword);
 
     if (!currentPassword) {
       return NextResponse.json(
@@ -46,9 +80,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!gmail.toLowerCase().endsWith("@gmail.com")) {
+    if (!isGmail(gmail)) {
       return NextResponse.json(
-        { success: false, message: "Vui lòng nhập đúng địa chỉ Gmail." },
+        { success: false, message: "Vui lòng nhập đúng Gmail cá nhân, ví dụ: ten@gmail.com." },
         { status: 400 }
       );
     }
@@ -69,12 +103,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const hasOldPlainPassword = !String(staff.password || "").startsWith("pwd:v1:");
+    const hasSecurityQuestion = Boolean(safeDecrypt(staff.securityQuestion));
+    const hasGmail = Boolean(safeDecrypt(staff.gmail));
+
     const forceSetup =
       req.cookies.get("vtdd_staff_force_setup")?.value === "1" ||
+      staff.needSetup === "1" ||
       isDefaultPasswordStored(staff.password) ||
-      !String(staff.password || "").startsWith("pwd:v1:") ||
-      !decryptText(staff.securityQuestion) ||
-      !decryptText(staff.gmail) ||
+      hasOldPlainPassword ||
+      !hasSecurityQuestion ||
+      !hasGmail ||
       !staff.securityAnswer;
 
     let passwordHash = staff.password;
@@ -108,6 +147,16 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      if (!isStrongEnough(newPassword)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Mật khẩu mới tối thiểu 6 ký tự, gồm chữ hoa, chữ thường, số và ký tự ! @ #.",
+          },
+          { status: 400 }
+        );
+      }
+
       passwordHash = hashPassword(newPassword);
     }
 
@@ -129,23 +178,17 @@ export async function POST(req: NextRequest) {
       encryptedQuestion: encryptText(question),
       answerHash,
       encryptedGmail: encryptText(gmail),
+      needSetup: "0",
     });
-    await updateStaffNeedSetup(staff.rowNumber, "0");
 
     const res = NextResponse.json({
       success: true,
-      message: forceSetup || changePassword
-        ? "Đã cập nhật thông tin và đổi mật khẩu thành công."
-        : "Đã cập nhật thông tin cá nhân thành công.",
+      changedPassword: forceSetup || changePassword,
+      message:
+        forceSetup || changePassword
+          ? "Đã cập nhật thông tin và đổi mật khẩu thành công. Lần đăng nhập sau hãy dùng mật khẩu mới."
+          : "Đã cập nhật thông tin cá nhân thành công.",
     });
-
-    res.cookies.set("vtdd_staff_force_setup", "0", {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 12,
-        });
-    return res;
 
     res.cookies.set("vtdd_staff_force_setup", "0", {
       httpOnly: true,
@@ -165,6 +208,8 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (err: any) {
+    console.error("STAFF_UPDATE_SECURITY_ERROR:", err);
+
     return NextResponse.json(
       { success: false, message: err?.message || "Không cập nhật được thông tin." },
       { status: 500 }
