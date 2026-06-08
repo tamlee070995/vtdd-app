@@ -32,11 +32,11 @@ export async function sendResetOtpMail(params: {
   await transporter.sendMail({
     from: getMailFrom(),
     to: params.to,
-    subject: "VTDD.ONLINE - Mã xác thực đặt lại mật khẩu",
+    subject: "Viễn Thông Di Động - Mã xác thực đặt lại mật khẩu",
     html: `
       <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;">
         <div style="max-width:520px;margin:auto;background:#ffffff;border-radius:18px;padding:24px;border:1px solid #e2e8f0;">
-          <h2 style="margin:0;color:#0f172a;">VTDD.ONLINE</h2>
+          <h2 style="margin:0;color:#0f172a;">Viễn Thông Di Động</h2>
           <p style="color:#64748b;font-weight:700;">Xin chào ${params.staffName || "Nhân viên"},</p>
           <p style="color:#0f172a;">Mã xác thực đặt lại mật khẩu cho tài khoản <b>${params.maNV}</b> là:</p>
           <div style="font-size:34px;font-weight:900;letter-spacing:8px;color:#111827;background:#ffd400;border-radius:14px;padding:16px;text-align:center;">
@@ -64,7 +64,7 @@ export async function sendNewStaffAccountMail(params: {
   await transporter.sendMail({
     from: getMailFrom(),
     to,
-    subject: `VTDD.ONLINE - Tài khoản mới chờ duyệt: ${params.maNV}`,
+    subject: `Viễn Thông Di Động - Tài khoản mới chờ duyệt: ${params.maNV}`,
     html: `
       <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;">
         <div style="max-width:560px;margin:auto;background:#ffffff;border-radius:20px;padding:24px;border:1px solid #e2e8f0;">
@@ -75,7 +75,7 @@ export async function sendNewStaffAccountMail(params: {
           <h2 style="margin:16px 0 8px;color:#0f172a;font-size:24px;">Có tài khoản mới chờ duyệt</h2>
 
           <p style="color:#475569;font-size:14px;line-height:1.5;">
-            Một nhân viên vừa tạo tài khoản trên VTDD.ONLINE. Vui lòng kiểm tra và chuyển trạng thái Active nếu hợp lệ.
+            Một nhân viên vừa tạo tài khoản trên trang TCDM. Vui lòng kiểm tra và chuyển trạng thái Active nếu hợp lệ.
           </p>
 
           <div style="margin-top:16px;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
@@ -100,7 +100,7 @@ export async function sendNewStaffAccountMail(params: {
           </a>
 
           <p style="margin-top:16px;color:#94a3b8;font-size:12px;line-height:1.5;">
-            Email tự động từ hệ thống VTDD.ONLINE.
+            Email tự động từ hệ thống Viễn Thông Di Động.
           </p>
         </div>
       </div>
@@ -119,7 +119,7 @@ export async function sendStaffActivatedMail(params: {
   await transporter.sendMail({
     from: getMailFrom(),
     to: params.to,
-    subject: "VTDD.ONLINE - Tài khoản đã được kích hoạt",
+    subject: "Viễn Thông Di Động - Tài khoản đã được kích hoạt",
     html: `
       <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;">
         <div style="max-width:560px;margin:auto;background:#ffffff;border-radius:20px;padding:24px;border:1px solid #e2e8f0;">
@@ -131,7 +131,7 @@ export async function sendStaffActivatedMail(params: {
 
           <p style="color:#475569;font-size:14px;line-height:1.55;">
             Xin chào <b>${params.staffName || "Nhân viên"}</b>, tài khoản nhân viên
-            <b>${params.maNV}</b> của bạn đã được Admin duyệt Active trên VTDD.ONLINE.
+            <b>${params.maNV}</b> của bạn đã được Admin duyệt Active trên trang TCDM.
           </p>
 
           <div style="margin-top:16px;padding:14px;border-radius:16px;background:#ecfdf5;border:1px solid #bbf7d0;color:#047857;font-size:14px;line-height:1.5;font-weight:700;">
@@ -143,7 +143,7 @@ export async function sendStaffActivatedMail(params: {
           </a>
 
           <p style="margin-top:16px;color:#94a3b8;font-size:12px;line-height:1.5;">
-            Email tự động từ hệ thống VTDD.ONLINE.
+            Email tự động từ hệ thống Viễn Thông Di Động.
           </p>
         </div>
       </div>

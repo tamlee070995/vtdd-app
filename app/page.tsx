@@ -12,7 +12,7 @@ export default function HomePage() {
           </div>
 
           <div>
-            <h1>VTDD.ONLINE</h1>
+            <h1>Viễn Thông Di Động</h1>
             <p>Trade-in Value Portal</p>
           </div>
         </header>

@@ -155,7 +155,7 @@ export default function RegisterPage() {
         <div className="login-brand-v2">
           <div className="brand-mark">VT</div>
           <div>
-            <div className="brand-title">VTDD.ONLINE</div>
+            <div className="brand-title">Viễn Thông Di Động</div>
             <div className="brand-subtitle">Create Staff Account</div>
           </div>
         </div>

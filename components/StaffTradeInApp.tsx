@@ -1767,7 +1767,7 @@ function renderSystemLock() {
       <main className="staff-os-page">
         <section className="staff-loader">
           <div className="loader-orb"></div>
-          <div className="loader-title">VTDD.ONLINE</div>
+          <div className="loader-title">Viễn Thông Di Động</div>
           <p>{loadMsg}</p>
         </section>
       </main>

@@ -990,7 +990,7 @@ export default function CustomerPage() {
       <main className="customer-personal-page">
         <section className="customer-personal-loader">
           <div className="customer-loader-orb"></div>
-          <h1>VTDD.ONLINE</h1>
+          <h1>Viễn Thông Di Động</h1>
           <p>{loadMsg}</p>
         </section>
       </main>
@@ -1008,7 +1008,7 @@ export default function CustomerPage() {
         <header className="customer-personal-hero">
           <div className="customer-personal-brand">
             <div>VT</div>
-            <span>VTDD.ONLINE</span>
+            <span>Viễn Thông Di Động</span>
           </div>
 
           <div className="customer-personal-kicker">TRA CỨU DÀNH CHO KHÁCH HÀNG</div>

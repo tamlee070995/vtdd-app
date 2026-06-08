@@ -36,7 +36,7 @@ export default async function AdminPage() {
 
             <h1>
               QUẢN TRỊ
-              <span>VTDD.ONLINE</span>
+              <span>Viễn Thông Di Động</span>
             </h1>
 
             <p>

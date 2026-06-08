@@ -17,7 +17,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
         <div className="login-brand-v2">
           <div className="brand-mark">VT</div>
           <div>
-            <div className="brand-title">VTDD.ONLINE</div>
+            <div className="brand-title">Viễn Thông Di Động</div>
             <div className="brand-subtitle">Staff Secure Login</div>
           </div>
         </div>

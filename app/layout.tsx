@@ -4,13 +4,13 @@ import "sweetalert2/dist/sweetalert2.min.css";
 import OnlineHeartbeat from "@/components/OnlineHeartbeat";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vtdd.online"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vienthongdidong.com"),
   title: {
-    default: "VTDD.ONLINE | Tra Cứu Thu Cũ",
-    template: "%s | VTDD.ONLINE",
+    default: "Viễn Thông Di Động",
+    template: "%s | VTDD",
   },
   description: "Cổng tra cứu thu cũ đổi mới dành cho nhân viên MWG và khách hàng.",
-  applicationName: "VTDD.ONLINE",
+  applicationName: "VTDD",
   icons: {
     icon: [
       { url: "/favicon.ico" },
