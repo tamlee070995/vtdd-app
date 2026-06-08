@@ -1,142 +1,519 @@
 .page {
-  --background: #fafafa;
-  --foreground: #fff;
-
-  --text-primary: #000;
-  --text-secondary: #666;
-
-  --button-primary-hover: #383838;
-  --button-secondary-hover: #f2f2f2;
-  --button-secondary-border: #ebebeb;
-
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-geist-sans);
-  background-color: var(--background);
+  min-height: 100dvh;
+  padding: clamp(12px, 1.6vw, 22px);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 212, 0, .22), transparent 28%),
+    radial-gradient(circle at 92% 8%, rgba(59, 130, 246, .12), transparent 28%),
+    #eef3f8;
+  color: #07111f;
+  font-family: Roboto, Arial, sans-serif;
 }
 
-.main {
+.topbar {
+  width: min(100%, 1380px);
+  height: clamp(62px, 6vw, 78px);
+  margin: 0 auto;
+  padding: 0 clamp(12px, 2vw, 22px);
+  border-radius: clamp(20px, 2vw, 28px);
   display: flex;
-  flex: 1;
-  width: 100%;
-  max-width: 800px;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  background-color: var(--foreground);
-  padding: 120px 60px;
+  background:
+    linear-gradient(135deg, rgba(2, 6, 23, .98), rgba(15, 23, 42, .94)),
+    #020617;
+  border: 1px solid rgba(255, 255, 255, .1);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .14);
 }
 
-.intro {
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.logoShell {
+  width: clamp(42px, 4vw, 54px);
+  height: clamp(42px, 4vw, 54px);
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: #ffd400;
+  overflow: hidden;
+  box-shadow: 0 0 0 6px rgba(255, 212, 0, .12);
+}
+
+.logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.brandText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.brandText strong {
+  font-size: clamp(18px, 2vw, 28px);
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -.04em;
+}
+
+.brandText small {
+  color: rgba(255, 255, 255, .68);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+}
+
+.adminButton {
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .16);
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.hero {
+  position: relative;
+  width: min(100%, 1380px);
+  min-height: clamp(230px, 34vh, 390px);
+  margin: clamp(14px, 1.7vw, 22px) auto;
+  border-radius: clamp(28px, 3vw, 42px);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 88% 20%, rgba(255, 212, 0, .46), transparent 24%),
+    linear-gradient(135deg, rgba(255, 255, 255, .97), rgba(255, 255, 255, .86)),
+    #ffffff;
+  border: 1px solid rgba(203, 213, 225, .9);
+  box-shadow: 0 28px 88px rgba(15, 23, 42, .12);
+}
+
+.heroPattern {
+  position: absolute;
+  inset: 0;
+  opacity: .55;
+  background-image:
+    linear-gradient(to right, rgba(15, 23, 42, .08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, .04) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, black, transparent 95%);
+}
+
+.heroContent {
+  position: relative;
+  width: min(92%, 980px);
+  text-align: center;
+  z-index: 1;
+}
+
+.kicker {
+  width: fit-content;
+  margin: 0 auto 18px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: #020617;
+  color: #ffd400;
+  font-size: clamp(10px, 1vw, 13px);
+  font-weight: 950;
+  letter-spacing: .16em;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(42px, 7vw, 104px);
+  line-height: .92;
+  font-weight: 1000;
+  letter-spacing: -.08em;
+  color: #020617;
+}
+
+.hero p {
+  width: min(100%, 780px);
+  margin: clamp(14px, 2vw, 22px) auto 0;
+  color: #475569;
+  font-size: clamp(15px, 1.6vw, 22px);
+  line-height: 1.45;
+  font-weight: 850;
+}
+
+.desktopModuleGrid {
+  width: min(100%, 1380px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(10px, 1.2vw, 18px);
+}
+
+.moduleCard {
+  min-height: clamp(230px, 24vh, 300px);
+  padding: clamp(16px, 1.5vw, 22px);
+  border-radius: clamp(22px, 2vw, 30px);
+  background: rgba(255, 255, 255, .84);
+  border: 1px solid rgba(203, 213, 225, .9);
+  box-shadow: 0 22px 70px rgba(15, 23, 42, .08);
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  gap: 24px;
-}
-
-.intro h1 {
-  max-width: 320px;
-  font-size: 40px;
-  font-weight: 600;
-  line-height: 48px;
-  letter-spacing: -2.4px;
-  text-wrap: balance;
-  color: var(--text-primary);
-}
-
-.intro p {
-  max-width: 440px;
-  font-size: 18px;
-  line-height: 32px;
-  text-wrap: balance;
-  color: var(--text-secondary);
-}
-
-.intro a {
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.ctas {
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-  max-width: 440px;
   gap: 16px;
-  font-size: 14px;
 }
 
-.ctas a {
+.moduleHead {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.moduleNumber {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: #020617;
+  color: #ffd400;
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.moduleHead h2 {
+  margin: 0;
+  color: #020617;
+  font-size: clamp(17px, 1.35vw, 22px);
+  line-height: 1.08;
+  font-weight: 1000;
+  letter-spacing: -.04em;
+}
+
+.moduleHead p {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 800;
+}
+
+.toolList {
+  margin-top: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.toolCard {
+  min-height: 74px;
+  padding: 13px 14px;
+  border-radius: 18px;
   display: flex;
-  justify-content: center;
   align-items: center;
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 128px;
-  border: 1px solid transparent;
-  transition: 0.2s;
-  cursor: pointer;
-  width: fit-content;
-  font-weight: 500;
+  justify-content: space-between;
+  gap: 12px;
+  text-decoration: none;
+  border: 1px solid rgba(203, 213, 225, .95);
 }
 
-a.primary {
-  background: var(--text-primary);
-  color: var(--background);
-  gap: 8px;
+.activeTool {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .26), transparent 40%),
+    #ffffff;
+  color: #020617;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
-a.secondary {
-  border-color: var(--button-secondary-border);
+.activeTool:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 212, 0, .75);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, .12);
 }
 
-/* Enable hover only on non-touch devices */
-@media (hover: hover) and (pointer: fine) {
-  a.primary:hover {
-    background: var(--button-primary-hover);
-    border-color: transparent;
+.disabledTool {
+  background: rgba(248, 250, 252, .75);
+  color: #94a3b8;
+}
+
+.toolText {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.toolText strong {
+  color: inherit;
+  font-size: 13.5px;
+  line-height: 1.2;
+  font-weight: 1000;
+}
+
+.toolText small {
+  color: #64748b;
+  font-size: 11.5px;
+  line-height: 1.35;
+  font-weight: 750;
+}
+
+.openIcon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #020617;
+  color: #ffd400;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.statusBadge {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: #fff7cc;
+  color: #92400e;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 950;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mobileModuleList {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .desktopModuleGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  a.secondary:hover {
-    background: var(--button-secondary-hover);
-    border-color: transparent;
+  .moduleCard {
+    min-height: auto;
   }
 }
 
-@media (max-width: 600px) {
-  .main {
-    padding: 48px 24px;
-  }
-
-  .intro {
-    gap: 16px;
-  }
-
-  .intro h1 {
-    font-size: 32px;
-    line-height: 40px;
-    letter-spacing: -1.92px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .logo {
-    filter: invert();
-  }
-
+@media (max-width: 720px) {
   .page {
-    --background: #000;
-    --foreground: #000;
+    padding: 10px;
+  }
 
-    --text-primary: #ededed;
-    --text-secondary: #999;
+  .topbar {
+    height: 60px;
+    border-radius: 22px;
+  }
 
-    --button-primary-hover: #ccc;
-    --button-secondary-hover: #1a1a1a;
-    --button-secondary-border: #1a1a1a;
+  .brandText strong {
+    font-size: 18px;
+  }
+
+  .brandText small {
+    display: none;
+  }
+
+  .logoShell {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+  }
+
+  .adminButton {
+    min-height: 38px;
+    padding: 0 14px;
+    font-size: 11px;
+  }
+
+  .hero {
+    min-height: 255px;
+    margin: 12px auto;
+    border-radius: 28px;
+    place-items: end center;
+    padding: 26px 16px;
+    background:
+      radial-gradient(circle at 88% 14%, rgba(255, 212, 0, .5), transparent 34%),
+      linear-gradient(135deg, #ffffff, #f8fafc);
+  }
+
+  .heroContent {
+    width: 100%;
+  }
+
+  .kicker {
+    margin-bottom: 14px;
+    padding: 9px 14px;
+  }
+
+  .hero h1 {
+    font-size: clamp(42px, 13vw, 62px);
+    line-height: .92;
+  }
+
+  .hero p {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .desktopModuleGrid {
+    display: none;
+  }
+
+  .mobileModuleList {
+    width: min(100%, 560px);
+    margin: 0 auto;
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobileGroup {
+    padding: 15px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, .9);
+    border: 1px solid rgba(203, 213, 225, .9);
+    box-shadow: 0 18px 55px rgba(15, 23, 42, .08);
+  }
+
+  .mobileGroupHeader {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 11px;
+    align-items: start;
+  }
+
+  .mobileGroupHeader > span {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: #020617;
+    color: #ffd400;
+    font-size: 13px;
+    font-weight: 1000;
+  }
+
+  .mobileGroupHeader h2 {
+    margin: 0;
+    color: #020617;
+    font-size: 18px;
+    line-height: 1.1;
+    font-weight: 1000;
+    letter-spacing: -.04em;
+  }
+
+  .mobileGroupHeader p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.35;
+    font-weight: 750;
+  }
+
+  .mobileTools {
+    display: grid;
+    gap: 9px;
+    margin-top: 13px;
+  }
+
+  .mobileTool,
+  .mobileToolDisabled {
+    min-height: 70px;
+    padding: 12px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid rgba(203, 213, 225, .9);
+    text-decoration: none;
+  }
+
+  .mobileTool {
+    background: #ffffff;
+    color: #020617;
+  }
+
+  .mobileToolDisabled {
+    background: #f8fafc;
+    color: #94a3b8;
+  }
+
+  .mobileTool span,
+  .mobileToolDisabled span {
+    display: grid;
+    gap: 5px;
+  }
+
+  .mobileTool strong,
+  .mobileToolDisabled strong {
+    font-size: 13.5px;
+    line-height: 1.2;
+    font-weight: 1000;
+  }
+
+  .mobileTool small,
+  .mobileToolDisabled small {
+    color: #64748b;
+    font-size: 11.5px;
+    line-height: 1.35;
+    font-weight: 750;
+  }
+
+  .mobileTool b {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    background: #020617;
+    color: #ffd400;
+    font-size: 22px;
+  }
+
+  .mobileToolDisabled em {
+    padding: 7px 9px;
+    border-radius: 999px;
+    background: #fff7cc;
+    color: #92400e;
+    font-size: 9.5px;
+    font-style: normal;
+    font-weight: 950;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+}
+
+@media (max-height: 760px) and (min-width: 900px) {
+  .hero {
+    min-height: 245px;
+  }
+
+  .hero h1 {
+    font-size: clamp(52px, 5.5vw, 82px);
+  }
+
+  .moduleCard {
+    min-height: 220px;
+  }
+
+  .toolCard {
+    min-height: 64px;
   }
 }
