@@ -347,6 +347,234 @@ const SYSTEM_UI_CSS = `
   max-width: none;
 }
 
+
+
+.vtdd-product-trigger {
+  width: 100%;
+  min-height: 58px;
+  padding: 0 44px 0 14px;
+  border-radius: 17px;
+  border: 1px solid #dbe3ee;
+  background: #f8fafc;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 900;
+  position: relative;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vtdd-product-trigger::after {
+  content: "⌕";
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #eef2f7;
+  color: #475569;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.vtdd-product-trigger:disabled {
+  opacity: .58;
+  color: #94a3b8;
+  cursor: not-allowed;
+  background: repeating-linear-gradient(135deg, #f8fafc 0 6px, #f1f5f9 6px 12px);
+}
+
+.vtdd-product-trigger[data-empty="true"] span {
+  color: #94a3b8;
+}
+
+.vtdd-product-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 999998;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: flex-end;
+  background: rgba(15, 23, 42, .56);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.vtdd-product-panel {
+  width: 100%;
+  max-height: min(88vh, 760px);
+  min-height: min(520px, 84vh);
+  border-radius: 28px 28px 22px 22px;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, .96);
+  box-shadow: 0 28px 90px rgba(15, 23, 42, .34);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.vtdd-product-panel-head {
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .22), transparent 36%),
+    #ffffff;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.vtdd-product-panel-head span {
+  display: inline-flex;
+  width: fit-content;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #ffd400;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.vtdd-product-panel-head h3 {
+  margin: 9px 0 0;
+  color: #0f172a;
+  font-size: 20px;
+  line-height: 1.08;
+  font-weight: 950;
+  letter-spacing: -.045em;
+}
+
+.vtdd-product-close {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 15px;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.vtdd-product-search-wrap {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.vtdd-product-search-wrap input {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 14px;
+  border-radius: 17px;
+  border: 1px solid #dbe3ee;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 900;
+  outline: none;
+}
+
+.vtdd-product-search-wrap input:focus {
+  border-color: #ffd400;
+  box-shadow: 0 0 0 4px rgba(255, 212, 0, .18);
+}
+
+.vtdd-product-count {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 850;
+}
+
+.vtdd-product-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 10px calc(14px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.vtdd-product-option {
+  width: 100%;
+  min-height: 54px;
+  margin-bottom: 8px;
+  padding: 12px 12px;
+  border-radius: 17px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 900;
+  letter-spacing: -.01em;
+}
+
+.vtdd-product-option.active {
+  border-color: #ffd400;
+  background: #fffbea;
+  box-shadow: inset 0 0 0 1px rgba(255, 212, 0, .50);
+}
+
+.vtdd-product-option small {
+  flex: 0 0 auto;
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.vtdd-product-option.active small {
+  background: #0f172a;
+  color: #ffd400;
+}
+
+.vtdd-product-empty {
+  padding: 28px 14px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 850;
+}
+
+@media (min-width: 720px) {
+  .vtdd-product-layer {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .vtdd-product-panel {
+    width: min(560px, 100%);
+    border-radius: 30px;
+  }
+}
 `;
 
 function settingEnabled(settings: SystemSettings, key: string) {
@@ -451,6 +679,118 @@ function isAppleBrand(value: any) {
 
 function unique(list: string[]) {
   return Array.from(new Set(list.filter(Boolean)));
+}
+
+
+
+type ProductPickerProps = {
+  label: string;
+  value: string;
+  placeholder: string;
+  options: string[];
+  disabled?: boolean;
+  onSelect: (value: string) => void;
+};
+
+function normalizeSearchText(value: any) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
+
+function ProductPicker({ label, value, placeholder, options, disabled = false, onSelect }: ProductPickerProps) {
+  const [open, setOpen] = useState(false);
+  const [keyword, setKeyword] = useState("");
+
+  const filteredOptions = useMemo(() => {
+    const q = normalizeSearchText(keyword);
+    if (!q) return options;
+
+    const words = q.split(/\s+/).filter(Boolean);
+
+    return options.filter((item) => {
+      const normalized = normalizeSearchText(item);
+      return words.every((word) => normalized.includes(word));
+    });
+  }, [options, keyword]);
+
+  function openPicker() {
+    if (disabled) return;
+    setKeyword("");
+    setOpen(true);
+  }
+
+  function chooseProduct(product: string) {
+    onSelect(product);
+    setOpen(false);
+    setKeyword("");
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="vtdd-product-trigger"
+        data-empty={value ? "false" : "true"}
+        disabled={disabled}
+        onClick={openPicker}
+      >
+        <span>{value || placeholder}</span>
+      </button>
+
+      {open && (
+        <section className="vtdd-product-layer" role="dialog" aria-modal="true">
+          <div className="vtdd-product-panel">
+            <div className="vtdd-product-panel-head">
+              <div>
+                <span>Danh sách sản phẩm</span>
+                <h3>{label}</h3>
+              </div>
+              <button type="button" className="vtdd-product-close" onClick={() => setOpen(false)} aria-label="Đóng">
+                ×
+              </button>
+            </div>
+
+            <div className="vtdd-product-search-wrap">
+              <input
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+                placeholder="Tìm nhanh theo tên máy, mã máy, bộ nhớ..."
+                inputMode="search"
+              />
+              <div className="vtdd-product-count">
+                Đang hiển thị {filteredOptions.length.toLocaleString("vi-VN")} / {options.length.toLocaleString("vi-VN")} sản phẩm. Có thể kéo lên/xuống để chọn.
+              </div>
+            </div>
+
+            <div className="vtdd-product-list">
+              {filteredOptions.length > 0 ? (
+                filteredOptions.map((item, index) => (
+                  <button
+                    key={`${item}-${index}`}
+                    type="button"
+                    className={item === value ? "vtdd-product-option active" : "vtdd-product-option"}
+                    onClick={() => chooseProduct(item)}
+                  >
+                    <span>{item}</span>
+                    <small>{item === value ? "Đã chọn" : "Chọn"}</small>
+                  </button>
+                ))
+              ) : (
+                <div className="vtdd-product-empty">
+                  Không tìm thấy sản phẩm phù hợp. Thử gõ ngắn hơn, ví dụ: iPhone 15, 17T, A56.
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+    </>
+  );
 }
 
 export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = false }: StaffTradeInAppProps) {
@@ -1496,19 +1836,20 @@ function renderSystemLock() {
               </select>
 
               <label>Tên sản phẩm mới</label>
-              <input
-                id="spMoi"
-                list="new-products"
+              <ProductPicker
+                label="Chọn sản phẩm mới"
                 value={spMoi}
+                options={newProducts}
                 disabled={!canChooseNewProduct}
-                onChange={(e) => {
-                setSpMoi(e.target.value);
-                setGiaBanMoiInput("");
-                setSpCu("");
-                setLoai("");
-                }}
                 placeholder={canChooseNewProduct ? "Gõ hoặc chọn máy mới" : "Chọn hãng trước"}
-                />
+                onSelect={(product) => {
+                  setSpMoi(product);
+                  setGiaBanMoiInput("");
+                  setSpCu("");
+                  setLoai("");
+                }}
+              />
+
                 <label>Giá bán máy mới</label>
                 <input
                 id="giaBanMoi"
@@ -1518,11 +1859,6 @@ function renderSystemLock() {
                 onChange={(e) => setGiaBanMoiInput(formatNumberInput(e.target.value))}
                 placeholder={spMoi ? "VD: 12.990.000" : "Chọn máy mới trước"}
                 />
-                <datalist id="new-products">
-                {newProducts.map((p, index) => (
-                    <option key={`new-${p}-${index}`} value={p} />
-                ))}
-                </datalist>
 
               {subsidyMeta.visible && (
                 <div className="subsidy-meta-grid">
@@ -1555,26 +1891,17 @@ function renderSystemLock() {
             </div>
 
           <label>Tên sản phẩm cũ</label>
-          <input
-            id="spCu"
-            list="old-products"
+          <ProductPicker
+            label="Chọn sản phẩm cũ"
             value={spCu}
+            options={oldProducts}
             disabled={!canChooseOldProduct}
-            onChange={(e) => {
-                setSpCu(e.target.value);
-                setLoai("");
+            placeholder={canChooseOldProduct ? "Gõ hoặc chọn máy cũ" : "Chọn máy mới trước"}
+            onSelect={(product) => {
+              setSpCu(product);
+              setLoai("");
             }}
-            placeholder={
-                canChooseOldProduct
-                ? "Gõ hoặc chọn máy cũ"
-                : "Chọn máy mới trước"
-            }
-            />
-            <datalist id="old-products">
-            {oldProducts.map((p, index) => (
-                <option key={`old-${p}-${index}`} value={p} />
-            ))}
-            </datalist>
+          />
 
           <label>Bộ nhớ</label>
           <input id="bonho" value={memory} readOnly placeholder="Tự động theo máy cũ" />
