@@ -810,11 +810,17 @@ function ProfilePasswordInput({
   const [visible, setVisible] = useState(false);
 
   return (
-    <div className="profile-v3-password-field">
+    <div className="profile-v3-password-field" data-visible={visible ? "1" : "0"}>
       <input
-        type={visible ? "text" : "password"}
+        type="text"
         value={value}
         autoComplete={autoComplete}
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        inputMode="text"
+        data-secure-password={visible ? "visible" : "hidden"}
+        style={{ WebkitTextSecurity: visible ? "none" : "disc" } as any}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
       />
