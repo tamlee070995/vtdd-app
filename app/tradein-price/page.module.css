@@ -1,251 +1,323 @@
-.page {
+.tradeEntryPage {
   min-height: 100dvh;
-  padding: clamp(12px, 2vw, 24px);
+  padding: clamp(10px, 1.8vw, 24px);
   background:
-    radial-gradient(circle at 12% 0%, rgba(255, 212, 0, .24), transparent 32%),
-    radial-gradient(circle at 96% 14%, rgba(59, 130, 246, .14), transparent 30%),
+    radial-gradient(circle at 12% 0%, rgba(255, 212, 0, .22), transparent 32%),
+    radial-gradient(circle at 92% 8%, rgba(37, 99, 235, .12), transparent 30%),
     #eef3f8;
   color: #07111f;
   font-family: Roboto, Arial, sans-serif;
 }
 
-.shell {
-  width: min(100%, 620px);
-  min-height: calc(100dvh - clamp(24px, 4vw, 48px));
+.tradeEntryShell {
+  width: min(100%, 980px);
+  min-height: calc(100dvh - clamp(20px, 3.6vw, 48px));
   margin: 0 auto;
   display: flex;
   flex-direction: column;
+  gap: clamp(12px, 1.5vw, 18px);
 }
 
-.brand {
-  height: 70px;
+.tradeEntryTopbar {
+  height: clamp(62px, 6.6vw, 78px);
+  padding: 0 clamp(12px, 1.8vw, 18px);
+  border-radius: clamp(20px, 2.2vw, 28px);
+  background: #07111f;
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 22px 70px rgba(15, 23, 42, .12);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
-.logoWrap {
-  width: 46px;
-  height: 46px;
-  border-radius: 15px;
+.tradeEntryBrand {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.tradeEntryLogoBox {
+  width: clamp(42px, 4.8vw, 54px);
+  height: clamp(42px, 4.8vw, 54px);
+  flex: 0 0 auto;
+  border-radius: 16px;
+  overflow: hidden;
   display: grid;
   place-items: center;
   background: #ffd400;
-  overflow: hidden;
-  box-shadow: 0 0 0 6px rgba(255, 212, 0, .14);
+  box-shadow: 0 0 0 6px rgba(255, 212, 0, .12);
 }
 
-.logoWrap img {
+.tradeEntryLogoBox img {
   width: 100%;
   height: 100%;
+  display: block;
   object-fit: contain;
 }
 
-.brand strong {
-  display: block;
-  color: #020617;
-  font-size: 18px;
+.tradeEntryBrandText {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.tradeEntryBrandText strong {
+  color: #ffffff;
+  font-size: clamp(16px, 2.2vw, 22px);
   line-height: 1;
   font-weight: 1000;
   letter-spacing: -.04em;
+  white-space: nowrap;
 }
 
-.brand span {
-  display: block;
-  margin-top: 4px;
-  color: #475569;
-  font-size: 12px;
+.tradeEntryBrandText small {
+  color: rgba(255, 255, 255, .66);
+  font-size: 11px;
   line-height: 1;
   font-weight: 850;
+  letter-spacing: .04em;
 }
 
-.hero {
-  min-height: clamp(260px, 42vh, 360px);
-  padding: clamp(22px, 4vw, 34px);
-  border-radius: clamp(26px, 5vw, 38px);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+.tradeEntryBackButton {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .16);
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tradeEntryHero {
+  position: relative;
+  overflow: hidden;
+  min-height: clamp(250px, 38vh, 360px);
+  padding: clamp(22px, 3vw, 34px);
+  border-radius: clamp(28px, 4vw, 42px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 330px);
+  gap: clamp(16px, 2vw, 24px);
+  align-items: end;
   background:
-    radial-gradient(circle at 88% 13%, rgba(255, 212, 0, .55), transparent 33%),
+    radial-gradient(circle at 88% 12%, rgba(255, 212, 0, .56), transparent 34%),
     linear-gradient(135deg, rgba(15, 23, 42, .98), rgba(2, 6, 23, .94));
   color: #ffffff;
-  overflow: hidden;
-  position: relative;
-  box-shadow: 0 26px 85px rgba(15, 23, 42, .18);
+  box-shadow: 0 26px 86px rgba(15, 23, 42, .17);
 }
 
-.hero::after {
-  content: "";
+.tradeEntryHeroGrid {
   position: absolute;
   inset: 0;
-  opacity: .35;
-  background-image: linear-gradient(to right, rgba(255,255,255,.12) 1px, transparent 1px);
+  opacity: .34;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, .14) 1px, transparent 1px);
   background-size: 22px 22px;
-  mask-image: linear-gradient(to bottom, transparent 0%, black 35%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 34%, transparent 100%);
+  pointer-events: none;
 }
 
-.badge {
+.tradeEntryHeroContent,
+.tradeEntryInfoBox {
   position: relative;
   z-index: 1;
+}
+
+.tradeEntryKicker {
   width: fit-content;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   padding: 10px 15px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, .12);
-  border: 1px solid rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .13);
+  border: 1px solid rgba(255, 255, 255, .16);
   color: #ffd400;
   font-size: 10px;
   font-weight: 1000;
-  letter-spacing: .12em;
+  letter-spacing: .14em;
 }
 
-.hero h1 {
-  position: relative;
-  z-index: 1;
+.tradeEntryHero h1 {
   margin: 0;
-  font-size: clamp(42px, 12vw, 72px);
-  line-height: .9;
+  color: #ffffff;
+  font-size: clamp(42px, 7.6vw, 82px);
+  line-height: .88;
   font-weight: 1000;
   letter-spacing: -.08em;
 }
 
-.hero h1 span {
+.tradeEntryHero h1 span {
   display: block;
   color: #ffd400;
 }
 
-.hero p {
-  position: relative;
-  z-index: 1;
-  width: min(100%, 500px);
+.tradeEntryHero p {
+  width: min(100%, 650px);
   margin: 18px 0 0;
-  color: rgba(255, 255, 255, .82);
-  font-size: 14px;
-  line-height: 1.5;
-  font-weight: 800;
+  color: rgba(255, 255, 255, .8);
+  font-size: clamp(13px, 1.5vw, 15px);
+  line-height: 1.55;
+  font-weight: 850;
 }
 
-.chooseGrid {
+.tradeEntryInfoBox {
+  padding: 18px;
+  border-radius: 22px;
   display: grid;
-  gap: 12px;
-  margin-top: 14px;
+  gap: 9px;
+  background: rgba(255, 255, 255, .1);
+  border: 1px solid rgba(255, 255, 255, .16);
+  backdrop-filter: blur(14px);
 }
 
-.chooseCard {
-  min-height: 112px;
-  padding: 17px;
-  border-radius: 24px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 14px;
-  align-items: center;
-  background: rgba(255, 255, 255, .92);
-  border: 1px solid rgba(203, 213, 225, .95);
-  color: #020617;
-  text-decoration: none;
-  box-shadow: 0 18px 50px rgba(15, 23, 42, .08);
-  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
-}
-
-.chooseCard:first-child {
-  border-color: rgba(255, 212, 0, .85);
-}
-
-.chooseCard:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 212, 0, .85);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, .12);
-}
-
-.cardNumber {
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  background: #020617;
+.tradeEntryInfoBox b {
   color: #ffd400;
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 1000;
 }
 
-.cardText span {
-  display: inline-flex;
-  margin-bottom: 7px;
+.tradeEntryInfoBox span {
+  color: rgba(255, 255, 255, .76);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.tradeEntryCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 1.2vw, 14px);
+}
+
+.tradeEntryCard {
+  min-height: 132px;
+  padding: 16px;
+  border-radius: 26px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 13px;
+  align-items: center;
+  background: rgba(255, 255, 255, .93);
+  border: 1px solid rgba(203, 213, 225, .95);
+  box-shadow: 0 18px 55px rgba(15, 23, 42, .08);
+  color: #020617;
+  text-decoration: none;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.tradeEntryCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 212, 0, .82);
+  box-shadow: 0 24px 76px rgba(15, 23, 42, .12);
+}
+
+.tone_internal {
+  border-color: rgba(255, 212, 0, .85);
+}
+
+.tone_print {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .22), transparent 45%),
+    rgba(255, 255, 255, .93);
+}
+
+.tradeEntryCardNumber {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: #07111f;
+  color: #ffd400;
+  font-size: 16px;
+  font-weight: 1000;
+}
+
+.tradeEntryCardBody {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tradeEntryCardBody em {
+  width: fit-content;
   padding: 6px 9px;
   border-radius: 999px;
   background: #fff7cc;
   color: #92400e;
   font-size: 9px;
+  line-height: 1;
+  font-style: normal;
   font-weight: 1000;
-  letter-spacing: .09em;
+  letter-spacing: .08em;
 }
 
-.chooseCard:nth-child(2) .cardText span {
+.tone_public .tradeEntryCardBody em {
   background: #dbeafe;
   color: #1d4ed8;
 }
 
-.cardText h2 {
-  margin: 0;
+.tone_print .tradeEntryCardBody em {
+  background: #dcfce7;
+  color: #047857;
+}
+
+.tradeEntryCardBody strong {
   color: #020617;
-  font-size: 18px;
-  line-height: 1.1;
+  font-size: clamp(15px, 1.45vw, 18px);
+  line-height: 1.12;
   font-weight: 1000;
   letter-spacing: -.04em;
 }
 
-.cardText p {
-  margin: 7px 0 0;
+.tradeEntryCardBody small {
   color: #475569;
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.38;
   font-weight: 800;
 }
 
-.arrow {
-  width: 42px;
-  height: 42px;
+.tradeEntryArrow {
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   background: #f1f5f9;
-  color: #020617;
-  font-size: 28px;
+  color: #07111f;
+  font-size: 26px;
   font-weight: 900;
 }
 
-.backHome {
+.tradeEntryFooter {
   width: fit-content;
-  margin: 18px auto 0;
-  color: #ef4444;
-  text-decoration: none;
-  font-size: 12px;
-  font-weight: 1000;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.status {
-  width: fit-content;
-  margin: auto auto 8px;
+  margin: auto auto 0;
   min-height: 34px;
   padding: 0 14px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   background: #ffffff;
+  border: 1px solid rgba(203, 213, 225, .95);
   color: #047857;
-  border: 1px solid rgba(203, 213, 225, .9);
   box-shadow: 0 14px 38px rgba(15, 23, 42, .08);
   font-size: 11px;
   font-weight: 1000;
   letter-spacing: .08em;
 }
 
-.status i {
+.tradeEntryOnlineDot {
   width: 10px;
   height: 10px;
   border-radius: 999px;
@@ -253,49 +325,78 @@
   box-shadow: 0 0 0 6px rgba(16, 185, 129, .12);
 }
 
-@media (min-width: 920px) {
-  .shell {
-    width: min(100%, 900px);
+@media (max-width: 920px) {
+  .tradeEntryHero {
+    grid-template-columns: 1fr;
   }
 
-  .chooseGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .tradeEntryInfoBox {
+    max-width: none;
   }
 
-  .chooseCard {
-    min-height: 126px;
+  .tradeEntryCards {
+    grid-template-columns: 1fr;
+  }
+
+  .tradeEntryCard {
+    min-height: 112px;
   }
 }
 
-@media (max-width: 430px) {
-  .page {
+@media (max-width: 560px) {
+  .tradeEntryPage {
     padding: 10px;
   }
 
-  .brand {
-    height: 64px;
+  .tradeEntryTopbar {
+    height: 62px;
+    border-radius: 22px;
   }
 
-  .hero {
-    min-height: 285px;
+  .tradeEntryBrandText strong {
+    font-size: 15px;
   }
 
-  .chooseCard {
-    min-height: 104px;
+  .tradeEntryBrandText small {
+    display: none;
+  }
+
+  .tradeEntryLogoBox {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+  }
+
+  .tradeEntryBackButton {
+    min-height: 38px;
+    padding: 0 12px;
+    font-size: 10px;
+  }
+
+  .tradeEntryHero {
+    min-height: 300px;
+    padding: 22px 18px;
+    border-radius: 28px;
+    align-items: end;
+  }
+
+  .tradeEntryHero h1 {
+    font-size: clamp(42px, 13vw, 58px);
+  }
+
+  .tradeEntryInfoBox {
+    display: none;
+  }
+
+  .tradeEntryCard {
+    min-height: 106px;
     padding: 14px;
-    grid-template-columns: auto 1fr auto;
+    border-radius: 22px;
   }
 
-  .cardNumber {
-    width: 52px;
-    height: 52px;
-  }
-
-  .cardText h2 {
-    font-size: 16px;
-  }
-
-  .cardText p {
-    font-size: 12px;
+  .tradeEntryCardNumber {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
   }
 }

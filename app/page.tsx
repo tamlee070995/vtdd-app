@@ -1,5 +1,11 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = {
+  title: "Trang chủ Ngành Hàng Viễn Thông Di Động",
+  description: "Trung Tâm Chính Sách & Nghiệp Vụ Sản Phẩm ngành hàng Viễn Thông Di Động.",
+};
 
 type ToolItem = {
   title: string;
@@ -9,7 +15,7 @@ type ToolItem = {
 };
 
 type ToolGroup = {
-  number: string;
+  id: string;
   title: string;
   desc: string;
   items: ToolItem[];
@@ -17,54 +23,66 @@ type ToolGroup = {
 
 const GROUPS: ToolGroup[] = [
   {
-    number: "01",
+    id: "01",
     title: "Hệ Thu Cũ Đổi Mới",
-    desc: "Công cụ, quy trình và bảng giá phục vụ vận hành Thu cũ đổi mới.",
+    desc: "Bảng giá và quy trình vận hành Thu cũ đổi mới.",
     items: [
       {
         title: "Bảng giá thu cũ đổi mới",
-        desc: "Tra cứu bảng giá, trợ giá và chọn luồng nhân viên / khách hàng.",
+        desc: "Mở trang chọn nhân viên hoặc khách hàng để tra cứu giá.",
         href: "/tradein-price",
       },
       {
         title: "Quy trình thu cũ đổi mới",
-        desc: "Tài liệu quy trình thao tác, kiểm tra và xử lý hồ sơ.",
+        desc: "Tài liệu quy trình thao tác và xử lý hồ sơ.",
         status: "Đang cập nhật",
       },
     ],
   },
   {
-    number: "02",
+    id: "02",
     title: "Hệ Máy Mới",
-    desc: "Chính sách liên quan sản phẩm mới, bán ra và bảo hành.",
+    desc: "Chính sách liên quan sản phẩm mới và bán ra.",
     items: [
       {
         title: "Chính sách bảo hành",
-        desc: "Thông tin chính sách bảo hành theo ngành hàng.",
+        desc: "Thông tin bảo hành theo ngành hàng.",
         status: "Đang cập nhật",
       },
     ],
   },
   {
-    number: "03",
+    id: "03",
     title: "Hệ Máy Cũ",
-    desc: "Quản lý nhóm máy đã sử dụng, máy thu mua và nghiệp vụ liên quan.",
+    desc: "Nghiệp vụ máy đã sử dụng và máy cũ thu mua.",
     items: [
       {
         title: "Máy ĐSD, Máy Cũ Thu Mua",
-        desc: "Thông tin nghiệp vụ dành cho máy đã sử dụng / máy cũ thu mua.",
+        desc: "Cẩm nang nghiệp vụ dành cho máy đã sử dụng.",
         status: "Đang cập nhật",
       },
     ],
   },
   {
-    number: "04",
+    id: "04",
     title: "Demo",
-    desc: "Công cụ hỗ trợ xử lý máy trưng bày, demo và chuyển đổi.",
+    desc: "Công cụ xử lý máy trưng bày và demo.",
     items: [
       {
         title: "Gỡ Demo",
-        desc: "Hướng dẫn và công cụ hỗ trợ xử lý gỡ demo.",
+        desc: "Hướng dẫn và công cụ hỗ trợ gỡ demo.",
+        status: "Đang cập nhật",
+      },
+    ],
+  },
+  {
+    id: "05",
+    title: "Công Cụ Hỗ Trợ",
+    desc: "Tiện ích hỗ trợ nghiệp vụ ngành hàng.",
+    items: [
+      {
+        title: "Công cụ hỗ trợ",
+        desc: "Tổng hợp các tiện ích nội bộ đang hoàn thiện.",
         status: "Đang cập nhật",
       },
     ],
@@ -79,9 +97,9 @@ export default function HomePage() {
   return (
     <main className={styles.page}>
       <header className={styles.topbar}>
-        <Link className={styles.brand} href="/" aria-label="Về trang chủ">
-          <span className={styles.logoShell}>
-            <img src="/mwg-logo.svg" alt="MWG" className={styles.logo} />
+        <Link href="/" className={styles.brand} aria-label="Trang chủ">
+          <span className={styles.logoBox}>
+            <img src="/mwg-logo.svg" alt="MWG" />
           </span>
 
           <span className={styles.brandText}>
@@ -90,48 +108,45 @@ export default function HomePage() {
           </span>
         </Link>
 
-        <nav className={styles.nav}>
-          <Link className={styles.adminButton} href="/admin">
-            Admin
-          </Link>
-        </nav>
+        <Link href="/admin" className={styles.adminButton}>
+          Admin
+        </Link>
       </header>
 
       <section className={styles.hero}>
-        <div className={styles.heroPattern} />
+        <div className={styles.heroGlow} />
+        <div className={styles.heroGrid} />
 
-        <div className={styles.heroContent}>
+        <div className={styles.heroInner}>
           <div className={styles.kicker}>NGÀNH HÀNG</div>
-
           <h1>Viễn Thông Di Động</h1>
-
           <p>Trung Tâm Chính Sách &amp; Nghiệp Vụ Sản Phẩm.</p>
         </div>
       </section>
 
-      <section className={styles.desktopModuleGrid} aria-label="Danh mục nghiệp vụ">
+      <section className={styles.moduleBoard} aria-label="Danh mục nghiệp vụ">
         {GROUPS.map((group) => (
-          <article className={styles.moduleCard} key={group.number}>
-            <div className={styles.moduleHead}>
-              <div className={styles.moduleNumber}>{group.number}</div>
+          <article className={styles.moduleRow} key={group.id}>
+            <div className={styles.moduleInfo}>
+              <span className={styles.moduleId}>{group.id}</span>
 
-              <div>
+              <div className={styles.moduleTitleBlock}>
                 <h2>{group.title}</h2>
                 <p>{group.desc}</p>
               </div>
             </div>
 
-            <div className={styles.toolList}>
+            <div className={styles.actions}>
               {group.items.map((item) => {
                 const content = (
                   <>
-                    <span className={styles.toolText}>
+                    <span className={styles.actionText}>
                       <strong>{item.title}</strong>
                       <small>{item.desc}</small>
                     </span>
 
                     {item.href ? (
-                      <span className={styles.openIcon}>›</span>
+                      <span className={styles.actionArrow}>›</span>
                     ) : (
                       <span className={styles.statusBadge}>{item.status}</span>
                     )}
@@ -139,59 +154,15 @@ export default function HomePage() {
                 );
 
                 return item.href ? (
-                  <Link
-                    key={item.title}
-                    href={item.href}
-                    className={cx(styles.toolCard, styles.activeTool)}
-                  >
+                  <Link key={item.title} href={item.href} className={cx(styles.actionCard, styles.actionActive)}>
                     {content}
                   </Link>
                 ) : (
-                  <div
-                    key={item.title}
-                    className={cx(styles.toolCard, styles.disabledTool)}
-                    aria-disabled="true"
-                  >
+                  <div key={item.title} className={cx(styles.actionCard, styles.actionDisabled)} aria-disabled="true">
                     {content}
                   </div>
                 );
               })}
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <section className={styles.mobileModuleList} aria-label="Danh mục nghiệp vụ mobile">
-        {GROUPS.map((group) => (
-          <article className={styles.mobileGroup} key={group.number}>
-            <div className={styles.mobileGroupHeader}>
-              <span>{group.number}</span>
-              <div>
-                <h2>{group.title}</h2>
-                <p>{group.desc}</p>
-              </div>
-            </div>
-
-            <div className={styles.mobileTools}>
-              {group.items.map((item) =>
-                item.href ? (
-                  <Link className={styles.mobileTool} href={item.href} key={item.title}>
-                    <span>
-                      <strong>{item.title}</strong>
-                      <small>{item.desc}</small>
-                    </span>
-                    <b>›</b>
-                  </Link>
-                ) : (
-                  <div className={styles.mobileToolDisabled} key={item.title}>
-                    <span>
-                      <strong>{item.title}</strong>
-                      <small>{item.desc}</small>
-                    </span>
-                    <em>{item.status}</em>
-                  </div>
-                )
-              )}
             </div>
           </article>
         ))}

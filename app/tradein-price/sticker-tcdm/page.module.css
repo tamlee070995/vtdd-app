@@ -1,0 +1,1196 @@
+.page {
+  min-height: 100dvh;
+  padding: clamp(10px, 1.5vw, 24px);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(255, 212, 0, .18), transparent 32%),
+    radial-gradient(circle at 90% 8%, rgba(59, 130, 246, .12), transparent 30%),
+    #eef3f8;
+  color: #07111f;
+  font-family: Roboto, Arial, sans-serif;
+}
+
+.header {
+  width: min(100%, 1280px);
+  height: 72px;
+  margin: 0 auto;
+  padding: 0 18px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #07111f;
+  color: #fff;
+  box-shadow: 0 22px 65px rgba(15, 23, 42, .14);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.logoBox {
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: #ffd400;
+}
+
+.logoBox img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.brand strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 1000;
+}
+
+.brand small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, .72);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.backButton,
+.printButton,
+.clearButton {
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.backButton {
+  background: rgba(255, 255, 255, .1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, .16);
+}
+
+.printButton {
+  background: #ffd400;
+  color: #07111f;
+}
+
+.clearButton {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.hero {
+  width: min(100%, 1280px);
+  min-height: 210px;
+  margin: 14px auto 0;
+  padding: clamp(22px, 3vw, 34px);
+  border-radius: 30px;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 22px;
+  align-items: end;
+  background:
+    radial-gradient(circle at 86% 15%, rgba(255, 212, 0, .5), transparent 34%),
+    linear-gradient(135deg, rgba(15, 23, 42, .98), rgba(2, 6, 23, .94));
+  color: #fff;
+  box-shadow: 0 26px 80px rgba(15, 23, 42, .16);
+}
+
+.kicker {
+  width: fit-content;
+  display: inline-flex;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .12);
+  color: #ffd400;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .14em;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(42px, 5.2vw, 76px);
+  line-height: .92;
+  font-weight: 1000;
+  letter-spacing: -.075em;
+}
+
+.hero p {
+  width: min(100%, 720px);
+  margin: 16px 0 0;
+  color: rgba(255, 255, 255, .78);
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 850;
+}
+
+.printGuide {
+  padding: 18px;
+  border-radius: 22px;
+  display: grid;
+  gap: 9px;
+  background: rgba(255, 255, 255, .1);
+  border: 1px solid rgba(255, 255, 255, .14);
+}
+
+.printGuide b {
+  color: #ffd400;
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.printGuide span {
+  color: rgba(255, 255, 255, .78);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.workspace {
+  width: min(100%, 1280px);
+  margin: 14px auto 0;
+  display: grid;
+  grid-template-columns: 430px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.controlPanel,
+.previewPanel {
+  border-radius: 28px;
+  background: rgba(255, 255, 255, .92);
+  border: 1px solid rgba(203, 213, 225, .95);
+  box-shadow: 0 22px 70px rgba(15, 23, 42, .08);
+}
+
+.controlPanel,
+.previewPanel {
+  padding: 22px;
+}
+
+.panelTitle,
+.previewHeader > div {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.panelTitle > span,
+.previewHeader span {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: #07111f;
+  color: #ffd400;
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.panelTitle h2,
+.previewHeader h2 {
+  margin: 0;
+  color: #07111f;
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 1000;
+  letter-spacing: -.04em;
+}
+
+.panelTitle p,
+.previewHeader p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.templateGrid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.templateButton {
+  min-height: 48px;
+  border: 1px solid #cbd5e1;
+  border-radius: 15px;
+  background: #f8fafc;
+  color: #07111f;
+  cursor: pointer;
+  text-align: left;
+  padding: 0 12px;
+}
+
+.templateButton span {
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 950;
+}
+
+.templateActive {
+  background: #07111f;
+  color: #ffd400;
+  border-color: #07111f;
+}
+
+.quickEdit {
+  margin-top: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.quickEdit label {
+  display: grid;
+  gap: 7px;
+}
+
+.quickEdit label > span {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.quickEdit input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  padding: 0 14px;
+  background: #f8fafc;
+  color: #07111f;
+  outline: none;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.quickEdit input:focus {
+  background: #fff;
+  border-color: #ffd400;
+  box-shadow: 0 0 0 4px rgba(255, 212, 0, .18);
+}
+
+.quickEdit small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.panelActions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.previewHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.livePreview {
+  min-height: 285px;
+  margin-top: 18px;
+  padding: 28px;
+  border-radius: 24px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(248, 250, 252, .92), rgba(255, 255, 255, .9));
+  border: 1px dashed #cbd5e1;
+}
+
+.printSheetWrap {
+  margin-top: 18px;
+  border-radius: 24px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  overflow: auto;
+}
+
+.printSheet {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 12mm;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 82mm;
+  gap: 7mm;
+  background: #fff;
+}
+
+.printSlot {
+  display: grid;
+  place-items: center;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* ======================= STICKER CORE ======================= */
+.sticker {
+  --ink: #07111f;
+  --red: #d71920;
+  --deep: #850005;
+  position: relative;
+  width: 330px;
+  height: 205px;
+  flex: 0 0 auto;
+  isolation: isolate;
+}
+
+.leftBlank {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 43%;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.stickerArtwork {
+  position: absolute;
+  inset: 0;
+}
+
+.topLayer,
+.mainLayer {
+  position: absolute;
+}
+
+.titleText,
+.amountText,
+.footerText {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 20px;
+  outline: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  cursor: text;
+  white-space: nowrap;
+  user-select: text;
+  -webkit-user-select: text;
+  paint-order: stroke fill;
+}
+
+.titleText:focus,
+.amountText:focus,
+.footerText:focus {
+  outline: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.titleText {
+  color: #07111f;
+  font-size: 41px;
+  line-height: .9;
+  font-weight: 1000;
+  letter-spacing: -.065em;
+  -webkit-text-stroke: 1.25px #07111f;
+  text-shadow:
+    1px 0 0 #07111f,
+    -1px 0 0 #07111f,
+    0 1px 0 #07111f,
+    0 -1px 0 #07111f;
+}
+
+.amountText {
+  color: #07111f;
+  font-size: 42px;
+  line-height: .9;
+  font-weight: 1000;
+  letter-spacing: -.035em;
+}
+
+.footerText {
+  color: #07111f;
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: -.02em;
+}
+
+/* 01 - bám sát sticker mẫu đỏ */
+.classicRed .topLayer {
+  left: 34px;
+  top: 8px;
+  width: 234px;
+  height: 90px;
+  border-radius: 26px 32px 10px 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 16px;
+  transform: rotate(-5deg);
+  background: #fff;
+  border: 2.5px solid #111827;
+  z-index: 3;
+  box-shadow: 0 7px 0 rgba(0, 0, 0, .08);
+}
+
+.classicRed .mainLayer {
+  right: 8px;
+  bottom: 11px;
+  width: 298px;
+  height: 116px;
+  border-radius: 25px 15px 25px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 24px 12px 30px;
+  transform: rotate(-1deg);
+  background: linear-gradient(180deg, #ff2d32 0%, #e30009 57%, #aa0008 100%);
+  border: 3px solid #770005;
+  color: #fff;
+  z-index: 5;
+  box-shadow:
+    inset 0 5px 0 rgba(255, 255, 255, .22),
+    inset 0 -7px 0 rgba(0, 0, 0, .13),
+    0 8px 0 rgba(0, 0, 0, .12);
+}
+
+.classicRed .mainLayer::after {
+  content: "";
+  position: absolute;
+  inset: 8px 10px auto 10px;
+  height: 28px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .25), transparent);
+  pointer-events: none;
+}
+
+.classicRed .titleText {
+  color: #d71920;
+  font-size: 45px;
+  -webkit-text-stroke: 1.25px #07111f;
+  text-shadow:
+    1px 0 0 #07111f,
+    -1px 0 0 #07111f,
+    0 1px 0 #07111f,
+    0 -1px 0 #07111f,
+    2px 3px 0 rgba(0, 0, 0, .08);
+  z-index: 8;
+}
+
+.classicRed .amountText {
+  color: #fff;
+  font-size: 43px;
+  text-shadow: 2px 3px 0 rgba(0, 0, 0, .22);
+}
+
+.classicRed .footerText {
+  color: #fff;
+  margin-right: 2px;
+  text-shadow: 1px 2px 0 rgba(0, 0, 0, .22);
+}
+
+/* Các mẫu còn lại: chữ đen, viền đen, dễ in trắng đen */
+.bolt .topLayer,
+.ticket .topLayer,
+.bubble .topLayer,
+.shield .topLayer,
+.tag .topLayer,
+.capsule .topLayer,
+.corner .topLayer,
+.flag .topLayer,
+.stamp .topLayer {
+  color: #07111f;
+  z-index: 9;
+}
+
+.bolt .mainLayer,
+.ticket .mainLayer,
+.bubble .mainLayer,
+.shield .mainLayer,
+.tag .mainLayer,
+.capsule .mainLayer,
+.corner .mainLayer,
+.flag .mainLayer,
+.stamp .mainLayer {
+  color: #07111f;
+  z-index: 4;
+  background: #fff;
+}
+
+.bolt .topLayer {
+  top: 17px;
+  right: 34px;
+  transform: rotate(-5deg);
+}
+.bolt .mainLayer {
+  right: 8px;
+  bottom: 16px;
+  width: 230px;
+  height: 124px;
+  clip-path: polygon(14% 0, 100% 0, 85% 40%, 100% 40%, 46% 100%, 58% 55%, 0 55%);
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  padding: 15px 24px;
+  filter: drop-shadow(0 0 1.8px #07111f) drop-shadow(0 4px 0 rgba(15, 23, 42, .22));
+}
+.bolt .amountText { font-size: 37px; }
+.bolt .footerText { font-size: 15px; }
+
+.ticket .topLayer {
+  top: 15px;
+  right: 18px;
+  width: 218px;
+  height: 61px;
+  border: 3px solid #07111f;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  transform: rotate(2deg);
+  background: #fff;
+}
+.ticket .mainLayer {
+  right: 13px;
+  bottom: 20px;
+  width: 245px;
+  height: 96px;
+  border: 3px solid #07111f;
+  border-radius: 26px;
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  padding: 12px 22px;
+}
+.ticket .mainLayer::before,
+.ticket .mainLayer::after {
+  content: "";
+  position: absolute;
+  top: 34px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #eef3f8;
+  border: 3px solid #07111f;
+}
+.ticket .mainLayer::before { left: -12px; }
+.ticket .mainLayer::after { right: -12px; }
+.ticket .amountText { font-size: 36px; }
+
+.bubble .topLayer {
+  top: 8px;
+  right: 34px;
+  padding: 10px 18px;
+  border: 3px solid #07111f;
+  border-radius: 999px;
+  background: #fff;
+  transform: rotate(-7deg);
+}
+.bubble .mainLayer {
+  right: 16px;
+  bottom: 16px;
+  width: 224px;
+  height: 124px;
+  border: 3px solid #07111f;
+  border-radius: 55% 45% 50% 40%;
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  padding: 12px 24px;
+}
+.bubble .mainLayer::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  bottom: -18px;
+  width: 34px;
+  height: 28px;
+  border: 3px solid #07111f;
+  border-top: 0;
+  border-left: 0;
+  transform: rotate(26deg);
+  background: #fff;
+}
+.bubble .amountText { font-size: 36px; }
+
+.shield .topLayer {
+  top: 17px;
+  right: 45px;
+  width: 205px;
+  display: flex;
+  justify-content: center;
+}
+.shield .mainLayer {
+  right: 16px;
+  bottom: 10px;
+  width: 224px;
+  height: 146px;
+  clip-path: polygon(50% 0, 100% 20%, 88% 76%, 50% 100%, 12% 76%, 0 20%);
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  padding: 22px 18px 14px;
+  filter: drop-shadow(0 0 1.8px #07111f) drop-shadow(0 4px 0 rgba(15, 23, 42, .22));
+}
+.shield .amountText { font-size: 34px; }
+
+.tag .topLayer {
+  top: 24px;
+  right: 28px;
+  transform: rotate(-2deg);
+}
+.tag .mainLayer {
+  right: 12px;
+  bottom: 18px;
+  width: 248px;
+  height: 107px;
+  border: 3px solid #07111f;
+  border-radius: 14px 36px 36px 14px;
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  padding: 12px 20px;
+}
+.tag .mainLayer::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 43px;
+  width: 16px;
+  height: 16px;
+  border: 3px solid #07111f;
+  border-radius: 50%;
+  background: #eef3f8;
+}
+.tag .amountText { font-size: 36px; }
+
+.capsule .topLayer {
+  top: 16px;
+  right: 48px;
+  transform: rotate(-3deg);
+}
+.capsule .mainLayer {
+  right: 9px;
+  bottom: 23px;
+  width: 265px;
+  height: 98px;
+  border: 3px solid #07111f;
+  border-radius: 999px;
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  padding: 12px 28px;
+}
+.capsule .amountText { font-size: 38px; }
+
+.corner .topLayer {
+  top: 15px;
+  right: 32px;
+}
+.corner .mainLayer {
+  right: 10px;
+  bottom: 14px;
+  width: 244px;
+  height: 128px;
+  border: 3px solid #07111f;
+  border-radius: 16px;
+  border-top-left-radius: 72px;
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  padding: 12px 20px;
+  transform: skew(-5deg);
+}
+.corner .mainLayer > * { transform: skew(5deg); }
+.corner .amountText { font-size: 35px; }
+
+.flag .topLayer {
+  top: 18px;
+  right: 42px;
+  transform: rotate(-5deg);
+}
+.flag .mainLayer {
+  right: 13px;
+  bottom: 20px;
+  width: 250px;
+  height: 104px;
+  clip-path: polygon(0 0, 100% 0, 90% 50%, 100% 100%, 0 100%);
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  padding: 12px 28px 12px 18px;
+  filter: drop-shadow(0 0 1.8px #07111f) drop-shadow(0 4px 0 rgba(15, 23, 42, .2));
+}
+.flag .amountText { font-size: 36px; }
+
+.stamp .topLayer {
+  top: 13px;
+  right: 30px;
+}
+.stamp .mainLayer {
+  right: 16px;
+  bottom: 15px;
+  width: 237px;
+  height: 123px;
+  border: 3px dashed #07111f;
+  border-radius: 22px;
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  padding: 12px 20px;
+  transform: rotate(2deg);
+}
+.stamp .amountText { font-size: 36px; }
+
+@media (max-width: 980px) {
+  .hero,
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace {
+    width: min(100%, 760px);
+  }
+}
+
+@media (max-width: 560px) {
+  .page {
+    padding: 10px;
+  }
+
+  .header {
+    height: auto;
+    min-height: 64px;
+    border-radius: 22px;
+  }
+
+  .brand small {
+    display: none;
+  }
+
+  .hero {
+    min-height: 240px;
+    border-radius: 26px;
+  }
+
+  .hero h1 {
+    font-size: 42px;
+  }
+
+  .templateGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .panelActions {
+    flex-direction: column;
+  }
+
+  .clearButton,
+  .printButton {
+    width: 100%;
+  }
+
+  .livePreview {
+    padding: 16px;
+    overflow-x: auto;
+    justify-content: start;
+  }
+
+  .sticker {
+    transform: scale(.86);
+    transform-origin: left center;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 7mm;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  .page {
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .header,
+  .hero,
+  .controlPanel,
+  .previewHeader,
+  .livePreview {
+    display: none !important;
+  }
+
+  .workspace {
+    width: 100% !important;
+    display: block !important;
+    margin: 0 !important;
+  }
+
+  .previewPanel {
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  .printSheetWrap {
+    margin: 0 !important;
+    border: 0 !important;
+    overflow: visible !important;
+  }
+
+  .printSheet {
+    width: 196mm !important;
+    min-height: auto !important;
+    padding: 0 !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    grid-auto-rows: 86mm !important;
+    gap: 4mm !important;
+    background: #fff !important;
+  }
+
+  .printSlot {
+    display: grid !important;
+    place-items: center !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .sticker {
+    transform: scale(.92) !important;
+    transform-origin: center center !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .titleText,
+  .amountText,
+  .footerText {
+    caret-color: transparent !important;
+  }
+}
+
+/* ======================= V4 FIX: VIỀN ĐEN + THIẾT KẾ LẠI MẪU 2/5/9 ======================= */
+/* Tất cả dòng TRỢ GIÁ giữ nét viền đen rõ khi in */
+.titleText {
+  -webkit-text-stroke: 1.8px #07111f;
+  paint-order: stroke fill;
+  text-shadow:
+    1.2px 0 0 #07111f,
+    -1.2px 0 0 #07111f,
+    0 1.2px 0 #07111f,
+    0 -1.2px 0 #07111f;
+}
+
+/* Riêng các mẫu chữ đen: dùng nền trắng + khung đen bao chữ, tránh chữ bị chìm */
+.bolt .titleText,
+.shield .titleText,
+.tag .titleText,
+.capsule .titleText,
+.corner .titleText,
+.flag .titleText,
+.stamp .titleText {
+  color: #07111f;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  letter-spacing: -.06em;
+}
+
+/* 02 - Tia sét: thiết kế lại, chữ đen + khung viền đen */
+.bolt .topLayer {
+  top: 10px;
+  right: 30px;
+  width: 190px;
+  min-height: 56px;
+  padding: 7px 15px 5px;
+  border: 3px solid #07111f;
+  border-radius: 18px 18px 10px 18px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  transform: rotate(-6deg);
+  z-index: 30;
+  box-shadow: 4px 5px 0 rgba(7, 17, 31, .18);
+}
+
+.bolt .mainLayer {
+  right: 2px;
+  bottom: 4px;
+  width: 285px;
+  height: 148px;
+  clip-path: polygon(18% 0, 100% 0, 79% 38%, 98% 38%, 43% 100%, 54% 58%, 0 58%);
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  gap: 8px;
+  padding: 26px 30px 18px 55px;
+  background: #fff;
+  filter:
+    drop-shadow(2px 0 0 #07111f)
+    drop-shadow(-2px 0 0 #07111f)
+    drop-shadow(0 2px 0 #07111f)
+    drop-shadow(0 -2px 0 #07111f)
+    drop-shadow(0 8px 0 rgba(7, 17, 31, .15));
+}
+
+.bolt .amountText {
+  font-size: 39px;
+  color: #07111f;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+
+.bolt .footerText {
+  color: #07111f;
+  font-size: 16px;
+}
+
+/* 05 - Khiên giá: thiết kế mới dạng khiên + tab tiêu đề có viền đen */
+.shield .topLayer {
+  top: 9px;
+  right: 45px;
+  width: 188px;
+  min-height: 52px;
+  padding: 7px 13px 5px;
+  border: 3px solid #07111f;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  transform: rotate(-3deg);
+  z-index: 30;
+  box-shadow: 4px 5px 0 rgba(7, 17, 31, .16);
+}
+
+.shield .mainLayer {
+  right: 8px;
+  bottom: 5px;
+  width: 265px;
+  height: 148px;
+  clip-path: polygon(50% 0, 96% 18%, 88% 72%, 50% 100%, 12% 72%, 4% 18%);
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 9px;
+  padding: 26px 22px 18px;
+  background: #fff;
+  filter:
+    drop-shadow(2px 0 0 #07111f)
+    drop-shadow(-2px 0 0 #07111f)
+    drop-shadow(0 2px 0 #07111f)
+    drop-shadow(0 -2px 0 #07111f)
+    drop-shadow(0 8px 0 rgba(7, 17, 31, .16));
+}
+
+.shield .mainLayer::before {
+  content: "";
+  position: absolute;
+  inset: 24px 28px 22px;
+  border: 2px solid rgba(7, 17, 31, .35);
+  clip-path: polygon(50% 0, 96% 18%, 88% 72%, 50% 100%, 12% 72%, 4% 18%);
+  pointer-events: none;
+}
+
+.shield .amountText {
+  color: #07111f;
+  font-size: 38px;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+
+.shield .footerText {
+  color: #07111f;
+  font-size: 15px;
+}
+
+/* 06 - Tag dán máy: thêm viền đen quanh chữ TRỢ GIÁ */
+.tag .topLayer {
+  top: 13px;
+  right: 42px;
+  width: 185px;
+  min-height: 50px;
+  padding: 7px 13px 5px;
+  border: 3px solid #07111f;
+  border-radius: 12px 22px 22px 12px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  transform: rotate(-3deg);
+  z-index: 30;
+  box-shadow: 4px 5px 0 rgba(7, 17, 31, .15);
+}
+
+.tag .mainLayer {
+  right: 10px;
+  bottom: 13px;
+  width: 256px;
+  height: 116px;
+  border: 3px solid #07111f;
+  border-radius: 14px 40px 40px 14px;
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  gap: 7px;
+  padding: 14px 22px;
+  background: #fff;
+  box-shadow: 0 7px 0 rgba(7, 17, 31, .13);
+}
+
+/* 07 - Capsule: thêm viền đen quanh chữ TRỢ GIÁ */
+.capsule .topLayer {
+  top: 10px;
+  right: 52px;
+  width: 180px;
+  min-height: 50px;
+  padding: 7px 16px 5px;
+  border: 3px solid #07111f;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  transform: rotate(-3deg);
+  z-index: 30;
+  box-shadow: 4px 5px 0 rgba(7, 17, 31, .15);
+}
+
+.capsule .mainLayer {
+  right: 6px;
+  bottom: 18px;
+  width: 274px;
+  height: 106px;
+  border: 3px solid #07111f;
+  border-radius: 999px;
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  gap: 7px;
+  padding: 12px 30px;
+  background: #fff;
+  box-shadow: 0 7px 0 rgba(7, 17, 31, .13);
+}
+
+/* 08 - Góc dán máy: thêm viền đen quanh chữ TRỢ GIÁ */
+.corner .topLayer {
+  top: 12px;
+  right: 40px;
+  width: 184px;
+  min-height: 50px;
+  padding: 7px 14px 5px;
+  border: 3px solid #07111f;
+  border-radius: 13px 28px 13px 28px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  transform: rotate(-4deg);
+  z-index: 30;
+  box-shadow: 4px 5px 0 rgba(7, 17, 31, .15);
+}
+
+.corner .mainLayer {
+  right: 8px;
+  bottom: 9px;
+  width: 258px;
+  height: 134px;
+  border: 3px solid #07111f;
+  border-radius: 18px;
+  border-top-left-radius: 78px;
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  gap: 7px;
+  padding: 14px 22px;
+  transform: skew(-4deg);
+  background: #fff;
+  box-shadow: 0 7px 0 rgba(7, 17, 31, .13);
+}
+
+/* 09 - Cờ nổi: thiết kế mới dạng bảng xiên + cờ gập, chữ đen viền đen */
+.flag .topLayer {
+  top: 8px;
+  right: 38px;
+  width: 188px;
+  min-height: 52px;
+  padding: 7px 14px 5px;
+  border: 3px solid #07111f;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  transform: rotate(-7deg);
+  z-index: 30;
+  box-shadow: 4px 5px 0 rgba(7, 17, 31, .16);
+}
+
+.flag .mainLayer {
+  right: 8px;
+  bottom: 14px;
+  width: 266px;
+  height: 118px;
+  clip-path: polygon(0 0, 92% 0, 100% 50%, 92% 100%, 0 100%, 8% 50%);
+  display: grid;
+  justify-items: end;
+  align-content: center;
+  gap: 8px;
+  padding: 14px 34px 14px 34px;
+  background: #fff;
+  transform: rotate(2deg);
+  filter:
+    drop-shadow(2px 0 0 #07111f)
+    drop-shadow(-2px 0 0 #07111f)
+    drop-shadow(0 2px 0 #07111f)
+    drop-shadow(0 -2px 0 #07111f)
+    drop-shadow(0 8px 0 rgba(7, 17, 31, .16));
+}
+
+.flag .mainLayer::before {
+  content: "";
+  position: absolute;
+  left: 22px;
+  top: 18px;
+  bottom: 18px;
+  width: 2px;
+  background: #07111f;
+  opacity: .8;
+  pointer-events: none;
+}
+
+.flag .amountText {
+  color: #07111f;
+  font-size: 38px;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+
+.flag .footerText {
+  color: #07111f;
+  font-size: 15px;
+}

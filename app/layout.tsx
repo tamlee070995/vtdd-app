@@ -1,40 +1,30 @@
-import type { Metadata, Viewport } from "next";
-import "./globals.css";
-import "sweetalert2/dist/sweetalert2.min.css";
+import type { Metadata } from "next";
+import { Roboto } from "next/font/google";
 import OnlineHeartbeat from "@/components/OnlineHeartbeat";
+import "./globals.css";
+
+const roboto = Roboto({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "700", "900"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vtdd.online"),
   title: {
-    default: "Viễn Thông Di Động | Tra Cứu Thu Cũ",
+    default: "Ngành Hàng Viễn Thông Di Động",
     template: "%s | Viễn Thông Di Động",
   },
-  description: "Cổng tra cứu thu cũ đổi mới dành cho nhân viên MWG và khách hàng.",
-  applicationName: "Viễn Thông Di Động",
+  description: "Trung Tâm Chính Sách & Nghiệp Vụ Sản Phẩm.",
   icons: {
-    icon: [
-      { url: "/favicon.ico" },
-      { url: "/icon.png", type: "image/png", sizes: "512x512" },
-    ],
-    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    icon: "/favicon.ico",
+    apple: "/apple-icon.png",
   },
 };
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
-  themeColor: "#ffd400",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
-      <body>{/* OnlineHeartbeat theo dõi số user online ở mọi trang */}
+      <body className={roboto.className}>
         <OnlineHeartbeat />
         {children}
       </body>

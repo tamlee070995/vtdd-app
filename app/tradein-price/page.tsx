@@ -1,71 +1,123 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 
+export const metadata: Metadata = {
+  title: "Bảng Giá Thu Cũ Đổi Mới | Viễn Thông Di Động",
+  description: "Chọn luồng tra cứu bảng giá thu cũ đổi mới dành cho nhân viên, khách hàng hoặc in sticker trợ giá.",
+};
+
+type EntryItem = {
+  index: string;
+  badge: string;
+  title: string;
+  desc: string;
+  href: string;
+  tone: "internal" | "public" | "print";
+};
+
+const ENTRY_ITEMS: EntryItem[] = [
+  {
+    index: "01",
+    badge: "INTERNAL",
+    title: "Nhân viên TGDD / ĐMX",
+    desc: "Đăng nhập nội bộ để tra bảng giá, trợ giá và xuất báo giá nhanh.",
+    href: "/login",
+    tone: "internal",
+  },
+  {
+    index: "02",
+    badge: "PUBLIC",
+    title: "Khách hàng cá nhân",
+    desc: "Trang tra cứu công khai, đơn giản và dễ hiểu cho khách hàng.",
+    href: "/khach-hang",
+    tone: "public",
+  },
+  {
+    index: "03",
+    badge: "PRINT",
+    title: "In sticker trợ giá",
+    desc: "Tạo sticker trợ giá thu cũ đổi mới và in tối đa 6 tem trên A4.",
+    href: "/tradein-price/sticker-tcdm",
+    tone: "print",
+  },
+];
+
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+
 export default function TradeInPriceEntryPage() {
   return (
-    <main className={styles.page}>
-      <section className={styles.shell}>
-        <header className={styles.brand}>
-          <Link href="/" className={styles.logoWrap} aria-label="Về trang chủ">
-            <img src="/mwg-logo.svg" alt="MWG" />
+    <main className={styles.tradeEntryPage}>
+      <section className={styles.tradeEntryShell}>
+        <header className={styles.tradeEntryTopbar}>
+          <Link href="/" className={styles.tradeEntryBrand} aria-label="Về trang chủ ngành hàng">
+            <span className={styles.tradeEntryLogoBox}>
+              <img src="/mwg-logo.svg" alt="MWG" />
+            </span>
+
+            <span className={styles.tradeEntryBrandText}>
+              <strong>Viễn Thông Di Động</strong>
+              <small>Bảng giá thu cũ đổi mới</small>
+            </span>
           </Link>
 
-          <div>
-            <strong>Viễn Thông Di Động</strong>
-            <span>Trade-in Value Portal</span>
-          </div>
+          <Link href="/" className={styles.tradeEntryBackButton}>
+            Về trang chủ
+          </Link>
         </header>
 
-        <section className={styles.hero}>
-          <div className={styles.badge}>BẢNG GIÁ THU CŨ ĐỔI MỚI</div>
+        <section className={styles.tradeEntryHero}>
+          <div className={styles.tradeEntryHeroGrid} />
 
-          <h1>
-            TRA CỨU GIÁ
-            <span>THU CŨ ĐỔI MỚI</span>
-          </h1>
+          <div className={styles.tradeEntryHeroContent}>
+            <div className={styles.tradeEntryKicker}>TRA CỨU GIÁ THU CŨ</div>
 
-          <p>
-            Chọn đúng luồng sử dụng để mở trang tra cứu phù hợp cho nhân viên nội bộ
-            hoặc khách hàng cá nhân.
-          </p>
+            <h1>
+              Chọn luồng
+              <span>Thu Cũ Đổi Mới</span>
+            </h1>
+
+            <p>
+              Mở đúng trang sử dụng cho nhân viên nội bộ, khách hàng cá nhân hoặc công cụ in sticker trợ giá.
+            </p>
+          </div>
+
+          <aside className={styles.tradeEntryInfoBox}>
+            <b>Hướng dẫn nhanh</b>
+            <span>Nhân viên: cần đăng nhập nội bộ.</span>
+            <span>Khách hàng: tra cứu công khai.</span>
+            <span>Sticker: chỉnh chữ trực tiếp và in A4.</span>
+          </aside>
         </section>
 
-        <section className={styles.chooseGrid}>
-          <Link href="/login" className={styles.chooseCard}>
-            <div className={styles.cardNumber}>01</div>
+        <section className={styles.tradeEntryCards} aria-label="Chọn luồng bảng giá thu cũ đổi mới">
+          {ENTRY_ITEMS.map((item) => (
+            <Link
+              href={item.href}
+              key={item.index}
+              className={cx(styles.tradeEntryCard, styles[`tone_${item.tone}`])}
+            >
+              <span className={styles.tradeEntryCardNumber}>{item.index}</span>
 
-            <div className={styles.cardText}>
-              <span>INTERNAL</span>
-              <h2>Nhân viên TGDD / ĐMX</h2>
-              <p>Đăng nhập nội bộ để tra bảng giá, trợ giá và xuất báo giá.</p>
-            </div>
+              <span className={styles.tradeEntryCardBody}>
+                <em>{item.badge}</em>
+                <strong>{item.title}</strong>
+                <small>{item.desc}</small>
+              </span>
 
-            <div className={styles.arrow}>›</div>
-          </Link>
-
-          <Link href="/khach-hang" className={styles.chooseCard}>
-            <div className={styles.cardNumber}>02</div>
-
-            <div className={styles.cardText}>
-              <span>PUBLIC</span>
-              <h2>Khách hàng cá nhân</h2>
-              <p>Trang tra cứu công khai, đơn giản và dễ hiểu cho khách hàng.</p>
-            </div>
-
-            <div className={styles.arrow}>›</div>
-          </Link>
+              <span className={styles.tradeEntryArrow}>›</span>
+            </Link>
+          ))}
         </section>
 
-        <Link href="/" className={styles.backHome}>
-          ← Quay về trang chủ ngành hàng
-        </Link>
-
-        <div className={styles.status}>
-          <i />
+        <footer className={styles.tradeEntryFooter}>
+          <span className={styles.tradeEntryOnlineDot} />
           SYSTEM ONLINE
-        </div>
+        </footer>
       </section>
     </main>
   );

@@ -123,7 +123,9 @@ export default function ForgotPasswordPage() {
     <main className="login-page-v2 forgot-page-v2">
       <section className="login-card-v2">
         <div className="login-brand-v2">
-          <div className="brand-mark">VT</div>
+          <div className="brand-mark">
+            <img src="/mwg-logo.svg" alt="MWG" />
+          </div>
           <div>
             <div className="brand-title">Viễn Thông Di Động</div>
             <div className="brand-subtitle">Password Recovery</div>

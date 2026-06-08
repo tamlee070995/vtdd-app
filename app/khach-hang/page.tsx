@@ -1007,7 +1007,25 @@ export default function CustomerPage() {
       <section className="customer-personal-shell">
         <header className="customer-personal-hero">
           <div className="customer-personal-brand">
-            <div>VT</div>
+            <div
+              aria-label="MWG"
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 14,
+                background: "#ffd400",
+                overflow: "hidden",
+                display: "grid",
+                placeItems: "center",
+                flex: "0 0 auto",
+              }}
+            >
+              <img
+                src="/mwg-logo.svg"
+                alt="MWG"
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
+            </div>
             <span>Viễn Thông Di Động</span>
           </div>
 

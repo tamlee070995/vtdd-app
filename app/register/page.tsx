@@ -153,7 +153,9 @@ export default function RegisterPage() {
     >
       <section className="login-card-v2 register-page-content">
         <div className="login-brand-v2">
-          <div className="brand-mark">VT</div>
+          <div className="brand-mark">
+            <img src="/mwg-logo.svg" alt="MWG" />
+          </div>
           <div>
             <div className="brand-title">Viễn Thông Di Động</div>
             <div className="brand-subtitle">Create Staff Account</div>
