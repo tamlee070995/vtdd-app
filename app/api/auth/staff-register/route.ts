@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createStandbyAccount, findStaffByMaNV, getStaffRows } from "@/lib/staff-store";
+import {
+  createStandbyAccount,
+  findStaffByMaNV,
+  getStaffRows,
+} from "@/lib/staff-store";
 import {
   decryptText,
   encryptText,
@@ -12,9 +16,14 @@ import { sendNewStaffAccountMail } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
 
-function redirectRegister(req: NextRequest, type: "error" | "success", message: string) {
+function redirectRegister(
+  req: NextRequest,
+  type: "error" | "success",
+  message: string
+) {
   const url = new URL("/register", req.url);
   url.searchParams.set(type, message);
+
   return NextResponse.redirect(url, { status: 303 });
 }
 
@@ -72,9 +81,12 @@ function titleCaseVietnameseName(value: string) {
 
   if (!clean) return "";
 
-  return clean.replace(/(^|[\s'-])(\p{L})/gu, (_match, prefix: string, char: string) => {
-    return prefix + char.toLocaleUpperCase("vi-VN");
-  });
+  return clean.replace(
+    /(^|[\s'-])(\p{L})/gu,
+    (_match, prefix: string, char: string) => {
+      return prefix + char.toLocaleUpperCase("vi-VN");
+    }
+  );
 }
 
 function normalizeGmailForCompare(value: string) {
@@ -102,11 +114,6 @@ async function isGmailAlreadyUsed(gmail: string) {
     const staffGmail = normalizeGmailForCompare(safeDecryptGmail(staff.gmail));
     return staffGmail === targetGmail;
   });
-}
-
-function buildAdminUrl(req: NextRequest) {
-  const url = new URL("/admin", req.url);
-  return url.toString();
 }
 
 export async function POST(req: NextRequest) {
@@ -140,7 +147,15 @@ export async function POST(req: NextRequest) {
 
     const question = questionType === "custom" ? customQuestion : questionType;
 
-    if (!maNV || !staffName || !password || !confirmPassword || !question || !answer || !gmail) {
+    if (
+      !maNV ||
+      !staffName ||
+      !password ||
+      !confirmPassword ||
+      !question ||
+      !answer ||
+      !gmail
+    ) {
       return redirectRegister(
         req,
         "error",
@@ -167,7 +182,11 @@ export async function POST(req: NextRequest) {
     const existedStaff = await findStaffByMaNV(maNV);
 
     if (existedStaff) {
-      return redirectRegister(req, "error", "Mã nhân viên này đã tồn tại trên hệ thống.");
+      return redirectRegister(
+        req,
+        "error",
+        "Mã nhân viên này đã tồn tại trên hệ thống."
+      );
     }
 
     const gmailUsed = await isGmailAlreadyUsed(gmail);
@@ -191,14 +210,13 @@ export async function POST(req: NextRequest) {
 
     try {
       await sendNewStaffAccountMail({
-        to: process.env.ADMIN_NOTIFY_EMAIL || "tamlee070995@gmail.com",
-        maNV,
         staffName,
+        maNV,
         gmail,
-        adminUrl: buildAdminUrl(req),
+        adminUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://vtdd.online"}/admin`,
       });
     } catch (mailErr) {
-      console.error("SEND_NEW_STAFF_MAIL_FAILED:", mailErr);
+      console.warn("SEND_NEW_STAFF_MAIL_ERROR:", mailErr);
     }
 
     return redirectRegister(

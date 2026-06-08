@@ -4,13 +4,13 @@ import "sweetalert2/dist/sweetalert2.min.css";
 import OnlineHeartbeat from "@/components/OnlineHeartbeat";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vienthongdidong.com"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vtdd.online"),
   title: {
-    default: "Viễn Thông Di Động",
-    template: "%s | VTDD",
+    default: "Viễn Thông Di Động | Tra Cứu Thu Cũ",
+    template: "%s | Viễn Thông Di Động",
   },
   description: "Cổng tra cứu thu cũ đổi mới dành cho nhân viên MWG và khách hàng.",
-  applicationName: "VTDD",
+  applicationName: "Viễn Thông Di Động",
   icons: {
     icon: [
       { url: "/favicon.ico" },
@@ -23,8 +23,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  viewportFit: "cover",
   themeColor: "#ffd400",
 };
 
@@ -35,7 +34,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body>
+      <body>{/* OnlineHeartbeat theo dõi số user online ở mọi trang */}
         <OnlineHeartbeat />
         {children}
       </body>
