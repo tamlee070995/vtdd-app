@@ -599,7 +599,10 @@ function getEffectiveRange(notify: NotifySettings) {
 function formatSystemMessageLines(message: string) {
   const raw = String(message || "")
     .replace(/\r/g, "")
-    .replace(/\s+(?=\d+\s*\/)/g, "\n")
+    // Giữ đúng thứ tự trên xuống dưới theo nội dung Admin nhập.
+    // Nếu Admin nhập liền một dòng, hệ thống tự tách trước các mục kiểu A/, B/, 1/, 2/, bullet.
+    .replace(/\s+(?=[A-Za-zÀ-ỹ]\s*\/\s*)/g, "\n")
+    .replace(/\s+(?=\d+\s*\/\s*)/g, "\n")
     .replace(/\s+(?=[•▪▫●◆◇*-]\s*)/g, "\n")
     .trim();
 
@@ -1546,145 +1549,237 @@ async function submitProfileUpdate() {
 function renderProfilePanel(modeView: "modal" | "setup") {
   const isSetup = modeView === "setup" || mustSetup;
 
+  const finalQuestionPreview =
+    profileQuestion === "custom"
+      ? profileCustomQuestion || "Câu hỏi bảo mật riêng"
+      : profileQuestion || "Chưa chọn câu hỏi";
+
+  const passwordModeText = isSetup
+    ? "Bắt buộc đổi mật khẩu lần đầu"
+    : profileChangePassword
+      ? "Đang bật đổi mật khẩu"
+      : "Đang giữ mật khẩu cũ";
+
   return (
     <section
-      className={isSetup ? "profile-v3-layer profile-v3-setup-layer" : "profile-v3-layer"}
+      className={isSetup ? "profile-v5-layer profile-v5-setup" : "profile-v5-layer"}
       role="dialog"
       aria-modal="true"
     >
-      <div className={isSetup ? "profile-v3-card profile-v3-setup-card" : "profile-v3-card"}>
-        <div className="profile-v3-head">
-          <div>
-            <span>{isSetup ? "BẮT BUỘC CẬP NHẬT" : "BẢO MẬT TÀI KHOẢN"}</span>
+      <div className="profile-v5-shell">
+        <aside className="profile-v5-hero" aria-label="Tổng quan tài khoản">
+          <div className="profile-v5-hero-top">
+            <span>Bảo mật tài khoản</span>
+            {!isSetup && (
+              <button
+                type="button"
+                className="profile-v5-close"
+                onClick={closeProfilePanel}
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            )}
+          </div>
 
-            <h2>{isSetup ? "Thiết lập bảo mật" : "Cập nhật thông tin"}</h2>
-
+          <div className="profile-v5-hero-title">
+            <h2>{isSetup ? "Thiết lập lần đầu" : "Cập nhật thông tin"}</h2>
             <p>
               {isSetup
-                ? "Tài khoản đang dùng mật khẩu mặc định. Vui lòng đổi mật khẩu và cập nhật Gmail bảo mật."
-                : "Muốn thay đổi thông tin, cần nhập mật khẩu hiện tại để xác thực."}
+                ? "Đổi mật khẩu mặc định và thêm thông tin khôi phục trước khi sử dụng hệ thống."
+                : "Xác thực mật khẩu hiện tại, sau đó cập nhật mật khẩu, Gmail hoặc câu hỏi bảo mật."}
             </p>
           </div>
 
-          {!isSetup && (
-            <button
-              type="button"
-              className="profile-v3-close"
-              onClick={closeProfilePanel}
-              aria-label="Đóng"
-            >
-              ×
-            </button>
-          )}
-        </div>
-
-        <div className="profile-v3-body">
-          <label>Mật khẩu hiện tại</label>
-          <ProfilePasswordInput
-            value={profileCurrentPassword}
-            onChange={setProfileCurrentPassword}
-            autoComplete="current-password"
-            placeholder={isSetup ? "Nhập mật khẩu mặc định 123123" : "Nhập mật khẩu hiện tại"}
-          />
-
-          <label className="profile-v3-switch">
-            <input
-              type="checkbox"
-              checked={isSetup || profileChangePassword}
-              disabled={isSetup}
-              onChange={(e) => setProfileChangePassword(e.target.checked)}
-            />
-
-            <span className="profile-v3-switch-ui"></span>
-
+          <div className="profile-v5-user-card">
+            <div className="profile-v5-avatar">VT</div>
             <div>
-              <b>Đổi mật khẩu</b>
-              <em>
-                {isSetup
-                  ? "Bắt buộc đổi mật khẩu trong lần đăng nhập đầu tiên"
-                  : "Bật nếu muốn thay đổi mật khẩu đăng nhập"}
-              </em>
+              <b>{staffName || "Nhân viên"}</b>
+              <span>NV {maNV} · ST {maST}</span>
             </div>
-          </label>
+          </div>
 
-          {(isSetup || profileChangePassword) && (
-            <div className="profile-v3-password-box">
+          <div className="profile-v5-flow">
+            <div className="done">
+              <i>01</i>
               <div>
-                <label>Mật khẩu mới</label>
-                <ProfilePasswordInput
-                  value={profileNewPassword}
-                  onChange={setProfileNewPassword}
-                  autoComplete="new-password"
-                  placeholder="Nhập mật khẩu mới"
-                />
-              </div>
-
-              <div>
-                <label>Xác nhận mật khẩu mới</label>
-                <ProfilePasswordInput
-                  value={profileConfirmPassword}
-                  onChange={setProfileConfirmPassword}
-                  autoComplete="new-password"
-                  placeholder="Nhập lại mật khẩu mới"
-                />
+                <b>Xác thực</b>
+                <span>Nhập mật khẩu hiện tại.</span>
               </div>
             </div>
-          )}
+            <div className={isSetup || profileChangePassword ? "done" : ""}>
+              <i>02</i>
+              <div>
+                <b>Mật khẩu</b>
+                <span>{passwordModeText}</span>
+              </div>
+            </div>
+            <div className={profileGmail || finalQuestionPreview !== "Chưa chọn câu hỏi" ? "done" : ""}>
+              <i>03</i>
+              <div>
+                <b>Khôi phục</b>
+                <span>Gmail và câu hỏi bảo mật.</span>
+              </div>
+            </div>
+          </div>
 
-          <label>Câu hỏi bảo mật</label>
-          <select
-            value={profileQuestion}
-            onChange={(e) => setProfileQuestion(e.target.value)}
-          >
-            <option value="">Chọn câu hỏi bảo mật</option>
-            {SECURITY_QUESTIONS.map((q) => (
-              <option key={q} value={q}>
-                {q}
-              </option>
-            ))}
-            <option value="custom">Tự tạo câu hỏi riêng</option>
-          </select>
+          <div className="profile-v5-brand-note">
+            <small>Viễn Thông Di Động</small>
+            <strong>{finalQuestionPreview}</strong>
+          </div>
+        </aside>
 
-          {profileQuestion === "custom" && (
-            <>
-              <label>Câu hỏi tự tạo</label>
-              <input
-                value={profileCustomQuestion}
-                onChange={(e) => setProfileCustomQuestion(e.target.value)}
-                placeholder="Nhập câu hỏi bảo mật riêng"
+        <form
+          className="profile-v5-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitProfileUpdate();
+          }}
+        >
+          <div className="profile-v5-mobile-head">
+            <div>
+              <span>Bảo mật tài khoản</span>
+              <h2>{isSetup ? "Thiết lập lần đầu" : "Cập nhật thông tin"}</h2>
+            </div>
+            {!isSetup && (
+              <button type="button" onClick={closeProfilePanel} aria-label="Đóng">×</button>
+            )}
+          </div>
+
+          <section className="profile-v5-block profile-v5-auth-block">
+            <div className="profile-v5-block-head">
+              <i>01</i>
+              <div>
+                <b>Xác thực tài khoản</b>
+                <span>Bắt buộc nhập mật khẩu hiện tại để lưu thay đổi.</span>
+              </div>
+            </div>
+
+            <div className="profile-v5-field profile-v5-field-wide">
+              <label>Mật khẩu hiện tại</label>
+              <ProfilePasswordInput
+                value={profileCurrentPassword}
+                onChange={setProfileCurrentPassword}
+                autoComplete="current-password"
+                placeholder={isSetup ? "Nhập mật khẩu mặc định 123123" : "Nhập mật khẩu hiện tại"}
               />
-            </>
-          )}
+            </div>
+          </section>
 
-          <label>Câu trả lời bảo mật</label>
-          <input
-            value={profileAnswer}
-            onChange={(e) => setProfileAnswer(e.target.value)}
-            placeholder={isSetup ? "Bắt buộc nhập trong lần đầu" : "Để trống nếu không đổi câu trả lời"}
-          />
+          <section className="profile-v5-block profile-v5-password-block">
+            <label className="profile-v5-switch">
+              <input
+                type="checkbox"
+                checked={isSetup || profileChangePassword}
+                disabled={isSetup}
+                onChange={(e) => setProfileChangePassword(e.target.checked)}
+              />
+              <span></span>
+              <div>
+                <b>Đổi mật khẩu đăng nhập</b>
+                <em>
+                  {isSetup
+                    ? "Bắt buộc tạo mật khẩu mới cho tài khoản."
+                    : "Bật nếu muốn thay đổi mật khẩu đăng nhập hiện tại."}
+                </em>
+              </div>
+            </label>
 
-          <label>Gmail</label>
-          <input
-            type="email"
-            value={profileGmail}
-            onChange={(e) => setProfileGmail(e.target.value)}
-            placeholder="ten@gmail.com"
-          />
+            {(isSetup || profileChangePassword) && (
+              <div className="profile-v5-two-cols profile-v5-password-grid">
+                <div className="profile-v5-field">
+                  <label>Mật khẩu mới</label>
+                  <ProfilePasswordInput
+                    value={profileNewPassword}
+                    onChange={setProfileNewPassword}
+                    autoComplete="new-password"
+                    placeholder="Nhập mật khẩu mới"
+                  />
+                </div>
 
-          <button
-            type="button"
-            className="profile-v3-save"
-            onClick={submitProfileUpdate}
-            disabled={profileSaving}
-          >
-            {profileSaving ? "ĐANG LƯU..." : "LƯU THAY ĐỔI"}
-          </button>
-        </div>
+                <div className="profile-v5-field">
+                  <label>Xác nhận mật khẩu mới</label>
+                  <ProfilePasswordInput
+                    value={profileConfirmPassword}
+                    onChange={setProfileConfirmPassword}
+                    autoComplete="new-password"
+                    placeholder="Nhập lại mật khẩu mới"
+                  />
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="profile-v5-block profile-v5-recovery-block">
+            <div className="profile-v5-block-head">
+              <i>02</i>
+              <div>
+                <b>Thông tin khôi phục</b>
+                <span>Dùng cho OTP quên mật khẩu và xác minh tài khoản.</span>
+              </div>
+            </div>
+
+            <div className="profile-v5-field profile-v5-field-wide">
+              <label>Câu hỏi bảo mật</label>
+              <select value={profileQuestion} onChange={(e) => setProfileQuestion(e.target.value)}>
+                <option value="">Chọn câu hỏi bảo mật</option>
+                {SECURITY_QUESTIONS.map((q) => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+                <option value="custom">Tự tạo câu hỏi riêng</option>
+              </select>
+            </div>
+
+            {profileQuestion === "custom" && (
+              <div className="profile-v5-field profile-v5-field-wide">
+                <label>Câu hỏi tự tạo</label>
+                <textarea
+                  value={profileCustomQuestion}
+                  onChange={(e) => setProfileCustomQuestion(e.target.value)}
+                  placeholder="Nhập câu hỏi bảo mật riêng"
+                  rows={2}
+                />
+              </div>
+            )}
+
+            <div className="profile-v5-two-cols profile-v5-recovery-grid">
+              <div className="profile-v5-field">
+                <label>Câu trả lời bảo mật</label>
+                <textarea
+                  value={profileAnswer}
+                  onChange={(e) => setProfileAnswer(e.target.value)}
+                  placeholder={isSetup ? "Bắt buộc nhập trong lần đầu" : "Để trống nếu không đổi"}
+                  rows={2}
+                />
+              </div>
+
+              <div className="profile-v5-field">
+                <label>Gmail nhận OTP</label>
+                <input
+                  type="email"
+                  value={profileGmail}
+                  onChange={(e) => setProfileGmail(e.target.value)}
+                  placeholder="ten@gmail.com"
+                />
+              </div>
+            </div>
+          </section>
+
+          <div className="profile-v5-actions">
+            {!isSetup && (
+              <button type="button" className="profile-v5-btn ghost" onClick={closeProfilePanel}>
+                Đóng
+              </button>
+            )}
+            <button type="submit" className="profile-v5-btn primary" disabled={profileSaving}>
+              {profileSaving ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+          </div>
+        </form>
       </div>
     </section>
   );
 }
-
 
 function closeSystemPush() {
   const version = notifySettings.pushVersion || notifySettings.pushMessage;
@@ -1702,6 +1797,7 @@ function renderSystemStyle() {
 
 function renderSystemNotices() {
   const effectiveRange = getEffectiveRange(notifySettings);
+  const fixedBannerLines = formatSystemMessageLines(notifySettings.fixedBanner || "");
 
   return (
     <>
@@ -1711,19 +1807,21 @@ function renderSystemNotices() {
         </div>
       ) : null}
 
-      {notifySettings.fixedBanner ? (
-        <div className="vtdd-system-banner vtdd-system-banner-featured">
-          <div className="vtdd-system-banner-head">
-            <span>Thông báo hệ thống</span>
-            <strong>Quan trọng</strong>
+      {fixedBannerLines.length > 0 ? (
+        <section className="vtdd-system-banner vtdd-system-banner-featured system-notice-v2" aria-label="Thông báo hệ thống">
+          <div className="system-notice-v2-head">
+            <div>
+              <span>Thông báo hệ thống</span>
+              <strong>Quan trọng</strong>
+            </div>
           </div>
 
-          <div className="vtdd-system-banner-body">
-            {formatSystemMessageLines(notifySettings.fixedBanner).map((line, index) => (
+          <div className="system-notice-v2-list">
+            {fixedBannerLines.map((line, index) => (
               <p key={`system-banner-${index}`}>{line}</p>
             ))}
           </div>
-        </div>
+        </section>
       ) : null}
 
       {effectiveRange ? (
@@ -1831,6 +1929,8 @@ function renderSystemLock() {
 
         {showProfilePanel && renderProfilePanel("modal")}
 
+        <section className="staff-workspace">
+          <div className="staff-main-panel">
         <section className="mode-switch">
           <button
             className={mode === "tradein" ? "active" : ""}
@@ -1964,7 +2064,9 @@ function renderSystemLock() {
                         ))}
                     </select>
                     </section>
+          </div>
 
+          <aside className="staff-side-panel">
                     {selectedOldRow && (
                     <section className="type-price-grid">
                         {TYPE_OPTIONS.map((t) => {
@@ -2018,6 +2120,14 @@ function renderSystemLock() {
             })}
           </section>
         )}
+
+            {!selectedOldRow && (
+              <section className="type-empty-card">
+                <div className="type-empty-icon">₫</div>
+                <h3>Chọn máy cũ để xem bảng giá</h3>
+                <p>Sau khi chọn model máy cũ, bảng giá theo từng loại máy sẽ hiển thị tại đây.</p>
+              </section>
+            )}
 
         <section className={showQuote && loai ? "result-sheet-v2 is-open" : "result-sheet-v2"}>
           <button className="result-close" onClick={() => setShowQuote(false)} aria-label="Đóng">
@@ -2105,11 +2215,13 @@ function renderSystemLock() {
             </button>
           </div>
         </section>
+          </aside>
+        </section>
       </section>
 
       {showCustomerView && (
         <section className="customer-focus-layer" role="dialog" aria-modal="true">
-          <div className="customer-focus-brand">© THEGIOIDIDONG.COM</div>
+          <div className="customer-focus-brand">Viễn Thông Di Động</div>
 
           <div className="customer-focus-card">
             <button className="customer-focus-close" onClick={closeCustomerView} aria-label="Đóng">
