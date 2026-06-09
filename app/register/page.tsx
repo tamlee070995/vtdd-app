@@ -1,370 +1,524 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import PasswordInput from "@/components/PasswordInput";
+import { useEffect, useMemo, useState } from "react";
+
+type CaptchaPayload = {
+  question?: string;
+  token?: string;
+};
 
 const SECURITY_QUESTIONS = [
   "Tên thú cưng đầu tiên của bạn là gì?",
-  "Tên giáo viên chủ nhiệm đầu tiên của bạn là gì?",
-  "Món ăn yêu thích của bạn là gì?",
-  "Tên người bạn thân nhất thời đi học là gì?",
+  "Bạn sinh ra ở tỉnh/thành nào?",
+  "Tên trường tiểu học của bạn là gì?",
+  "Tên người bạn thân thời nhỏ của bạn là gì?",
+  "Biển số xe đầu tiên của bạn là gì?",
 ];
 
-function checkPasswordRule(password: string) {
-  if (password.length < 6) {
-    return "Mật khẩu phải có ít nhất 6 ký tự.";
-  }
-
-  if (!/[A-Z]/.test(password)) {
-    return "Mật khẩu phải có ít nhất 1 ký tự viết HOA.";
-  }
-
-  if (!/[a-z]/.test(password)) {
-    return "Mật khẩu phải có ít nhất 1 ký tự viết thường.";
-  }
-
-  if (!/[0-9]/.test(password)) {
-    return "Mật khẩu phải có ít nhất 1 số.";
-  }
-
-  if (!/[!@#]/.test(password)) {
-    return "Mật khẩu phải có ít nhất 1 ký tự đặc biệt: !, @ hoặc #.";
-  }
-
-  return "";
-}
-
-function checkGmailRule(gmail: string) {
-  const value = String(gmail || "").trim().toLowerCase();
-
-  if (!value) {
-    return "";
-  }
-
-  if (value.includes(" ")) {
-    return "Gmail không được có khoảng trắng.";
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-    return "Gmail chưa đúng định dạng.";
-  }
-
-  if (!value.endsWith("@gmail.com")) {
-    return "Gmail xác thực phải là địa chỉ @gmail.com.";
-  }
-
-  return "";
+function getParam(name: string) {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get(name) || "";
 }
 
 export default function RegisterPage() {
-  const [questionType, setQuestionType] = useState("");
-  const [captchaQuestion, setCaptchaQuestion] = useState("");
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [captchaLoading, setCaptchaLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
+  const [captcha, setCaptcha] = useState<CaptchaPayload>({});
+  const [loadingCaptcha, setLoadingCaptcha] = useState(false);
+  const [questionType, setQuestionType] = useState(SECURITY_QUESTIONS[0]);
+  const [gmail, setGmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [gmail, setGmail] = useState("");
-  const [gmailTouched, setGmailTouched] = useState(false);
+  const gmailError = useMemo(() => {
+    const value = gmail.trim().toLowerCase();
 
-  const isSuccess = !!success;
+    if (!value) return "";
+    if (value.includes(" ")) return "Gmail không được có khoảng trắng.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "Gmail chưa đúng định dạng.";
+    if (!value.endsWith("@gmail.com")) return "Chỉ dùng Gmail cá nhân @gmail.com.";
 
-  const passwordError = password ? checkPasswordRule(password) : "";
+    return "";
+  }, [gmail]);
 
-  const confirmError =
-    confirmPassword && password !== confirmPassword
-      ? "Mật khẩu xác nhận chưa khớp."
-      : "";
-
-  const gmailError = checkGmailRule(gmail);
-  const showGmailError = gmailTouched && !!gmailError;
+  const passwordHint = useMemo(() => {
+    if (!password) return "Tối thiểu 6 ký tự, có chữ HOA, chữ thường, số và ký tự ! @ #.";
+    if (password.length < 6) return "Mật khẩu phải có ít nhất 6 ký tự.";
+    if (!/[A-Z]/.test(password)) return "Cần ít nhất 1 chữ HOA.";
+    if (!/[a-z]/.test(password)) return "Cần ít nhất 1 chữ thường.";
+    if (!/[0-9]/.test(password)) return "Cần ít nhất 1 số.";
+    if (!/[!@#]/.test(password)) return "Cần ít nhất 1 ký tự đặc biệt: ! @ #.";
+    if (confirmPassword && password !== confirmPassword) return "Mật khẩu xác nhận chưa khớp.";
+    return "Mật khẩu hợp lệ.";
+  }, [password, confirmPassword]);
 
   async function loadCaptcha() {
     try {
-      setCaptchaLoading(true);
-
-      const res = await fetch("/api/auth/register-captcha", {
-        cache: "no-store",
-      });
-
+      setLoadingCaptcha(true);
+      const res = await fetch("/api/auth/register-captcha", { cache: "no-store" });
       const data = await res.json();
 
-      if (data.success) {
-        setCaptchaQuestion(data.question || "");
-        setCaptchaToken(data.token || "");
-      }
-
-      setCaptchaLoading(false);
+      setCaptcha({
+        question: data.question || data.captchaQuestion || "",
+        token: data.token || data.captchaToken || "",
+      });
     } catch {
-      setCaptchaLoading(false);
-    }
-  }
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    setError("");
-    setGmailTouched(true);
-
-    const passwordRuleError = checkPasswordRule(password);
-    const gmailRuleError = checkGmailRule(gmail);
-
-    if (passwordRuleError) {
-      e.preventDefault();
-      setError(passwordRuleError);
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      e.preventDefault();
-      setError("Mật khẩu xác nhận chưa khớp.");
-      return;
-    }
-
-    if (gmailRuleError) {
-      e.preventDefault();
-      setError(gmailRuleError);
-      return;
+      setCaptcha({ question: "Không tải được captcha", token: "" });
+    } finally {
+      setLoadingCaptcha(false);
     }
   }
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const errorMessage = params.get("error") || "";
-    const successMessage = params.get("success") || "";
-
-    setError(errorMessage);
-    setSuccess(successMessage);
-
-    if (!successMessage) {
-      loadCaptcha();
-    }
+    setError(getParam("error"));
+    setSuccess(getParam("success"));
+    loadCaptcha();
   }, []);
 
   return (
-    <main
-      className={
-        isSuccess
-          ? "login-page-v2 register-page-compact register-success-active"
-          : "login-page-v2 register-page-compact"
-      }
-    >
-      <section className="login-card-v2 register-page-content">
-        <div className="login-brand-v2">
-          <div className="brand-mark">
-            <img src="/mwg-logo.svg" alt="MWG" />
-          </div>
-          <div>
-            <div className="brand-title">Viễn Thông Di Động</div>
-            <div className="brand-subtitle">Create Staff Account</div>
-          </div>
-        </div>
+    <main className="register-vtd-page">
+      <style>{styles}</style>
 
-        <section className="register-hero-compact">
-          <div className="hero-kicker">NEW ACCOUNT</div>
-          <h1>
-            TẠO MỚI
-            <span>TÀI KHOẢN</span>
-          </h1>
+      <section className="register-vtd-shell">
+        <header className="register-vtd-brand">
+          <Link href="/tradein-price" className="register-vtd-logo" aria-label="Quay lại bảng giá">
+            <img src="/mwg-logo.svg" alt="MWG" />
+          </Link>
+
+          <div>
+            <strong>Viễn Thông Di Động</strong>
+            <span>Tạo tài khoản nhân viên</span>
+          </div>
+        </header>
+
+        <section className="register-vtd-hero">
+          <div className="register-vtd-kicker">STAFF ACCESS</div>
+          <h1>Tạo tài khoản chờ duyệt</h1>
           <p>
-            Tài khoản sẽ ở trạng thái chờ duyệt. Admin duyệt xong mới đăng nhập được.
+            Nhập thông tin nhân viên để gửi yêu cầu kích hoạt. Admin sẽ kiểm tra và duyệt Active trước khi sử dụng.
           </p>
         </section>
 
-        <form
-          className="register-form-compact"
-          action="/api/auth/staff-register"
-          method="POST"
-          onSubmit={handleSubmit}
-          noValidate
-        >
-          <div className="register-grid-2">
-            <div className="register-field">
-              <label htmlFor="maNV">Mã nhân viên</label>
-              <input
-                id="maNV"
-                name="maNV"
-                inputMode="numeric"
-                placeholder="VD: 36964"
-                disabled={isSuccess}
-              />
-            </div>
+        <form className="register-vtd-card" action="/api/auth/staff-register" method="POST">
+          {error && <div className="register-vtd-alert error">⚠️ {error}</div>}
+          {success && <div className="register-vtd-alert success">✅ {success}</div>}
 
-            <div className="register-field">
-              <label htmlFor="staffName">Tên nhân viên</label>
-              <input
-                id="staffName"
-                name="staffName"
-                placeholder="VD: Lê Minh Tâm"
-                disabled={isSuccess}
-              />
-            </div>
+          <div className="register-vtd-grid two">
+            <label className="register-vtd-field">
+              <span>Mã nhân viên</span>
+              <input name="maNV" inputMode="numeric" placeholder="Ví dụ: 36964" autoComplete="off" required />
+            </label>
+
+            <label className="register-vtd-field">
+              <span>Mã siêu thị</span>
+              <input name="maST" inputMode="numeric" placeholder="Ví dụ: 3755" autoComplete="off" required />
+            </label>
           </div>
 
-          <div className="register-field">
-            <label htmlFor="password">Mật khẩu</label>
-            <PasswordInput
-              id="password"
-              name="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Tối thiểu 6 ký tự"
-              autoComplete="new-password"
-              disabled={isSuccess}
-            />
+          <label className="register-vtd-field">
+            <span>Tên nhân viên</span>
+            <input name="staffName" placeholder="Ví dụ: Lê Minh Tâm" autoComplete="name" required />
+          </label>
 
-            <div className={passwordError ? "register-password-rule error" : "register-password-rule"}>
-              Tối thiểu 6 ký tự, có chữ HOA, chữ thường, số và ký tự ! @ #
-            </div>
+          <div className="register-vtd-grid two">
+            <label className="register-vtd-field">
+              <span>Mật khẩu</span>
+              <div className="register-vtd-password-wrap">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Nhập mật khẩu"
+                  autoComplete="new-password"
+                  required
+                />
+                <button type="button" onClick={() => setShowPassword((v) => !v)}>
+                  {showPassword ? "ẨN" : "HIỆN"}
+                </button>
+              </div>
+            </label>
+
+            <label className="register-vtd-field">
+              <span>Xác nhận mật khẩu</span>
+              <div className="register-vtd-password-wrap">
+                <input
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Nhập lại mật khẩu"
+                  autoComplete="new-password"
+                  required
+                />
+                <button type="button" onClick={() => setShowConfirmPassword((v) => !v)}>
+                  {showConfirmPassword ? "ẨN" : "HIỆN"}
+                </button>
+              </div>
+            </label>
           </div>
 
-          <div className="register-field">
-            <label htmlFor="confirmPassword">Xác nhận mật khẩu</label>
-            <PasswordInput
-              id="confirmPassword"
-              name="confirmPassword"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Nhập lại mật khẩu"
-              autoComplete="new-password"
-              disabled={isSuccess}
-            />
-
-            {confirmError ? (
-              <div className="register-password-rule error">{confirmError}</div>
-            ) : null}
+          <div className={passwordHint === "Mật khẩu hợp lệ." ? "register-vtd-rule ok" : "register-vtd-rule"}>
+            {passwordHint}
           </div>
 
-          <div className="register-field">
-            <label htmlFor="questionType">Câu hỏi bảo mật</label>
-            <select
-              id="questionType"
-              name="questionType"
-              value={questionType}
-              onChange={(e) => setQuestionType(e.target.value)}
-              disabled={isSuccess}
-            >
-              <option value="">Chọn câu hỏi bảo mật</option>
+          <label className="register-vtd-field">
+            <span>Câu hỏi bảo mật</span>
+            <select name="questionType" value={questionType} onChange={(e) => setQuestionType(e.target.value)} required>
               {SECURITY_QUESTIONS.map((q) => (
-                <option key={q} value={q}>
-                  {q}
-                </option>
+                <option key={q} value={q}>{q}</option>
               ))}
               <option value="custom">Tự tạo câu hỏi riêng</option>
             </select>
-          </div>
+          </label>
 
           {questionType === "custom" && (
-            <div className="register-custom-box">
-              <div className="register-field">
-                <label htmlFor="customQuestion">Câu hỏi tự tạo</label>
-                <input
-                  id="customQuestion"
-                  name="customQuestion"
-                  placeholder="VD: Biệt danh hồi nhỏ của bạn là gì?"
-                  disabled={isSuccess}
-                />
-              </div>
-            </div>
+            <label className="register-vtd-field">
+              <span>Câu hỏi tự tạo</span>
+              <input name="customQuestion" placeholder="Nhập câu hỏi bảo mật riêng" />
+            </label>
           )}
 
-          <div className="register-field">
-            <label htmlFor="answer">Câu trả lời bảo mật</label>
-            <input
-              id="answer"
-              name="answer"
-              placeholder="Nhập câu trả lời bảo mật"
-              autoComplete="off"
-              disabled={isSuccess}
-            />
-          </div>
+          <label className="register-vtd-field">
+            <span>Câu trả lời bảo mật</span>
+            <input name="answer" placeholder="Nhập câu trả lời bảo mật" autoComplete="off" required />
+          </label>
 
-          <div className="register-field">
-            <label htmlFor="gmail">Gmail xác thực</label>
+          <label className="register-vtd-field">
+            <span>Gmail xác thực</span>
             <input
-              id="gmail"
               name="gmail"
               type="email"
               value={gmail}
-              onChange={(e) => {
-                setGmail(e.target.value.trim().toLowerCase());
-                setGmailTouched(true);
-              }}
-              onBlur={() => setGmailTouched(true)}
-              placeholder="VD: ten@gmail.com"
-              disabled={isSuccess}
+              onChange={(e) => setGmail(e.target.value)}
+              placeholder="ten@gmail.com"
+              autoComplete="email"
+              required
             />
+          </label>
 
-            {showGmailError && (
-            <div className="register-password-rule error">{gmailError}</div>
-            )}
+          {gmailError ? (
+            <div className="register-vtd-alert mini-error">{gmailError}</div>
+          ) : gmail ? (
+            <div className="register-vtd-alert mini-ok">Gmail hợp lệ.</div>
+          ) : null}
+
+          <div className="register-vtd-captcha">
+            <input type="hidden" name="captchaToken" value={captcha.token || ""} />
+
+            <label className="register-vtd-field">
+              <span>Captcha</span>
+              <div className="register-vtd-captcha-line">
+                <strong>{loadingCaptcha ? "Đang tải..." : captcha.question || "Bấm tải lại captcha"}</strong>
+                <button type="button" onClick={loadCaptcha}>Tải lại</button>
+              </div>
+              <input name="captchaAnswer" inputMode="numeric" placeholder="Nhập kết quả" required />
+            </label>
           </div>
 
-          <div className="register-captcha-box">
-            <div>
-              <span>CAPTCHA</span>
-              <b>{captchaLoading ? "Đang tạo..." : captchaQuestion || "Bấm đổi mã"}</b>
-            </div>
+          <button className="register-vtd-submit" type="submit" disabled={!!gmailError}>
+            Tạo tài khoản chờ duyệt
+          </button>
 
-            <button type="button" onClick={loadCaptcha} disabled={isSuccess}>
-              Đổi mã
-            </button>
-          </div>
-
-          <input type="hidden" name="captchaToken" value={captchaToken} />
-
-          <div className="register-field">
-            <label htmlFor="captchaAnswer">Nhập kết quả captcha</label>
-            <input
-              id="captchaAnswer"
-              name="captchaAnswer"
-              inputMode="numeric"
-              placeholder="VD: 12"
-              autoComplete="off"
-              disabled={isSuccess}
-            />
-          </div>
-
-          {error ? <div className="staff-error-banner">⚠️ {error}</div> : null}
-
-          {!isSuccess && (
-            <button className="register-submit-btn compact" type="submit">
-              TẠO TÀI KHOẢN CHỜ DUYỆT
-            </button>
-          )}
-
-          <Link className="register-back-btn compact" href="/login">
-            QUAY LẠI ĐĂNG NHẬP
+          <Link href="/login" className="register-vtd-back">
+            Quay lại đăng nhập
           </Link>
         </form>
       </section>
-
-      {isSuccess && (
-        <section className="register-success-layer" role="dialog" aria-modal="true">
-          <div className="register-success-popup">
-            <div className="register-success-icon">✓</div>
-
-            <div className="register-success-kicker">TẠO TÀI KHOẢN THÀNH CÔNG</div>
-
-            <h2>Đang chờ Admin duyệt</h2>
-
-            <p>
-              Tài khoản đã được ghi nhận trên hệ thống. Vui lòng chờ Admin kích hoạt,
-              sau đó đăng nhập lại để tiếp tục sử dụng.
-            </p>
-
-            <div className="register-success-message">
-              {success || "Đã tạo tài khoản chờ duyệt. Vui lòng liên hệ Admin để được kích hoạt."}
-            </div>
-
-            <Link className="register-success-login-btn" href="/login">
-              QUAY LẠI ĐĂNG NHẬP
-            </Link>
-          </div>
-        </section>
-      )}
     </main>
   );
 }
+
+const styles = `
+.register-vtd-page {
+  min-height: 100dvh;
+  padding: clamp(12px, 2vw, 24px);
+  background: radial-gradient(circle at 12% 0%, rgba(255, 212, 0, .2), transparent 30%), #eef3f8;
+  color: #07111f;
+  font-family: Roboto, Arial, sans-serif;
+}
+
+.register-vtd-shell {
+  width: min(100%, 680px);
+  margin: 0 auto;
+}
+
+.register-vtd-brand {
+  height: 68px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.register-vtd-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: #ffd400;
+  box-shadow: 0 0 0 6px rgba(255, 212, 0, .14);
+}
+
+.register-vtd-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.register-vtd-brand strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: -.04em;
+}
+
+.register-vtd-brand span {
+  display: block;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.register-vtd-hero {
+  min-height: 210px;
+  padding: clamp(22px, 4vw, 34px);
+  border-radius: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: radial-gradient(circle at 88% 14%, rgba(255, 212, 0, .55), transparent 34%), linear-gradient(135deg, #0f172a, #020617);
+  color: #fff;
+  box-shadow: 0 26px 80px rgba(15, 23, 42, .16);
+}
+
+.register-vtd-kicker {
+  width: fit-content;
+  margin-bottom: 15px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .12);
+  color: #ffd400;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .14em;
+}
+
+.register-vtd-hero h1 {
+  margin: 0;
+  font-size: clamp(38px, 8vw, 66px);
+  line-height: .92;
+  font-weight: 1000;
+  letter-spacing: -.07em;
+}
+
+.register-vtd-hero p {
+  margin: 16px 0 0;
+  color: rgba(255, 255, 255, .78);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 800;
+}
+
+.register-vtd-card {
+  margin-top: 14px;
+  padding: clamp(16px, 3vw, 26px);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, .94);
+  border: 1px solid rgba(203, 213, 225, .95);
+  box-shadow: 0 22px 70px rgba(15, 23, 42, .08);
+}
+
+.register-vtd-grid.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.register-vtd-field {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 13px;
+}
+
+.register-vtd-field span {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.register-vtd-field input,
+.register-vtd-field select {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  padding: 0 14px;
+  background: #f8fafc;
+  color: #07111f;
+  outline: none;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.register-vtd-field input:focus,
+.register-vtd-field select:focus {
+  background: #fff;
+  border-color: #ffd400;
+  box-shadow: 0 0 0 4px rgba(255, 212, 0, .18);
+}
+
+.register-vtd-password-wrap {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  padding: 5px;
+  background: #f8fafc;
+}
+
+.register-vtd-password-wrap input {
+  min-height: 42px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.register-vtd-password-wrap button,
+.register-vtd-captcha-line button {
+  border: 0;
+  min-height: 38px;
+  border-radius: 13px;
+  padding: 0 13px;
+  background: #07111f;
+  color: #ffd400;
+  font-size: 11px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.register-vtd-rule {
+  margin: -3px 0 14px;
+  padding: 11px 13px;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 800;
+}
+
+.register-vtd-rule.ok {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.register-vtd-alert {
+  margin-bottom: 13px;
+  padding: 13px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 900;
+}
+
+.register-vtd-alert.error,
+.register-vtd-alert.mini-error {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.register-vtd-alert.success,
+.register-vtd-alert.mini-ok {
+  background: #dcfce7;
+  color: #047857;
+  border: 1px solid #bbf7d0;
+}
+
+.register-vtd-alert.mini-error,
+.register-vtd-alert.mini-ok {
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.register-vtd-captcha-line {
+  min-height: 50px;
+  padding: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #fff;
+}
+
+.register-vtd-captcha-line strong {
+  padding-left: 8px;
+  color: #07111f;
+  font-size: 14px;
+  font-weight: 1000;
+}
+
+.register-vtd-submit {
+  width: 100%;
+  min-height: 54px;
+  border: 0;
+  border-radius: 18px;
+  background: #ffd400;
+  color: #07111f;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 1000;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.register-vtd-submit:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.register-vtd-back {
+  width: fit-content;
+  margin: 18px auto 0;
+  display: block;
+  color: #ef4444;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 560px) {
+  .register-vtd-page {
+    padding: 10px;
+  }
+
+  .register-vtd-grid.two {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .register-vtd-hero {
+    min-height: 230px;
+    border-radius: 28px;
+  }
+
+  .register-vtd-card {
+    border-radius: 26px;
+  }
+}
+`;
