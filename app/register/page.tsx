@@ -104,17 +104,16 @@ export default function RegisterPage() {
 
         <form className="register-vtd-card" action="/api/auth/staff-register" method="POST">
           {error && <div className="register-vtd-alert error">⚠️ {error}</div>}
-          {success && <div className="register-vtd-alert success">✅ {success}</div>}
 
           <div className="register-vtd-grid two">
             <label className="register-vtd-field">
               <span>Mã nhân viên</span>
-              <input name="maNV" inputMode="numeric" placeholder="Ví dụ: 36964" autoComplete="off" required />
+              <input name="maNV" inputMode="numeric" placeholder="Ví dụ: 123123" autoComplete="off" required />
             </label>
 
             <label className="register-vtd-field">
               <span>Mã siêu thị</span>
-              <input name="maST" inputMode="numeric" placeholder="Ví dụ: 3755" autoComplete="off" required />
+              <input name="maST" inputMode="numeric" placeholder="Ví dụ: 123123" autoComplete="off" required />
             </label>
           </div>
 
@@ -129,11 +128,13 @@ export default function RegisterPage() {
               <div className="register-vtd-password-wrap">
                 <input
                   name="password"
-                  type={showPassword ? "text" : "password"}
+                  type="text"
+                  className={showPassword ? "register-vtd-secure-input" : "register-vtd-secure-input masked"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Nhập mật khẩu"
                   autoComplete="new-password"
+                  spellCheck={false}
                   required
                 />
                 <button type="button" onClick={() => setShowPassword((v) => !v)}>
@@ -147,11 +148,13 @@ export default function RegisterPage() {
               <div className="register-vtd-password-wrap">
                 <input
                   name="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
+                  type="text"
+                  className={showConfirmPassword ? "register-vtd-secure-input" : "register-vtd-secure-input masked"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Nhập lại mật khẩu"
                   autoComplete="new-password"
+                  spellCheck={false}
                   required
                 />
                 <button type="button" onClick={() => setShowConfirmPassword((v) => !v)}>
@@ -227,6 +230,29 @@ export default function RegisterPage() {
             Quay lại đăng nhập
           </Link>
         </form>
+
+        {success && (
+          <div className="register-vtd-modal-backdrop" role="dialog" aria-modal="true">
+            <div className="register-vtd-success-modal">
+              <div className="register-vtd-modal-icon">✓</div>
+              <div className="register-vtd-modal-kicker">TẠO TÀI KHOẢN THÀNH CÔNG</div>
+              <h2>Đã hoàn tất tạo tài khoản</h2>
+              <p>
+                Chờ admin xét duyệt sử dụng, sẽ nhận được phản hồi qua mail đăng ký
+                ngay khi admin duyệt xong.
+              </p>
+              <button
+                type="button"
+                className="register-vtd-modal-ok"
+                onClick={() => {
+                  window.location.href = "/login";
+                }}
+              >
+                Đồng ý
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );
@@ -500,6 +526,118 @@ const styles = `
   font-weight: 1000;
   letter-spacing: .08em;
   text-transform: uppercase;
+}
+
+
+.register-vtd-password-wrap input::-ms-reveal,
+.register-vtd-password-wrap input::-ms-clear {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.register-vtd-password-wrap input::-webkit-credentials-auto-fill-button,
+.register-vtd-password-wrap input::-webkit-contacts-auto-fill-button,
+.register-vtd-password-wrap input::-webkit-textfield-decoration-container {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.register-vtd-secure-input.masked {
+  -webkit-text-security: disc;
+  text-security: disc;
+}
+
+.register-vtd-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  padding: 18px;
+  display: grid;
+  place-items: center;
+  background: rgba(2, 6, 23, .58);
+  backdrop-filter: blur(10px);
+}
+
+.register-vtd-success-modal {
+  width: min(100%, 430px);
+  padding: 26px;
+  border-radius: 28px;
+  background: #ffffff;
+  border: 1px solid rgba(203, 213, 225, .95);
+  box-shadow: 0 34px 110px rgba(2, 6, 23, .32);
+  text-align: center;
+  animation: registerModalIn .18s ease-out;
+}
+
+.register-vtd-modal-icon {
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 14px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  background: #dcfce7;
+  color: #047857;
+  font-size: 34px;
+  font-weight: 1000;
+  box-shadow: 0 0 0 8px rgba(22, 163, 74, .08);
+}
+
+.register-vtd-modal-kicker {
+  width: fit-content;
+  margin: 0 auto 12px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #07111f;
+  color: #ffd400;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .12em;
+}
+
+.register-vtd-success-modal h2 {
+  margin: 0;
+  color: #07111f;
+  font-size: 25px;
+  line-height: 1.1;
+  font-weight: 1000;
+  letter-spacing: -.04em;
+}
+
+.register-vtd-success-modal p {
+  margin: 14px 0 22px;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 800;
+}
+
+.register-vtd-modal-ok {
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-radius: 17px;
+  background: #ffd400;
+  color: #07111f;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 1000;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+@keyframes registerModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @media (max-width: 560px) {
