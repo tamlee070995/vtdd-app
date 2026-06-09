@@ -185,6 +185,16 @@ export default function HomePage() {
           </article>
         ))}
       </section>
+
+      <footer className={styles.footer}>
+        <span className={styles.footerLine} />
+        <span className={styles.footerPill}>
+          <i aria-hidden="true" />
+          <span>Copyright</span>
+          <strong>36964</strong>
+        </span>
+        <span className={styles.footerLine} />
+      </footer>
     </main>
   );
 }
