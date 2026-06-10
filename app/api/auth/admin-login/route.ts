@@ -5,17 +5,25 @@ import { setAdminCookies } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
+function normalizePermission(value: any): "admin" | "mod" | "" {
+  const v = String(value || "").trim().toLowerCase();
+  if (v === "admin") return "admin";
+  if (v === "mod" || v === "moderator") return "mod";
+  return "";
+}
+
 function redirectLogin(req: NextRequest, message: string) {
   const url = new URL("/admin/login", req.url);
   url.searchParams.set("error", message);
   return NextResponse.redirect(url, { status: 303 });
 }
 
-function normalizePermission(value: any): "admin" | "mod" | "" {
-  const v = String(value || "").trim().toLowerCase();
-  if (v === "admin") return "admin";
-  if (v === "mod" || v === "moderator") return "mod";
-  return "";
+function fail(req: NextRequest, message: string, jsonMode: boolean, status = 400) {
+  if (jsonMode) {
+    return NextResponse.json({ success: false, message }, { status });
+  }
+
+  return redirectLogin(req, message);
 }
 
 async function checkPassword(input: string, saved: string) {
@@ -42,17 +50,19 @@ function setSharedStaffCookie(res: NextResponse, name: string, value: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const contentType = req.headers.get("content-type") || "";
+  const jsonMode = contentType.includes("application/json");
+
   try {
     await ensureStaffAdminHeaders();
 
-    const contentType = req.headers.get("content-type") || "";
     let maNV = "";
     let password = "";
 
-    if (contentType.includes("application/json")) {
-      const body = await req.json();
-      maNV = normalizeCode(body.maNV);
-      password = String(body.password || "").trim();
+    if (jsonMode) {
+      const body = await req.json().catch(() => null);
+      maNV = normalizeCode(body?.maNV);
+      password = String(body?.password || "").trim();
     } else {
       const form = await req.formData();
       maNV = normalizeCode(form.get("maNV"));
@@ -60,33 +70,34 @@ export async function POST(req: NextRequest) {
     }
 
     if (!maNV || !password) {
-      return redirectLogin(req, "Vui lòng nhập mã nhân viên và mật khẩu.");
+      return fail(req, "Vui lòng nhập mã nhân viên và mật khẩu.", jsonMode, 400);
     }
 
     const staff = await findStaffByMaNV(maNV);
 
     if (!staff) {
-      return redirectLogin(req, "Tài khoản không tồn tại trong hệ thống.");
+      return fail(req, "Tài khoản không tồn tại trong hệ thống.", jsonMode, 404);
     }
 
     if (String(staff.status || "").trim().toLowerCase() !== "active") {
-      return redirectLogin(req, "Tài khoản chưa Active hoặc đã bị khóa.");
+      return fail(req, "Tài khoản chưa Active hoặc đã bị khóa.", jsonMode, 403);
     }
 
     const permission = normalizePermission(staff.permission);
 
     if (!permission) {
-      return redirectLogin(req, "Tài khoản này không thuộc đội ngũ quản trị viên.");
+      return fail(req, "Tài khoản này không thuộc đội ngũ quản trị viên.", jsonMode, 403);
     }
 
     const ok = await checkPassword(password, staff.password);
 
     if (!ok) {
-      return redirectLogin(req, "Mật khẩu không đúng.");
+      return fail(req, "Mật khẩu không đúng.", jsonMode, 401);
     }
 
-    const url = new URL("/admin", req.url);
-    const res = NextResponse.redirect(url, { status: 303 });
+    const res = jsonMode
+      ? NextResponse.json({ success: true, redirectTo: "/admin" })
+      : NextResponse.redirect(new URL("/admin", req.url), { status: 303 });
 
     setAdminCookies(res, {
       maNV: staff.maNV,
@@ -106,6 +117,6 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (err: any) {
-    return redirectLogin(req, "Lỗi đăng nhập Admin: " + (err?.message || "Không đăng nhập được."));
+    return fail(req, "Lỗi đăng nhập Admin: " + (err?.message || "Không đăng nhập được."), jsonMode, 500);
   }
 }
