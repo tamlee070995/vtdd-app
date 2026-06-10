@@ -1,5 +1,4 @@
 import Link from "next/link";
-import PasswordInput from "@/components/PasswordInput";
 
 type PageProps = {
   searchParams?: Promise<{ error?: string }> | { error?: string };
@@ -18,6 +17,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
           <div className="brand-mark">
             <img src="/mwg-logo.svg" alt="MWG" />
           </div>
+
           <div>
             <div className="brand-title">Viễn Thông Di Động</div>
             <div className="brand-subtitle">Staff Secure Login</div>
@@ -44,18 +44,22 @@ export default async function LoginPage({ searchParams }: PageProps) {
           noValidate
         >
           <label htmlFor="maNV">Mã nhân viên</label>
+
           <input
             id="maNV"
             name="maNV"
+            type="text"
             inputMode="numeric"
-            placeholder="VD: NV001"
+            placeholder="VD: 36964"
             autoComplete="username"
           />
 
           <label htmlFor="password">Mật khẩu</label>
-          <PasswordInput
+
+          <input
             id="password"
             name="password"
+            type="password"
             placeholder="Nhập mật khẩu"
             autoComplete="current-password"
           />

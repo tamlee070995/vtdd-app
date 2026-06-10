@@ -1117,7 +1117,7 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   };
 }, [mode, selectedNewRow, selectedOldRow, loai, giaBanMoiInput]);
 
-    function getQuoteTime() {
+  function getQuoteTime() {
     return new Date().toLocaleString("vi-VN", {
       day: "2-digit",
       month: "2-digit",
@@ -1127,7 +1127,12 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
     });
   }
 
-    useEffect(() => {
+  useEffect(() => {
+    // Chỉ tạo thời gian sau khi client hydrate xong để tránh lỗi Hydration Error trên Safari/iPhone.
+    setQuoteTime(getQuoteTime());
+  }, []);
+
+  useEffect(() => {
     if (lookupLogTick <= 0) return;
     if (!loai || !spCu || priceInfo.giaXac <= 0) return;
 
@@ -2145,7 +2150,7 @@ function renderSystemLock() {
           </div>
 
             <div className="quote-time-pill">
-                Cập nhật: {quoteTime || getQuoteTime()}
+                Cập nhật: {quoteTime || "--/--/---- --:--"}
             </div>
 
           <div className="result-card">
@@ -2239,7 +2244,7 @@ function renderSystemLock() {
             </div>
 
             <div className="customer-focus-time">
-              Cập nhật: {quoteTime || getQuoteTime()}
+              Cập nhật: {quoteTime || "--/--/---- --:--"}
             </div>
 
             <div className="customer-focus-info">

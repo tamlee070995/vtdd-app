@@ -46,7 +46,13 @@ function redirectLogin(req: NextRequest, message: string) {
   const url = new URL("/login", req.url);
   url.searchParams.set("error", message);
 
-  const res = NextResponse.redirect(url, { status: 303 });
+  const res = NextResponse.redirect(url, {
+    status: 303,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
+
   clearStaffCookies(res);
   return res;
 }
@@ -97,7 +103,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (staff.status.toLowerCase() === "standby") {
+    if (String(staff.status || "").toLowerCase() === "standby") {
       return redirectLogin(
         req,
         "Tài khoản chưa được duyệt sử dụng, vui lòng liên hệ Admin."
@@ -117,11 +123,16 @@ export async function POST(req: NextRequest) {
 
     const gmail = decryptText(staff.gmail);
     const securityQuestion = decryptText(staff.securityQuestion);
-
     const forceSetup = shouldForceSetup(staff, gmail, securityQuestion);
 
     const url = new URL("/staff", req.url);
-    const res = NextResponse.redirect(url, { status: 303 });
+
+    const res = NextResponse.redirect(url, {
+      status: 303,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
 
     setCookie(res, "vtdd_staff_nv", staff.maNV);
     setCookie(res, "vtdd_staff_st", staff.maST);

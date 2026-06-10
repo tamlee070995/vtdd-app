@@ -1,77 +1,64 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/admin-auth";
 import {
   adminResetStaffOtpCount,
   adminResetStaffSecurity,
+  ensureStaffAdminHeaders,
   findStaffByMaNV,
   getAdminStaffPage,
-  updateStaffNeedSetup,
+  updateStaffAdminAccess,
   updateStaffStatus,
 } from "@/lib/staff-store";
-import { decryptText, hashPassword } from "@/lib/staff-security";
-import { appendAdminAudit } from "@/lib/system-store";
-import { sendStaffActivatedMail } from "@/lib/mail";
+import { hashPassword, normalizeCode } from "@/lib/staff-security";
 
 export const dynamic = "force-dynamic";
 
-function isAdmin(req: NextRequest) {
-  return req.cookies.get("vtdd_admin_token")?.value === "admin-ok";
+function normalizePermission(value: any): "admin" | "mod" | "" {
+  const v = String(value || "").trim().toLowerCase();
+  if (v === "admin") return "admin";
+  if (v === "mod" || v === "moderator") return "mod";
+  return "";
 }
 
-function getClientIp(req: NextRequest) {
-  const forwarded = req.headers.get("forwarded") || "";
-  const forwardedFor = forwarded.match(/for="?([^;,\"]+)/i)?.[1] || "";
+async function isFullAdmin(admin: any) {
+  if (normalizePermission(admin?.permission) === "admin") return true;
 
-  return (
-    req.headers.get("cf-connecting-ip") ||
-    req.headers.get("true-client-ip") ||
-    req.headers.get("x-real-ip") ||
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    forwardedFor ||
-    ""
-  );
-}
-
-function safeDecrypt(value: string) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
+  // Chống lỗi cookie cũ: kiểm tra lại quyền Admin trực tiếp từ Google Sheet.
+  const maNV = normalizeCode(admin?.maNV || "");
+  if (!maNV) return false;
 
   try {
-    return decryptText(raw) || raw;
+    const staff = await findStaffByMaNV(maNV);
+    return normalizePermission(staff?.permission) === "admin";
   } catch {
-    return raw;
+    return false;
   }
 }
 
-function getLoginUrl(req: NextRequest) {
-  const envUrl = String(process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "").trim();
-  const origin = envUrl || new URL(req.url).origin;
-  return `${origin.replace(/\/$/, "")}/login`;
-}
+function normalizeModules(value: any) {
+  const allowed = new Set(["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "tools"]);
 
-async function safeAudit(data: Parameters<typeof appendAdminAudit>[0]) {
-  try {
-    await appendAdminAudit(data);
-  } catch (err: any) {
-    console.warn("SKIP_ADMIN_AUDIT:", err?.message || err);
-  }
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item, index, arr) => allowed.has(item) && arr.indexOf(item) === index)
+    .join(",");
 }
 
 export async function GET(req: NextRequest) {
+  const { response } = await requireAdminApi(req, { module: "tcdm" });
+  if (response) return response;
+
   try {
-    if (!isAdmin(req)) {
-      return NextResponse.json(
-        { success: false, message: "Chưa đăng nhập Admin." },
-        { status: 401 }
-      );
-    }
+    await ensureStaffAdminHeaders();
 
     const url = new URL(req.url);
     const page = Number(url.searchParams.get("page") || 1);
     const pageSize = Number(url.searchParams.get("pageSize") || 50);
-    const q = String(url.searchParams.get("q") || "").trim();
-    const status = String(url.searchParams.get("status") || "ALL").trim();
+    const status = url.searchParams.get("status") || "ALL";
+    const q = url.searchParams.get("q") || "";
 
-    const data = await getAdminStaffPage({ page, pageSize, q, status });
+    const data = await getAdminStaffPage({ page, pageSize, status, q });
 
     return NextResponse.json({
       success: true,
@@ -79,155 +66,92 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     return NextResponse.json(
-      {
-        success: false,
-        message: err?.message || "Không tải được danh sách nhân viên.",
-      },
+      { success: false, message: err?.message || "Không tải được danh sách nhân viên." },
       { status: 500 }
     );
   }
 }
 
 export async function POST(req: NextRequest) {
+  const { admin, response } = await requireAdminApi(req, { module: "tcdm" });
+  if (response) return response;
+
   try {
-    if (!isAdmin(req)) {
-      return NextResponse.json(
-        { success: false, message: "Chưa đăng nhập Admin." },
-        { status: 401 }
-      );
-    }
+    await ensureStaffAdminHeaders();
 
     const body = await req.json();
     const action = String(body.action || "").trim().toUpperCase();
-    const maNV = String(body.maNV || "").trim().replace(/\.0$/, "");
+    const maNV = normalizeCode(body.maNV);
 
     if (!maNV) {
-      return NextResponse.json(
-        { success: false, message: "Thiếu mã nhân viên." },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "Thiếu mã nhân viên." }, { status: 400 });
     }
 
-    const staff = await findStaffByMaNV(maNV);
+    const target = await findStaffByMaNV(maNV);
 
-    if (!staff) {
-      return NextResponse.json(
-        { success: false, message: "Không tìm thấy nhân viên." },
-        { status: 404 }
-      );
+    if (!target) {
+      return NextResponse.json({ success: false, message: "Không tìm thấy nhân viên." }, { status: 404 });
+    }
+
+    if (action === "UPDATE_PERMISSION") {
+      if (!(await isFullAdmin(admin))) {
+        return NextResponse.json(
+          { success: false, message: "Chỉ Admin mới được cấp/xóa quyền Admin hoặc Mod." },
+          { status: 403 }
+        );
+      }
+
+      const permission = normalizePermission(body.permission);
+      const modules = permission === "mod" ? normalizeModules(body.modules) : "";
+
+      await updateStaffAdminAccess(target.rowNumber, { permission, modules });
+
+      const message =
+        permission === "admin"
+          ? `Đã cấp quyền Admin cho NV ${target.maNV}.`
+          : permission === "mod"
+            ? `Đã cấp quyền Mod cho NV ${target.maNV}. Hạng mục: ${modules || "chưa chọn"}.`
+            : `Đã xóa quyền Admin/Mod của NV ${target.maNV}. Tài khoản trở về user thường.`;
+
+      return NextResponse.json({ success: true, message });
     }
 
     if (action === "ACTIVE") {
-      await updateStaffStatus(staff.rowNumber, "Active");
-      await updateStaffNeedSetup(staff.rowNumber, "0");
-
-      let mailNote = "";
-      const gmail = safeDecrypt(staff.gmail);
-
-      if (gmail) {
-        try {
-          await sendStaffActivatedMail({
-            to: gmail,
-            staffName: staff.staffName || "Nhân viên",
-            maNV: staff.maNV,
-            loginUrl: getLoginUrl(req),
-          });
-          mailNote = " Đã gửi Gmail thông báo cho nhân viên.";
-        } catch (mailErr: any) {
-          mailNote = " Tuy nhiên chưa gửi được Gmail thông báo cho nhân viên.";
-          console.warn("SEND_ACTIVE_MAIL_FAILED:", mailErr?.message || mailErr);
-        }
-      } else {
-        mailNote = " Tài khoản chưa có Gmail nên không gửi được mail thông báo.";
-      }
-
-      await safeAudit({
-        admin: "Admin",
-        action: "ACTIVE_STAFF",
-        target: maNV,
-        oldValue: `STATUS=${staff.status || ""}; NEED_SETUP=${staff.needSetup || ""}`,
-        newValue: "STATUS=Active; NEED_SETUP=0",
-        ip: getClientIp(req),
-        note: `Duyệt tài khoản nhân viên.${mailNote}`,
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: `Đã Active tài khoản ${maNV}.${mailNote}`,
-      });
+      await updateStaffStatus(target.rowNumber, "Active");
+      return NextResponse.json({ success: true, message: `Đã Active tài khoản NV ${target.maNV}.` });
     }
 
     if (action === "STANDBY") {
-      await updateStaffStatus(staff.rowNumber, "Standby");
-
-      await safeAudit({
-        admin: "Admin",
-        action: "STANDBY_STAFF",
-        target: maNV,
-        oldValue: staff.status,
-        newValue: "Standby",
-        ip: getClientIp(req),
-        note: "Chuyển tài khoản về trạng thái chờ duyệt.",
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: `Đã chuyển ${maNV} về Standby.`,
-      });
+      await updateStaffStatus(target.rowNumber, "Standby");
+      return NextResponse.json({ success: true, message: `Đã chuyển NV ${target.maNV} về Standby.` });
     }
 
     if (action === "RESET_SECURITY") {
-      const defaultPassword = process.env.DEFAULT_STAFF_PASSWORD || "123123";
+      if (!(await isFullAdmin(admin))) {
+        return NextResponse.json(
+          { success: false, message: "Chỉ Admin mới được reset bảo mật tài khoản." },
+          { status: 403 }
+        );
+      }
 
-      await adminResetStaffSecurity(staff.rowNumber, {
-        passwordHash: hashPassword(defaultPassword),
-      });
-
-      await safeAudit({
-        admin: "Admin",
-        action: "RESET_SECURITY",
-        target: maNV,
-        oldValue: "F:I, K:O",
-        newValue: "Password=123123, Security/Gmail cleared, NEED_SETUP=1, OTP_COUNT=0",
-        ip: getClientIp(req),
-        note: "Reset mật khẩu, bảo mật và OTP count.",
-      });
+      const passwordHash = (hashPassword as any)("123123", target.maNV);
+      await adminResetStaffSecurity(target.rowNumber, { passwordHash });
 
       return NextResponse.json({
         success: true,
-        message: `Đã reset bảo mật cho ${maNV}. Mật khẩu mặc định: ${defaultPassword}.`,
+        message: `Đã reset bảo mật NV ${target.maNV}. Mật khẩu mặc định: 123123.`,
       });
     }
 
     if (action === "RESET_OTP_COUNT") {
-      await adminResetStaffOtpCount(staff.rowNumber);
-
-      await safeAudit({
-        admin: "Admin",
-        action: "RESET_OTP_COUNT",
-        target: maNV,
-        oldValue: staff.resetOtpCount || "0",
-        newValue: "0",
-        ip: getClientIp(req),
-        note: "Reset số lượt gửi OTP trong ngày.",
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: `Đã reset OTP count cho ${maNV}.`,
-      });
+      await adminResetStaffOtpCount(target.rowNumber);
+      return NextResponse.json({ success: true, message: `Đã reset số lượt OTP của NV ${target.maNV}.` });
     }
 
-    return NextResponse.json(
-      { success: false, message: "Action không hợp lệ." },
-      { status: 400 }
-    );
+    return NextResponse.json({ success: false, message: "Action không hợp lệ." }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json(
-      {
-        success: false,
-        message: err?.message || "Không xử lý được thao tác Admin.",
-      },
+      { success: false, message: err?.message || "Không xử lý được yêu cầu nhân viên." },
       { status: 500 }
     );
   }

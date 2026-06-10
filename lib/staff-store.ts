@@ -44,6 +44,9 @@ function cleanCode(value: any) {
   return clean(value).replace(/\.0$/, "");
 }
 
+export type StaffPermission = "admin" | "mod" | "";
+export type StaffAdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools";
+
 export type StaffRow = {
   rowNumber: number;
   maNV: string;
@@ -61,6 +64,8 @@ export type StaffRow = {
   resetOtpDay: string;
   resetOtpCount: string;
   needSetup: string;
+  permission: StaffPermission;
+  modulePermissions: string;
 };
 
 export type AdminStaffPageItem = {
@@ -74,7 +79,16 @@ export type AdminStaffPageItem = {
   resetOtpCount: string;
   needSetup: string;
   gmail: string;
+  permission: StaffPermission;
+  modulePermissions: string;
 };
+
+function normalizePermission(value: any): StaffPermission {
+  const v = clean(value).toLowerCase();
+  if (v === "admin") return "admin";
+  if (v === "mod" || v === "moderator") return "mod";
+  return "";
+}
 
 function mapStaffRow(row: any[], index: number): StaffRow {
   return {
@@ -94,11 +108,40 @@ function mapStaffRow(row: any[], index: number): StaffRow {
     resetOtpDay: clean(row[12]),
     resetOtpCount: clean(row[13]),
     needSetup: clean(row[14]),
+    permission: normalizePermission(row[15]),
+    modulePermissions: clean(row[16]),
   };
 }
 
+export async function ensureStaffAdminHeaders() {
+  const sheets = await getSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
+
+  return enqueueStaffWrite(async () => {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${SHEET_NAME}!P1:Q1`,
+    });
+
+    const currentP = clean(res.data.values?.[0]?.[0]);
+    const currentQ = clean(res.data.values?.[0]?.[1]);
+    if (currentP.toUpperCase() === "PERMISSION" && currentQ.toUpperCase() === "ADMIN_MODULES") return;
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${SHEET_NAME}!P1:Q1`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [["PERMISSION", "ADMIN_MODULES"]] },
+    });
+  });
+}
+
+export async function ensureStaffPermissionHeader() {
+  return ensureStaffAdminHeaders();
+}
+
 export async function getStaffRows(): Promise<StaffRow[]> {
-  const rows = await readSheetRange(`${SHEET_NAME}!A2:O`);
+  const rows = await readSheetRange(`${SHEET_NAME}!A2:Q`);
   return rows.map((row: any[], index: number) => mapStaffRow(row, index));
 }
 
@@ -121,7 +164,7 @@ export async function getAdminStaffPage(params: {
   const q = clean(params.q).toLowerCase();
   const status = clean(params.status || "ALL");
 
-  const rows = await readSheetRange(`${SHEET_NAME}!A2:O`);
+  const rows = await readSheetRange(`${SHEET_NAME}!A2:Q`);
 
   let total = 0;
   let active = 0;
@@ -151,6 +194,8 @@ export async function getAdminStaffPage(params: {
         item.storeName,
         item.department,
         normalizedStatus,
+        item.permission,
+        item.modulePermissions,
       ]
         .join(" ")
         .toLowerCase();
@@ -169,6 +214,8 @@ export async function getAdminStaffPage(params: {
       resetOtpCount: item.resetOtpCount || "0",
       needSetup: item.needSetup || "0",
       gmail: item.gmail ? "Đã cấu hình" : "",
+      permission: item.permission,
+      modulePermissions: item.modulePermissions || "",
     });
   });
 
@@ -191,12 +238,7 @@ export async function getAdminStaffPage(params: {
       pageSize,
       total: totalFiltered,
       pages,
-      summary: {
-        total,
-        active,
-        standby,
-        needSetup,
-      },
+      summary: { total, active, standby, needSetup },
     },
   };
 }
@@ -215,25 +257,30 @@ export async function updateStaffSecurity(
   const spreadsheetId = getSpreadsheetId();
 
   return enqueueStaffWrite(async () => {
+    const batchData: Array<{ range: string; values: any[][] }> = [
+      {
+        range: `${SHEET_NAME}!F${rowNumber}:I${rowNumber}`,
+        values: [[
+          data.passwordHash,
+          data.encryptedQuestion,
+          data.answerHash,
+          data.encryptedGmail,
+        ]],
+      },
+    ];
+
+    if (data.needSetup === "0" || data.needSetup === "1") {
+      batchData.push({
+        range: `${SHEET_NAME}!O${rowNumber}:O${rowNumber}`,
+        values: [[data.needSetup]],
+      });
+    }
+
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId,
       requestBody: {
         valueInputOption: "USER_ENTERED",
-        data: [
-          {
-            range: `${SHEET_NAME}!F${rowNumber}:I${rowNumber}`,
-            values: [[
-              data.passwordHash,
-              data.encryptedQuestion,
-              data.answerHash,
-              data.encryptedGmail,
-            ]],
-          },
-          {
-            range: `${SHEET_NAME}!O${rowNumber}:O${rowNumber}`,
-            values: [[data.needSetup ?? "0"]],
-          },
-        ],
+        data: batchData,
       },
     });
   });
@@ -242,6 +289,7 @@ export async function updateStaffSecurity(
 export async function createStandbyAccount(data: {
   maNV: string;
   staffName: string;
+  maST?: string;
   passwordHash: string;
   encryptedQuestion: string;
   answerHash: string;
@@ -253,14 +301,14 @@ export async function createStandbyAccount(data: {
   return enqueueStaffWrite(async () => {
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${SHEET_NAME}!A:O`,
+      range: `${SHEET_NAME}!A:Q`,
       valueInputOption: "USER_ENTERED",
       insertDataOption: "INSERT_ROWS",
       requestBody: {
         values: [[
           data.maNV,
           data.staffName,
-          "",
+          data.maST || "",
           "",
           "",
           data.passwordHash,
@@ -273,6 +321,8 @@ export async function createStandbyAccount(data: {
           "",
           "",
           "1",
+          "",
+          "",
         ]],
       },
     });
@@ -281,12 +331,7 @@ export async function createStandbyAccount(data: {
 
 export async function updateStaffResetOtp(
   rowNumber: number,
-  data: {
-    otpHash: string;
-    expiresAt: string;
-    day: string;
-    count: number;
-  }
+  data: { otpHash: string; expiresAt: string; day: string; count: number }
 ) {
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
@@ -296,17 +341,12 @@ export async function updateStaffResetOtp(
       spreadsheetId,
       range: `${SHEET_NAME}!K${rowNumber}:N${rowNumber}`,
       valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [[data.otpHash, data.expiresAt, data.day, data.count]],
-      },
+      requestBody: { values: [[data.otpHash, data.expiresAt, data.day, data.count]] },
     });
   });
 }
 
-export async function resetStaffPasswordByOtp(
-  rowNumber: number,
-  data: { passwordHash: string }
-) {
+export async function resetStaffPasswordByOtp(rowNumber: number, data: { passwordHash: string }) {
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -316,14 +356,8 @@ export async function resetStaffPasswordByOtp(
       requestBody: {
         valueInputOption: "USER_ENTERED",
         data: [
-          {
-            range: `${SHEET_NAME}!F${rowNumber}:F${rowNumber}`,
-            values: [[data.passwordHash]],
-          },
-          {
-            range: `${SHEET_NAME}!K${rowNumber}:L${rowNumber}`,
-            values: [["", ""]],
-          },
+          { range: `${SHEET_NAME}!F${rowNumber}:F${rowNumber}`, values: [[data.passwordHash]] },
+          { range: `${SHEET_NAME}!K${rowNumber}:L${rowNumber}`, values: [["", ""]] },
         ],
       },
     });
@@ -358,10 +392,52 @@ export async function updateStaffStatus(rowNumber: number, status: "Active" | "S
   });
 }
 
-export async function adminResetStaffSecurity(
+export async function updateStaffPermission(rowNumber: number, permission: "admin" | "mod" | "") {
+  await ensureStaffAdminHeaders();
+  const sheets = await getSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
+
+  return enqueueStaffWrite(async () => {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${SHEET_NAME}!P${rowNumber}:P${rowNumber}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[permission]] },
+    });
+  });
+}
+
+
+function normalizeModulePermissions(value: any) {
+  const allowed = new Set(["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "tools"]);
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item, index, arr) => allowed.has(item) && arr.indexOf(item) === index)
+    .join(",");
+}
+
+export async function updateStaffAdminAccess(
   rowNumber: number,
-  data: { passwordHash: string }
+  data: { permission: "admin" | "mod" | ""; modules?: string }
 ) {
+  await ensureStaffAdminHeaders();
+  const sheets = await getSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
+  const permission = normalizePermission(data.permission);
+  const modules = permission === "mod" ? normalizeModulePermissions(data.modules) : "";
+
+  return enqueueStaffWrite(async () => {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${SHEET_NAME}!P${rowNumber}:Q${rowNumber}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[permission, modules]] },
+    });
+  });
+}
+
+export async function adminResetStaffSecurity(rowNumber: number, data: { passwordHash: string }) {
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -371,14 +447,8 @@ export async function adminResetStaffSecurity(
       requestBody: {
         valueInputOption: "USER_ENTERED",
         data: [
-          {
-            range: `${SHEET_NAME}!F${rowNumber}:I${rowNumber}`,
-            values: [[data.passwordHash, "", "", ""]],
-          },
-          {
-            range: `${SHEET_NAME}!K${rowNumber}:O${rowNumber}`,
-            values: [["", "", "", "0", "1"]],
-          },
+          { range: `${SHEET_NAME}!F${rowNumber}:I${rowNumber}`, values: [[data.passwordHash, "", "", ""]] },
+          { range: `${SHEET_NAME}!K${rowNumber}:O${rowNumber}`, values: [["", "", "", "0", "1"]] },
         ],
       },
     });

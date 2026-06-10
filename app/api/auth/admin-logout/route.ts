@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clearAdminCookies } from "@/lib/admin-auth";
 
-const ADMIN_COOKIES = ["vtdd_admin_token", "vtdd_admin_name"];
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const url = new URL("/", req.url);
+  const url = new URL("/admin/login", req.url);
   const res = NextResponse.redirect(url, { status: 303 });
-
-  ADMIN_COOKIES.forEach((name) => {
-    res.cookies.set(name, "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 0,
-    });
-  });
-
+  clearAdminCookies(res);
   return res;
+}
+
+export async function POST(req: NextRequest) {
+  return GET(req);
 }

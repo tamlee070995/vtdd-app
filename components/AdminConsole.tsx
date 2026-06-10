@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Editor } from "@tinymce/tinymce-react";
 
 type AdminStaff = {
   rowNumber: number;
@@ -13,6 +14,8 @@ type AdminStaff = {
   resetOtpCount: string;
   needSetup: string;
   gmail: string;
+  permission: "admin" | "mod" | "";
+  modulePermissions: string;
 };
 
 type StaffSummary = {
@@ -51,8 +54,13 @@ type AdminDashboard = {
   totalLogs: number;
 };
 
+type AdminRole = "admin" | "mod";
+
 type AdminConsoleProps = {
   initialSettings: Record<string, string>;
+  adminRole?: AdminRole;
+  adminName?: string;
+  adminModules?: string;
 };
 
 type OnlineStats = {
@@ -77,7 +85,7 @@ const EMPTY_DASHBOARD: AdminDashboard = {
   totalLogs: 0,
 };
 
-type TabKey = "overview" | "staff" | "notify" | "system" | "dashboard" | "security";
+type TabKey = "overview" | "staff" | "permission" | "notify" | "system" | "dashboard" | "security";
 
 type ToastState = {
   type: "success" | "error";
@@ -99,10 +107,21 @@ const TAB_ITEMS: Array<{
 }> = [
   { key: "overview", label: "Tổng quan", desc: "Trạng thái", icon: "01" },
   { key: "staff", label: "Nhân viên", desc: "Duyệt & reset", icon: "02" },
-  { key: "notify", label: "Thông báo", desc: "Banner & push", icon: "03" },
-  { key: "system", label: "Hệ thống", desc: "Lock & reload", icon: "04" },
-  { key: "dashboard", label: "Dashboard", desc: "Tra giá & log", icon: "05" },
-  { key: "security", label: "Bảo mật", desc: "PIN admin", icon: "06" },
+  { key: "permission", label: "Phân quyền", desc: "Admin / Mod", icon: "03" },
+  { key: "notify", label: "Thông báo", desc: "Banner & push", icon: "04" },
+  { key: "system", label: "Hệ thống", desc: "Lock & reload", icon: "05" },
+  { key: "dashboard", label: "Dashboard", desc: "Tra giá & log", icon: "06" },
+  { key: "security", label: "Bảo mật", desc: "PIN admin", icon: "07" },
+];
+
+
+const ADMIN_MODULE_OPTIONS = [
+  { key: "tcdm", label: "1.1 Tra giá TCDM" },
+  { key: "quy-trinh-thu-cu", label: "1.2 Quy trình TCDM" },
+  { key: "may-moi", label: "2 Trang máy mới" },
+  { key: "may-cu", label: "3 Trang máy cũ" },
+  { key: "demo", label: "4 Trang demo" },
+  { key: "tools", label: "5 Công cụ" },
 ];
 
 function isOn(value: string) {
@@ -127,7 +146,7 @@ function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("vi-VN");
 }
 
-export default function AdminConsole({ initialSettings }: AdminConsoleProps) {
+function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsoleProps) {
   const [tab, setTab] = useState<TabKey>("overview");
   const [settings, setSettings] = useState<Record<string, string>>(initialSettings);
   const [busy, setBusy] = useState("");
@@ -157,6 +176,7 @@ export default function AdminConsole({ initialSettings }: AdminConsoleProps) {
   const [confirmPin, setConfirmPin] = useState("");
 
   const summary = staffMeta.summary || EMPTY_SUMMARY;
+  const isFullAdmin = String(adminRole || "").toLowerCase() === "admin";
 
   const lockCount = useMemo(() => {
     return [
@@ -307,7 +327,7 @@ export default function AdminConsole({ initialSettings }: AdminConsoleProps) {
   }, []);
 
   useEffect(() => {
-    if (tab !== "staff") return;
+    if (tab !== "staff" && tab !== "permission") return;
     loadStaff(staffPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, staffStatusFilter, staffQuery, staffPage]);
@@ -329,6 +349,26 @@ export default function AdminConsole({ initialSettings }: AdminConsoleProps) {
       });
 
       showToast("success", data.message || "Đã cập nhật.");
+      setBusy("");
+      await loadStaff(staffPage, { silent: true });
+    } catch (err: any) {
+      setBusy("");
+      showToast("error", getErrorMessage(err));
+    }
+  }
+
+  async function runStaffAdminAccess(maNV: string, permission: string, modules: string) {
+    try {
+      setBusy(`UPDATE_PERMISSION-${maNV}`);
+
+      const data = await postJSON("/api/admin/staff", {
+        action: "UPDATE_PERMISSION",
+        maNV,
+        permission,
+        modules,
+      });
+
+      showToast("success", data.message || "Đã cập nhật phân quyền.");
       setBusy("");
       await loadStaff(staffPage, { silent: true });
     } catch (err: any) {
@@ -618,7 +658,14 @@ export default function AdminConsole({ initialSettings }: AdminConsoleProps) {
                         <span>OTP: {item.resetOtpCount || "0"}</span>
                         <span>SETUP: {item.needSetup || "0"}</span>
                         {item.gmail ? <span>{item.gmail}</span> : null}
+                        {item.permission ? <span>QUYỀN: {item.permission.toUpperCase()}</span> : <span>QUYỀN: —</span>}
                       </div>
+
+                      <StaffAdminAccessBox
+                        item={item}
+                        disabled={busy === `UPDATE_PERMISSION-${item.maNV}`}
+                        onSave={runStaffAdminAccess}
+                      />
                     </div>
 
                     <div className="adminx-staff-actions">
@@ -684,6 +731,111 @@ export default function AdminConsole({ initialSettings }: AdminConsoleProps) {
           </div>
         </section>
       )}
+
+
+      {tab === "permission" && (
+        <section className="adminx-panel adminx-permission-page">
+          <div className="adminx-panel-head adminx-panel-head-row">
+            <div>
+              <span className="adminx-eyebrow">Permission Control</span>
+              <h2>Phân quyền Admin / Mod / User</h2>
+              <p>Admin có thể cấp/xóa quyền Admin hoặc Mod. Mod chỉ được quản trị các hạng mục được cấp.</p>
+            </div>
+            <button className="adminx-action-btn" type="button" onClick={() => loadStaff(staffPage)} disabled={staffLoading}>
+              {staffLoading ? "Đang tải..." : "Tải lại danh sách"}
+            </button>
+          </div>
+
+          {!isFullAdmin && (
+            <div className="adminx-permission-alert">
+              Chỉ tài khoản Admin mới được cấp hoặc xóa quyền Admin/Mod. Tài khoản Mod chỉ xem được danh sách quyền hiện tại.
+            </div>
+          )}
+
+          <div className="adminx-filter-bar">
+            <input
+              value={staffSearchInput}
+              onChange={(e) => setStaffSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") applyStaffSearch();
+              }}
+              placeholder="Nhập mã NV hoặc tên nhân viên cần phân quyền"
+            />
+            <select
+              value={staffStatusFilter}
+              onChange={(e) => {
+                setStaffPage(1);
+                setStaffStatusFilter(e.target.value as "ALL" | "Active" | "Standby");
+              }}
+            >
+              <option value="ALL">Tất cả</option>
+              <option value="Active">Active</option>
+              <option value="Standby">Standby</option>
+            </select>
+            <button type="button" onClick={applyStaffSearch} disabled={staffLoading}>
+              Tìm
+            </button>
+          </div>
+
+          <div className="adminx-permission-list-v3">
+            {staffLoading ? (
+              <div className="adminx-empty-state">
+                <div className="adminx-spinner"></div>
+                <b>Đang tải danh sách</b>
+                <p>Vui lòng chờ trong giây lát.</p>
+              </div>
+            ) : staff.length === 0 ? (
+              <div className="adminx-empty-state">
+                <b>Không tìm thấy nhân viên</b>
+                <p>Thử nhập mã nhân viên hoặc tên khác.</p>
+              </div>
+            ) : (
+              staff.map((item) => (
+                <article className="adminx-permission-card-v3" key={`permission-${item.maNV}-${item.rowNumber}`}>
+                  <div className="adminx-permission-user-v3">
+                    <span className={item.status === "Active" ? "adminx-badge active" : "adminx-badge standby"}>
+                      {item.status || "Standby"}
+                    </span>
+                    <h3>{item.staffName || "Chưa có tên"}</h3>
+                    <p>NV {item.maNV} · ST {item.maST || "—"} · {item.storeName || "Chưa có siêu thị"}</p>
+                    <div className="adminx-staff-flags">
+                      {item.permission ? <span>QUYỀN: {item.permission.toUpperCase()}</span> : <span>QUYỀN: USER THƯỜNG</span>}
+                      {item.modulePermissions ? <span>MODULES: {item.modulePermissions}</span> : <span>MODULES: —</span>}
+                    </div>
+                  </div>
+
+                  <StaffAdminAccessBox
+                    item={item}
+                    disabled={!isFullAdmin || busy === `UPDATE_PERMISSION-${item.maNV}`}
+                    onSave={runStaffAdminAccess}
+                  />
+                </article>
+              ))
+            )}
+          </div>
+
+          <div className="adminx-pagination">
+            <button
+              type="button"
+              disabled={staffLoading || staffMeta.page <= 1}
+              onClick={() => setStaffPage((v) => Math.max(1, v - 1))}
+            >
+              Trang trước
+            </button>
+            <span>
+              {formatNumber(staffMeta.page)} / {formatNumber(staffMeta.pages)}
+            </span>
+            <button
+              type="button"
+              disabled={staffLoading || staffMeta.page >= staffMeta.pages}
+              onClick={() => setStaffPage((v) => Math.min(staffMeta.pages, v + 1))}
+            >
+              Trang sau
+            </button>
+          </div>
+        </section>
+      )}
+
 
       {tab === "notify" && (
         <section className="adminx-panel">
@@ -908,122 +1060,6 @@ export default function AdminConsole({ initialSettings }: AdminConsoleProps) {
   );
 }
 
-
-const ADMINX_ONLINE_STYLE = `
-.adminx-online-panel {
-  margin-top: 14px;
-  padding: 16px;
-  border-radius: 26px;
-  background:
-    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .18), transparent 38%),
-    linear-gradient(135deg, #ffffff, #f8fafc);
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, .06);
-}
-
-.adminx-online-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.adminx-online-head span {
-  width: fit-content;
-  display: inline-flex;
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: #0f172a;
-  color: #ffd400;
-  font-size: 9.5px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.adminx-online-head h3 {
-  margin-top: 10px;
-  color: #0f172a;
-  font-size: 44px;
-  line-height: .9;
-  font-weight: 900;
-  letter-spacing: -.07em;
-}
-
-.adminx-online-head p {
-  margin-top: 7px;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.4;
-  font-weight: 750;
-}
-
-.adminx-online-head button {
-  flex: 0 0 auto;
-  min-height: 40px;
-  padding: 0 13px;
-  border: 0;
-  border-radius: 999px;
-  background: #ffd400;
-  color: #111827;
-  font-size: 10.5px;
-  font-weight: 900;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-}
-
-.adminx-online-head button:disabled {
-  opacity: .65;
-  cursor: wait;
-}
-
-.adminx-online-grid {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.adminx-online-grid div {
-  min-height: 84px;
-  padding: 13px;
-  border-radius: 20px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
-}
-
-.adminx-online-grid span {
-  display: block;
-  color: #64748b;
-  font-size: 10px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.adminx-online-grid b {
-  display: block;
-  margin-top: 10px;
-  color: #0f172a;
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: -.06em;
-}
-
-@media screen and (max-width: 560px) {
-  .adminx-online-head {
-    display: grid;
-  }
-
-  .adminx-online-grid {
-    grid-template-columns: 1fr;
-  }
-}
-`;
 
 const ADMINX_STYLE = `
 .admin-saas-page {
@@ -1906,4 +1942,1090 @@ const ADMINX_STYLE = `
     padding: 10px;
   }
 }
+/* ===== VTDD ADMIN V3 - Permission tab & TinyMCE ===== */
+.adminx-permission-page { display: grid; gap: 14px; }
+.adminx-permission-alert {
+  padding: 13px 14px;
+  border-radius: 18px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 900;
+}
+.adminx-permission-list-v3 { display: grid; gap: 12px; }
+.adminx-permission-card-v3 {
+  padding: 16px;
+  border-radius: 24px;
+  display: grid;
+  grid-template-columns: minmax(260px, .85fr) minmax(420px, 1.15fr);
+  gap: 14px;
+  background: #ffffff;
+  border: 1px solid #dbe4ef;
+  box-shadow: 0 14px 34px rgba(15,23,42,.055);
+}
+.adminx-permission-user-v3 { display: grid; align-content: start; gap: 8px; }
+.adminx-permission-user-v3 h3 { color: #07111f; font-size: 20px; line-height: 1.1; font-weight: 1000; letter-spacing: -.035em; }
+.adminx-permission-user-v3 p { color: #64748b; font-size: 13px; line-height: 1.45; font-weight: 850; }
+.adminx-permission-box-v2 button:disabled { opacity: .52; cursor: not-allowed; }
+.adminx-role-pills button:disabled,
+.adminx-module-buttons button:disabled { opacity: .55; cursor: not-allowed; }
+.cms-rich-box-tiny { display: grid; gap: 8px; }
+.cms-rich-box-tiny .tox-tinymce { border-radius: 18px !important; border-color: #cbd5e1 !important; overflow: hidden; }
+.cms-rich-box-tiny .tox .tox-statusbar { background: #f8fafc; }
+.cms-rich-box-tiny .tox .tox-promotion { display: none !important; }
+.cms-preview-body img,
+.cms-pro-editor-card img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 18px;
+  display: block;
+  margin: 12px 0;
+}
+.cms-preview-body figure,
+.cms-pro-editor-card figure {
+  max-width: 100%;
+  margin: 14px 0;
+}
+.cms-preview-body figcaption,
+.cms-pro-editor-card figcaption {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+@media (max-width: 980px) { .adminx-permission-card-v3 { grid-template-columns: 1fr; } }
+
+`;
+
+const ADMINX_ONLINE_STYLE = `
+.adminx-online-panel {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .18), transparent 38%),
+    linear-gradient(135deg, #ffffff, #f8fafc);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, .06);
+}
+
+.adminx-online-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.adminx-online-head span {
+  width: fit-content;
+  display: inline-flex;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #ffd400;
+  font-size: 9.5px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-online-head h3 {
+  margin-top: 10px;
+  color: #0f172a;
+  font-size: 44px;
+  line-height: .9;
+  font-weight: 900;
+  letter-spacing: -.07em;
+}
+
+.adminx-online-head p {
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 750;
+}
+
+.adminx-online-head button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffd400;
+  color: #111827;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.adminx-online-head button:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
+.adminx-online-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.adminx-online-grid div {
+  min-height: 84px;
+  padding: 13px;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
+}
+
+.adminx-online-grid span {
+  display: block;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-online-grid b {
+  display: block;
+  margin-top: 10px;
+  color: #0f172a;
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -.06em;
+}
+
+@media screen and (max-width: 560px) {
+  .adminx-online-head {
+    display: grid;
+  }
+
+  .adminx-online-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* ===== VTDD ADMIN V3 - Permission tab & TinyMCE ===== */
+.adminx-permission-page { display: grid; gap: 14px; }
+.adminx-permission-alert {
+  padding: 13px 14px;
+  border-radius: 18px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 900;
+}
+.adminx-permission-list-v3 { display: grid; gap: 12px; }
+.adminx-permission-card-v3 {
+  padding: 16px;
+  border-radius: 24px;
+  display: grid;
+  grid-template-columns: minmax(260px, .85fr) minmax(420px, 1.15fr);
+  gap: 14px;
+  background: #ffffff;
+  border: 1px solid #dbe4ef;
+  box-shadow: 0 14px 34px rgba(15,23,42,.055);
+}
+.adminx-permission-user-v3 { display: grid; align-content: start; gap: 8px; }
+.adminx-permission-user-v3 h3 { color: #07111f; font-size: 20px; line-height: 1.1; font-weight: 1000; letter-spacing: -.035em; }
+.adminx-permission-user-v3 p { color: #64748b; font-size: 13px; line-height: 1.45; font-weight: 850; }
+.adminx-permission-box-v2 button:disabled { opacity: .52; cursor: not-allowed; }
+.adminx-role-pills button:disabled,
+.adminx-module-buttons button:disabled { opacity: .55; cursor: not-allowed; }
+.cms-rich-box-tiny { display: grid; gap: 8px; }
+.cms-rich-box-tiny .tox-tinymce { border-radius: 18px !important; border-color: #cbd5e1 !important; overflow: hidden; }
+.cms-rich-box-tiny .tox .tox-statusbar { background: #f8fafc; }
+.cms-rich-box-tiny .tox .tox-promotion { display: none !important; }
+.cms-preview-body img,
+.cms-pro-editor-card img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 18px;
+  display: block;
+  margin: 12px 0;
+}
+.cms-preview-body figure,
+.cms-pro-editor-card figure {
+  max-width: 100%;
+  margin: 14px 0;
+}
+.cms-preview-body figcaption,
+.cms-pro-editor-card figcaption {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+@media (max-width: 980px) { .adminx-permission-card-v3 { grid-template-columns: 1fr; } }
+
+`;
+
+
+
+function StaffAdminAccessBox({
+  item,
+  disabled,
+  onSave,
+}: {
+  item: AdminStaff;
+  disabled: boolean;
+  onSave: (maNV: string, permission: string, modules: string) => Promise<void>;
+}) {
+  const [permission, setPermission] = useState(item.permission || "");
+  const [modules, setModules] = useState<string[]>(
+    String(item.modulePermissions || "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean)
+  );
+
+  useEffect(() => {
+    setPermission(item.permission || "");
+    setModules(String(item.modulePermissions || "").split(",").map((v) => v.trim()).filter(Boolean));
+  }, [item.permission, item.modulePermissions, item.maNV]);
+
+  function setRole(next: "" | "mod" | "admin") {
+    setPermission(next);
+    if (next !== "mod") setModules([]);
+  }
+
+  function toggleModule(key: string) {
+    setModules((current) =>
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key]
+    );
+  }
+
+  return (
+    <div className="adminx-permission-box adminx-permission-box-v2">
+      <div className="adminx-permission-head adminx-permission-head-v2">
+        <div>
+          <b>Phân quyền tài khoản</b>
+          <small>Trống = user thường · Mod = theo hạng mục · Admin = toàn quyền</small>
+        </div>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onSave(item.maNV, permission, modules.join(","))}
+        >
+          {disabled ? "Đang lưu..." : "Lưu phân quyền"}
+        </button>
+      </div>
+
+      <div className="adminx-role-pills">
+        <button type="button" disabled={disabled} className={permission === "" ? "active" : ""} onClick={() => setRole("")}>User thường<small>Không có quyền admin</small></button>
+        <button type="button" disabled={disabled} className={permission === "mod" ? "active" : ""} onClick={() => setRole("mod")}>Mod<small>Chỉ hạng mục được cấp</small></button>
+        <button type="button" disabled={disabled} className={permission === "admin" ? "active" : ""} onClick={() => setRole("admin")}>Admin<small>Toàn quyền hệ thống</small></button>
+      </div>
+
+      {permission === "mod" && (
+        <div className="adminx-module-buttons">
+          {ADMIN_MODULE_OPTIONS.map((module) => (
+            <button
+              key={module.key}
+              type="button"
+              disabled={disabled}
+              className={modules.includes(module.key) ? "active" : ""}
+              onClick={() => toggleModule(module.key)}
+            >
+              <span>{module.label}</span>
+              <small>{module.key}</small>
+            </button>
+          ))}
+        </div>
+      )}
+      {permission === "admin" && <em>Admin có toàn quyền, không cần chọn hạng mục.</em>}
+      {permission === "" && <em>User thường không được truy cập trang quản trị.</em>}
+    </div>
+  );
+}
+type CmsSlug = "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo";
+type AdminModuleKey = "tcdm" | CmsSlug | "tools";
+
+type CmsItem = {
+  slug: CmsSlug;
+  label: string;
+  title: string;
+  summary: string;
+  body: string;
+  draftTitle: string;
+  draftSummary: string;
+  draftBody: string;
+  published: boolean;
+  updatedAt: string;
+};
+
+type CmsItems = Record<CmsSlug, CmsItem>;
+
+const ADMIN_MODULES: Array<{
+  key: AdminModuleKey;
+  no: string;
+  title: string;
+  desc: string;
+  badge: string;
+}> = [
+  {
+    key: "tcdm",
+    no: "01",
+    title: "Quản trị: Trang tra giá TCDM",
+    desc: "Tài khoản nhân viên, thông báo, lock web, dashboard và reload data.",
+    badge: "Đang hoạt động",
+  },
+  {
+    key: "quy-trinh-thu-cu",
+    no: "1.2",
+    title: "Quy trình thu cũ đổi mới",
+    desc: "Soạn nội dung quy trình thao tác, kiểm tra và xử lý hồ sơ.",
+    badge: "CMS nháp / xuất bản",
+  },
+  {
+    key: "may-moi",
+    no: "02",
+    title: "Quản trị: Trang máy mới",
+    desc: "Soạn chính sách bảo hành theo kiểu CMS / Google Site.",
+    badge: "CMS nháp / xuất bản",
+  },
+  {
+    key: "may-cu",
+    no: "03",
+    title: "Quản trị: Trang máy cũ",
+    desc: "Soạn nội dung máy ĐSD, máy cũ thu mua và nghiệp vụ liên quan.",
+    badge: "CMS nháp / xuất bản",
+  },
+  {
+    key: "demo",
+    no: "04",
+    title: "Quản trị: Trang demo / gỡ demo",
+    desc: "Soạn nội dung hướng dẫn gỡ demo, chuyển đổi máy trưng bày.",
+    badge: "CMS nháp / xuất bản",
+  },
+  {
+    key: "tools",
+    no: "05",
+    title: "Quản trị: Công cụ hỗ trợ",
+    desc: "Khu vực công cụ mở rộng, hiện giữ trạng thái đang cập nhật.",
+    badge: "Đang cập nhật",
+  },
+];
+
+const EMPTY_CMS: CmsItems = {
+  "quy-trinh-thu-cu": {
+    slug: "quy-trinh-thu-cu",
+    label: "Quy trình thu cũ đổi mới",
+    title: "Quy trình thu cũ đổi mới",
+    summary: "Tài liệu quy trình thao tác, kiểm tra và xử lý hồ sơ.",
+    body: "",
+    draftTitle: "Quy trình thu cũ đổi mới",
+    draftSummary: "Tài liệu quy trình thao tác, kiểm tra và xử lý hồ sơ.",
+    draftBody: "",
+    published: false,
+    updatedAt: "",
+  },
+  "may-moi": {
+    slug: "may-moi",
+    label: "Trang máy mới",
+    title: "Chính sách bảo hành",
+    summary: "Thông tin chính sách bảo hành theo ngành hàng.",
+    body: "",
+    draftTitle: "Chính sách bảo hành",
+    draftSummary: "Thông tin chính sách bảo hành theo ngành hàng.",
+    draftBody: "",
+    published: false,
+    updatedAt: "",
+  },
+  "may-cu": {
+    slug: "may-cu",
+    label: "Trang máy cũ",
+    title: "Máy ĐSD, Máy Cũ Thu Mua",
+    summary: "Thông tin nghiệp vụ dành cho máy đã sử dụng / máy cũ thu mua.",
+    body: "",
+    draftTitle: "Máy ĐSD, Máy Cũ Thu Mua",
+    draftSummary: "Thông tin nghiệp vụ dành cho máy đã sử dụng / máy cũ thu mua.",
+    draftBody: "",
+    published: false,
+    updatedAt: "",
+  },
+  demo: {
+    slug: "demo",
+    label: "Trang demo",
+    title: "Gỡ Demo",
+    summary: "Hướng dẫn và công cụ hỗ trợ xử lý gỡ demo.",
+    body: "",
+    draftTitle: "Gỡ Demo",
+    draftSummary: "Hướng dẫn và công cụ hỗ trợ xử lý gỡ demo.",
+    draftBody: "",
+    published: false,
+    updatedAt: "",
+  },
+};
+
+function isCmsModule(key: AdminModuleKey): key is CmsSlug {
+  return key === "quy-trinh-thu-cu" || key === "may-moi" || key === "may-cu" || key === "demo";
+}
+
+function parseModuleList(value: string) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function legacyTextToHtml(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw.includes("<") && raw.includes(">")) return raw;
+  return raw
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => `<p>${line.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`)
+    .join("");
+}
+
+function CmsEditor({
+  slug,
+  item,
+  onSaved,
+  showToast,
+}: {
+  slug: CmsSlug;
+  item: CmsItem;
+  onSaved: () => Promise<void>;
+  showToast: (type: "success" | "error", text: string) => void;
+}) {
+  const [title, setTitle] = useState(item.draftTitle || item.title || "");
+  const [summary, setSummary] = useState(item.draftSummary || item.summary || "");
+  const [body, setBody] = useState(legacyTextToHtml(item.draftBody || item.body || ""));
+  const [busy, setBusy] = useState("");
+  const editorRef = useRef<any>(null);
+
+  useEffect(() => {
+    setTitle(item.draftTitle || item.title || "");
+    setSummary(item.draftSummary || item.summary || "");
+    const nextBody = legacyTextToHtml(item.draftBody || item.body || "");
+    setBody(nextBody);
+  }, [item.slug, item.draftTitle, item.draftSummary, item.draftBody, item.title, item.summary, item.body]);
+
+
+  async function post(action: "SAVE_DRAFT" | "PUBLISH" | "UNPUBLISH") {
+    try {
+      setBusy(action);
+
+      let finalBody = body;
+      const editor = editorRef.current;
+
+      if (editor && action !== "UNPUBLISH") {
+        await editor.uploadImages();
+        finalBody = editor.getContent();
+        setBody(finalBody);
+      }
+
+      if (action !== "UNPUBLISH" && /src=["']blob:/i.test(finalBody)) {
+        throw new Error("Ảnh chưa upload xong. Vui lòng chờ vài giây rồi bấm lưu/xuất bản lại.");
+      }
+
+      async function sendCms(nextAction: "SAVE_DRAFT" | "PUBLISH" | "UNPUBLISH") {
+        const res = await fetch("/api/admin/home-cms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+          cache: "no-store",
+          body: JSON.stringify({ action: nextAction, slug, title, summary, body: finalBody }),
+        });
+
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.message || "Không lưu được nội dung.");
+        }
+
+        return data;
+      }
+
+      let data: any;
+
+      if (action === "PUBLISH") {
+        await sendCms("SAVE_DRAFT");
+        data = await sendCms("PUBLISH");
+      } else {
+        data = await sendCms(action);
+      }
+
+      showToast("success", data.message || "Đã lưu.");
+      await onSaved();
+      setBusy("");
+    } catch (err: any) {
+      setBusy("");
+      showToast("error", err?.message || "Không lưu được nội dung.");
+    }
+  }
+
+  return (
+    <section className="cms-pro-editor-card">
+      <div className="cms-pro-editor-top">
+        <div>
+          <span className="adminx-eyebrow">Nội dung CMS</span>
+          <h2>{item.label}</h2>
+          <p>Soạn nội dung dạng bản nháp. Khi bấm xuất bản, trang chủ sẽ mở trang nội dung này.</p>
+        </div>
+        <div className={item.published ? "cms-status published" : "cms-status draft"}>
+          {item.published ? "Đang xuất bản" : "Đang cập nhật"}
+        </div>
+      </div>
+
+      <div className="cms-pro-editor-grid">
+        <section className="cms-pro-fields">
+          <label>
+            <span>Tiêu đề hiển thị</span>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nhập tiêu đề" />
+          </label>
+
+          <label>
+            <span>Mô tả ngắn trên trang chủ</span>
+            <textarea
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder="Nhập mô tả ngắn"
+              rows={3}
+            />
+          </label>
+
+          <div className="cms-rich-box cms-rich-box-tiny">
+            <div className="cms-rich-label">Nội dung chi tiết</div>
+            <Editor
+              tinymceScriptSrc="/tinymce/tinymce.min.js"
+              licenseKey="gpl"
+              value={body}
+              onInit={(_evt, editor) => {
+                editorRef.current = editor;
+              }}
+              onEditorChange={(value) => setBody(value)}
+              init={{
+                height: 520,
+                menubar: "file edit view insert format tools table help",
+                branding: true,
+                promotion: false,
+                automatic_uploads: true,
+                paste_data_images: true,
+                images_reuse_filename: false,
+                image_title: true,
+                image_caption: true,
+                object_resizing: true,
+                convert_urls: false,
+                relative_urls: false,
+                remove_script_host: false,
+                file_picker_types: "image media file",
+                images_upload_handler: async (blobInfo, progress) => {
+                  const formData = new FormData();
+                  formData.append("file", blobInfo.blob(), blobInfo.filename());
+                  formData.append("slug", slug);
+
+                  const res = await fetch("/api/admin/cms-upload", {
+                    method: "POST",
+                    body: formData,
+                    cache: "no-store",
+                  });
+
+                  const data = await res.json().catch(() => null);
+
+                  if (!res.ok || !data?.success || !data?.location) {
+                    throw new Error(data?.message || "Upload ảnh thất bại.");
+                  }
+
+                  if (typeof progress === "function") progress(100);
+                  return data.location;
+                },
+                file_picker_callback: (callback, value, meta) => {
+                  if (meta.filetype !== "image") return;
+
+                  const input = document.createElement("input");
+                  input.setAttribute("type", "file");
+                  input.setAttribute("accept", "image/png,image/jpeg,image/webp,image/gif");
+
+                  input.addEventListener("change", async () => {
+                    const file = input.files?.[0];
+                    if (!file) return;
+
+                    const formData = new FormData();
+                    formData.append("file", file, file.name);
+                    formData.append("slug", slug);
+
+                    const res = await fetch("/api/admin/cms-upload", {
+                      method: "POST",
+                      body: formData,
+                      cache: "no-store",
+                    });
+
+                    const data = await res.json().catch(() => null);
+
+                    if (!res.ok || !data?.success || !data?.location) {
+                      showToast("error", data?.message || "Upload ảnh thất bại.");
+                      return;
+                    }
+
+                    callback(data.location, { title: file.name, alt: file.name });
+                  });
+
+                  input.click();
+                },
+                plugins: [
+                  "advlist",
+                  "autolink",
+                  "lists",
+                  "link",
+                  "image",
+                  "charmap",
+                  "preview",
+                  "anchor",
+                  "searchreplace",
+                  "visualblocks",
+                  "code",
+                  "fullscreen",
+                  "insertdatetime",
+                  "media",
+                  "table",
+                  "help",
+                  "wordcount",
+                ],
+                toolbar:
+                  "undo redo | blocks | bold italic underline forecolor backcolor | " +
+                  "alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | " +
+                  "link image media table | removeformat | code preview fullscreen | help",
+                content_style:
+                  "body{font-family:Roboto,Arial,sans-serif;font-size:15px;line-height:1.65;color:#07111f;padding:12px;} img{max-width:100%;height:auto;border-radius:18px;} h2{font-size:28px;} h3{font-size:22px;} blockquote{border-left:5px solid #ffd400;background:#fffbeb;border-radius:14px;margin:12px 0;padding:12px 16px;}",
+              }}
+            />
+            <small className="cms-editor-note-vtdd">TinyMCE WYSIWYG Editor · Có nhãn Powered by Tiny theo bản miễn phí.</small>
+          </div>
+        </section>
+
+        <aside className="cms-pro-preview">
+          <div className="cms-preview-toolbar">
+            <span>Bản xem trước</span>
+            <b>{item.updatedAt || "Chưa cập nhật"}</b>
+          </div>
+          <article>
+            <h3>{title || "Chưa có tiêu đề"}</h3>
+            <p>{summary || "Chưa có mô tả."}</p>
+            <div className="cms-preview-body" dangerouslySetInnerHTML={{ __html: body || "<p>Nội dung đang cập nhật.</p>" }} />
+          </article>
+        </aside>
+      </div>
+
+      <div className="cms-actions">
+        <button type="button" onClick={() => post("SAVE_DRAFT")} disabled={!!busy}>
+          {busy === "SAVE_DRAFT" ? "Đang lưu..." : "Lưu bản nháp"}
+        </button>
+        <button type="button" className="publish" onClick={() => post("PUBLISH")} disabled={!!busy}>
+          {busy === "PUBLISH" ? "Đang xuất bản..." : "Xuất bản"}
+        </button>
+        <button type="button" className="unpublish" onClick={() => post("UNPUBLISH")} disabled={!!busy}>
+          {busy === "UNPUBLISH" ? "Đang tắt..." : "Ngừng xuất bản"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function NoAccessPanel({ moduleTitle }: { moduleTitle: string }) {
+  return (
+    <section className="admin-cms-no-access-panel">
+      <div>
+        <b>Không có quyền truy cập</b>
+        <p>Tài khoản của bạn đang là Mod nhưng chưa được Admin cấp quyền cho hạng mục này.</p>
+        <small>{moduleTitle}</small>
+      </div>
+    </section>
+  );
+}
+
+export default function AdminConsole({
+  initialSettings,
+  adminRole = "admin",
+  adminName = "Admin",
+  adminModules = "",
+}: AdminConsoleProps) {
+  const [module, setModule] = useState<AdminModuleKey>("tcdm");
+  const [cmsItems, setCmsItems] = useState<CmsItems>(EMPTY_CMS);
+  const [cmsLoading, setCmsLoading] = useState(false);
+  const [toast, setToast] = useState<ToastState>(null);
+
+  const isAdmin = adminRole === "admin";
+  const allowedModules = useMemo(() => parseModuleList(adminModules), [adminModules]);
+
+  function canAccess(key: AdminModuleKey) {
+    if (isAdmin) return true;
+    return allowedModules.includes(key);
+  }
+
+  function showToast(type: "success" | "error", text: string) {
+    setToast({ type, text });
+    window.setTimeout(() => setToast(null), 2800);
+  }
+
+  async function loadCms() {
+    try {
+      setCmsLoading(true);
+      const res = await fetch("/api/admin/home-cms", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) throw new Error(data?.message || "Không tải được CMS.");
+      setCmsItems({ ...EMPTY_CMS, ...(data.items || {}) });
+      setCmsLoading(false);
+    } catch (err: any) {
+      setCmsLoading(false);
+      showToast("error", err?.message || "Không tải được CMS.");
+    }
+  }
+
+  useEffect(() => {
+    if (!isCmsModule(module)) return;
+    loadCms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [module]);
+
+  const activeMeta = ADMIN_MODULES.find((item) => item.key === module) || ADMIN_MODULES[0];
+  const activeAccess = canAccess(module);
+
+  return (
+    <section className="admin-cms-shell-v5">
+      <style>{ADMIN_CMS_STYLE}</style>
+
+      <div className="admin-cms-headline-v5">
+        <div>
+          <span>CMS DASHBOARD</span>
+          <h2>Quản trị theo hạng mục ngành hàng</h2>
+          <p>Tài khoản hiện tại: <b>{adminName}</b> · Quyền: <b>{adminRole.toUpperCase()}</b></p>
+        </div>
+        <div className="admin-cms-permission-summary">
+          {isAdmin ? "Toàn quyền hệ thống" : allowedModules.length ? `Được cấp: ${allowedModules.join(", ")}` : "Chưa được cấp hạng mục"}
+        </div>
+      </div>
+
+      <nav className="admin-cms-module-grid-v5">
+        {ADMIN_MODULES.map((item) => {
+          const allowed = canAccess(item.key);
+          return (
+            <button
+              key={item.key}
+              type="button"
+              className={`${module === item.key ? "active" : ""} ${!allowed ? "noAccess" : ""}`}
+              onClick={() => setModule(item.key)}
+            >
+              <i>{item.no}</i>
+              <span>
+                <b>{item.title}</b>
+                <em>{item.desc}</em>
+              </span>
+              <small>{allowed ? item.badge : "Không có quyền"}</small>
+            </button>
+          );
+        })}
+      </nav>
+
+      <section className="admin-cms-module-panel-v5">
+        {!activeAccess ? (
+          <NoAccessPanel moduleTitle={activeMeta.title} />
+        ) : module === "tcdm" ? (
+          <>
+            <div className="admin-cms-module-title-v5">
+              <span>01</span>
+              <div>
+                <h3>Quản trị: Trang tra giá TCDM</h3>
+                <p>Toàn bộ chức năng admin cũ được gom vào module này.</p>
+              </div>
+            </div>
+            <TcdmAdminConsole initialSettings={initialSettings} adminRole={adminRole} adminName={adminName} adminModules={adminModules} />
+          </>
+        ) : isCmsModule(module) ? (
+          cmsLoading ? (
+            <div className="cms-loading">Đang tải CMS...</div>
+          ) : (
+            <CmsEditor
+              slug={module}
+              item={cmsItems[module] || EMPTY_CMS[module]}
+              onSaved={loadCms}
+              showToast={showToast}
+            />
+          )
+        ) : (
+          <div className="admin-cms-empty-tools">
+            <span>05</span>
+            <h3>Quản trị: Công cụ hỗ trợ</h3>
+            <p>Khu vực này đang giữ nguyên trạng thái đang cập nhật. Chưa thao tác gì ở giai đoạn này.</p>
+          </div>
+        )}
+      </section>
+
+      {toast && <div className={`adminx-toast ${toast.type}`}>{toast.text}</div>}
+    </section>
+  );
+}
+
+const ADMIN_CMS_STYLE = `
+.admin-cms-shell-v5 { display: grid; gap: 14px; }
+.admin-cms-headline-v5 {
+  padding: clamp(18px, 2vw, 28px);
+  border-radius: 30px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  background: rgba(255,255,255,.9);
+  border: 1px solid rgba(203,213,225,.92);
+  box-shadow: 0 20px 70px rgba(15,23,42,.08);
+}
+.admin-cms-headline-v5 span,
+.admin-cms-module-title-v5 span,
+.cms-pro-editor-top .adminx-eyebrow {
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.admin-cms-headline-v5 h2 {
+  margin: 8px 0 0;
+  color: #07111f;
+  font-size: clamp(30px, 3vw, 48px);
+  line-height: .98;
+  font-weight: 1000;
+  letter-spacing: -.06em;
+}
+.admin-cms-headline-v5 p { margin: 10px 0 0; color: #64748b; font-size: 13px; font-weight: 850; }
+.admin-cms-permission-summary {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 1000;
+}
+.admin-cms-module-grid-v5 {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+.admin-cms-module-grid-v5 button {
+  min-height: 150px;
+  padding: 18px;
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid rgba(203,213,225,.95);
+  background: rgba(255,255,255,.88);
+  color: #07111f;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 18px 55px rgba(15,23,42,.06);
+}
+.admin-cms-module-grid-v5 button.active {
+  background: radial-gradient(circle at 100% 0%, rgba(255,212,0,.28), transparent 45%), #07111f;
+  color: #fff;
+  border-color: #ffd400;
+}
+.admin-cms-module-grid-v5 button.noAccess {
+  opacity: .52;
+  filter: grayscale(.18);
+}
+.admin-cms-module-grid-v5 button.noAccess.active {
+  opacity: .82;
+  background: #f8fafc;
+  color: #94a3b8;
+  border-color: #cbd5e1;
+}
+.admin-cms-module-grid-v5 i,
+.admin-cms-module-title-v5 > span,
+.admin-cms-empty-tools span {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: #020617;
+  color: #ffd400;
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 1000;
+}
+.admin-cms-module-grid-v5 button.active i { background: #ffd400; color: #07111f; }
+.admin-cms-module-grid-v5 b { display: block; color: inherit; font-size: 14px; line-height: 1.2; font-weight: 1000; }
+.admin-cms-module-grid-v5 em { display: block; margin-top: 8px; color: #64748b; font-size: 11px; line-height: 1.35; font-style: normal; font-weight: 800; }
+.admin-cms-module-grid-v5 button.active em { color: rgba(255,255,255,.72); }
+.admin-cms-module-grid-v5 small {
+  margin-top: auto;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: #fff7cc;
+  color: #92400e;
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+.admin-cms-module-panel-v5 {
+  padding: clamp(16px, 2vw, 28px);
+  border-radius: 30px;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(203,213,225,.92);
+  box-shadow: 0 22px 80px rgba(15,23,42,.08);
+}
+.admin-cms-module-title-v5 { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; margin-bottom: 16px; }
+.admin-cms-module-title-v5 h3,
+.cms-pro-editor-top h2,
+.admin-cms-empty-tools h3 { margin: 0; color: #07111f; font-size: clamp(26px, 2.7vw, 44px); line-height: .98; font-weight: 1000; letter-spacing: -.06em; }
+.admin-cms-module-title-v5 p,
+.cms-pro-editor-top p,
+.admin-cms-empty-tools p { margin: 8px 0 0; color: #64748b; font-size: 13px; line-height: 1.45; font-weight: 850; }
+.admin-cms-no-access-panel {
+  min-height: 320px;
+  border-radius: 26px;
+  display: grid;
+  place-items: center;
+  background: repeating-linear-gradient(135deg, #f8fafc, #f8fafc 12px, #f1f5f9 12px, #f1f5f9 24px);
+  border: 1px dashed #cbd5e1;
+  text-align: center;
+}
+.admin-cms-no-access-panel b { display: block; color: #b45309; font-size: 26px; font-weight: 1000; }
+.admin-cms-no-access-panel p { max-width: 460px; margin: 10px auto; color: #64748b; font-size: 14px; font-weight: 850; }
+.admin-cms-no-access-panel small { display: inline-flex; margin-top: 8px; padding: 8px 12px; border-radius: 999px; background: #fff7cc; color: #92400e; font-weight: 1000; }
+.cms-pro-editor-card { display: grid; gap: 16px; }
+.cms-pro-editor-top { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+.cms-status { min-height: 42px; padding: 0 15px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 1000; }
+.cms-status.published { background: #ecfdf5; border: 1px solid #bbf7d0; color: #047857; }
+.cms-status.draft { background: #fff7cc; border: 1px solid #fde68a; color: #92400e; }
+.cms-pro-editor-grid { display: grid; grid-template-columns: minmax(420px, 1.05fr) minmax(360px, .95fr); gap: 14px; align-items: stretch; }
+.cms-pro-fields,
+.cms-pro-preview { padding: 18px; border-radius: 24px; background: #fff; border: 1px solid #dbe4ef; }
+.cms-pro-fields { display: grid; gap: 14px; }
+.cms-pro-fields label { display: grid; gap: 7px; }
+.cms-pro-fields label span,
+.cms-rich-label { color: #64748b; font-size: 11px; font-weight: 1000; letter-spacing: .08em; text-transform: uppercase; }
+.cms-pro-fields input,
+.cms-pro-fields textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 16px; background: #f8fafc; color: #07111f; padding: 13px 14px; font-size: 14px; font-weight: 850; outline: none; resize: vertical; }
+.cms-pro-fields input:focus,
+.cms-pro-fields textarea:focus { background: #fff; border-color: #ffd400; box-shadow: 0 0 0 4px rgba(255,212,0,.18); }
+.cms-rich-box { display: grid; gap: 8px; }
+.cms-toolbar { min-height: 48px; padding: 8px; border-radius: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; background: #f1f5f9; border: 1px solid #dbe4ef; }
+.cms-toolbar button,
+.cms-toolbar select,
+.cms-toolbar input[type=color] { min-height: 34px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; color: #07111f; padding: 0 10px; font-size: 12px; font-weight: 900; cursor: pointer; }
+.cms-toolbar input[type=color] { width: 44px; padding: 3px; }
+.cms-rich-editor { min-height: 380px; padding: 18px; border-radius: 18px; border: 1px solid #cbd5e1; background: #fff; color: #07111f; outline: none; font-size: 15px; line-height: 1.65; font-weight: 700; overflow: auto; }
+.cms-rich-editor:focus { border-color: #ffd400; box-shadow: 0 0 0 4px rgba(255,212,0,.16); }
+.cms-rich-editor h2,
+.cms-preview-body h2 { font-size: 28px; line-height: 1.15; margin: 18px 0 8px; }
+.cms-rich-editor h3,
+.cms-preview-body h3 { font-size: 22px; line-height: 1.2; margin: 14px 0 8px; }
+.cms-rich-editor blockquote,
+.cms-preview-body blockquote { margin: 12px 0; padding: 12px 16px; border-left: 5px solid #ffd400; background: #fffbeb; border-radius: 14px; }
+.cms-pro-preview { min-height: 100%; display: grid; align-content: start; }
+.cms-preview-toolbar { display: flex; justify-content: space-between; gap: 12px; color: #64748b; font-size: 12px; font-weight: 900; margin-bottom: 14px; }
+.cms-pro-preview article h3 { margin: 0; color: #07111f; font-size: 30px; line-height: 1.08; font-weight: 1000; letter-spacing: -.04em; }
+.cms-pro-preview article > p { margin: 10px 0 18px; color: #475569; font-size: 14px; line-height: 1.5; font-weight: 850; }
+.cms-preview-body { color: #07111f; font-size: 15px; line-height: 1.65; font-weight: 700; }
+.cms-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.cms-actions button { min-height: 46px; border: 0; border-radius: 15px; padding: 0 18px; background: #e2e8f0; color: #07111f; font-size: 12px; font-weight: 1000; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.cms-actions button.publish { background: #ffd400; }
+.cms-actions button.unpublish { background: #07111f; color: #fff; }
+.cms-actions button:disabled { opacity: .55; cursor: not-allowed; }
+.admin-cms-empty-tools { min-height: 300px; display: grid; place-items: center; text-align: center; }
+.cms-loading { min-height: 260px; display: grid; place-items: center; color: #64748b; font-weight: 1000; }
+.adminx-permission-box { margin-top: 12px; padding: 12px; border-radius: 16px; background: #f8fafc; border: 1px solid #dbe4ef; display: grid; gap: 10px; }
+.adminx-permission-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.adminx-permission-head b { color: #07111f; font-size: 12px; font-weight: 1000; }
+.adminx-permission-head button { min-height: 34px; border: 0; border-radius: 11px; padding: 0 12px; background: #ffd400; color: #07111f; font-size: 11px; font-weight: 1000; cursor: pointer; }
+.adminx-permission-box select { min-height: 40px; border: 1px solid #cbd5e1; border-radius: 13px; background: #fff; padding: 0 12px; font-size: 13px; font-weight: 850; }
+.adminx-module-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.adminx-module-checks label { min-height: 36px; padding: 7px 9px; border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; color: #334155; font-size: 11px; font-weight: 850; }
+.adminx-permission-box em { color: #64748b; font-size: 12px; font-style: normal; font-weight: 850; }
+@media (max-width: 1280px) { .admin-cms-module-grid-v5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .cms-pro-editor-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .admin-cms-headline-v5, .cms-pro-editor-top { display: grid; } .admin-cms-module-grid-v5 { grid-template-columns: 1fr; } .admin-cms-module-grid-v5 button { min-height: 132px; } .cms-actions { display: grid; } .cms-actions button { width: 100%; } .adminx-module-checks { grid-template-columns: 1fr; } }
+
+/* ===== VTDD ADMIN FIX PACK ===== */
+.adminx-permission-box-v2 { margin-top: 14px; padding: 14px; border-radius: 20px; background: radial-gradient(circle at 100% 0%, rgba(255,212,0,.12), transparent 38%), #ffffff; border: 1px solid #dbe4ef; box-shadow: 0 12px 28px rgba(15,23,42,.045); }
+.adminx-permission-head-v2 { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+.adminx-permission-head-v2 small { display: block; margin-top: 4px; color: #64748b; font-size: 11px; line-height: 1.35; font-weight: 850; }
+.adminx-role-pills { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.adminx-role-pills button, .adminx-module-buttons button { min-height: 64px; padding: 11px; border-radius: 16px; border: 1px solid #e2e8f0; background: #f8fafc; color: #07111f; text-align: left; font-size: 12px; line-height: 1.15; font-weight: 1000; cursor: pointer; }
+.adminx-role-pills button small, .adminx-module-buttons button small { display: block; margin-top: 6px; color: #64748b; font-size: 9.5px; line-height: 1.25; font-weight: 850; }
+.adminx-role-pills button.active, .adminx-module-buttons button.active { background: #07111f; border-color: #07111f; color: #ffd400; box-shadow: 0 12px 24px rgba(15,23,42,.16); }
+.adminx-role-pills button.active small, .adminx-module-buttons button.active small { color: rgba(255,255,255,.72); }
+.adminx-module-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.adminx-module-buttons button span { display: block; }
+.cms-rich-editor-vtdd { min-height: 380px; resize: vertical; font-family: Roboto, Arial, sans-serif; white-space: pre-wrap; }
+.cms-editor-note-vtdd { display: block; margin-top: 8px; color: #64748b; font-size: 11px; font-weight: 850; }
+@media (max-width: 760px) { .adminx-permission-head-v2 { grid-template-columns: 1fr; } .adminx-role-pills, .adminx-module-buttons { grid-template-columns: 1fr; } }
+
+/* ===== VTDD ADMIN V3 - Permission tab & TinyMCE ===== */
+.adminx-permission-page { display: grid; gap: 14px; }
+.adminx-permission-alert {
+  padding: 13px 14px;
+  border-radius: 18px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 900;
+}
+.adminx-permission-list-v3 { display: grid; gap: 12px; }
+.adminx-permission-card-v3 {
+  padding: 16px;
+  border-radius: 24px;
+  display: grid;
+  grid-template-columns: minmax(260px, .85fr) minmax(420px, 1.15fr);
+  gap: 14px;
+  background: #ffffff;
+  border: 1px solid #dbe4ef;
+  box-shadow: 0 14px 34px rgba(15,23,42,.055);
+}
+.adminx-permission-user-v3 { display: grid; align-content: start; gap: 8px; }
+.adminx-permission-user-v3 h3 { color: #07111f; font-size: 20px; line-height: 1.1; font-weight: 1000; letter-spacing: -.035em; }
+.adminx-permission-user-v3 p { color: #64748b; font-size: 13px; line-height: 1.45; font-weight: 850; }
+.adminx-permission-box-v2 button:disabled { opacity: .52; cursor: not-allowed; }
+.adminx-role-pills button:disabled,
+.adminx-module-buttons button:disabled { opacity: .55; cursor: not-allowed; }
+.cms-rich-box-tiny { display: grid; gap: 8px; }
+.cms-rich-box-tiny .tox-tinymce { border-radius: 18px !important; border-color: #cbd5e1 !important; overflow: hidden; }
+.cms-rich-box-tiny .tox .tox-statusbar { background: #f8fafc; }
+.cms-rich-box-tiny .tox .tox-promotion { display: none !important; }
+.cms-preview-body img,
+.cms-pro-editor-card img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 18px;
+  display: block;
+  margin: 12px 0;
+}
+.cms-preview-body figure,
+.cms-pro-editor-card figure {
+  max-width: 100%;
+  margin: 14px 0;
+}
+.cms-preview-body figcaption,
+.cms-pro-editor-card figcaption {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+@media (max-width: 980px) { .adminx-permission-card-v3 { grid-template-columns: 1fr; } }
+
 `;

@@ -1,97 +1,111 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSystemSettings } from "@/lib/system-store";
-import { verifyPassword } from "@/lib/staff-security";
-
-const ADMIN_COOKIE = "vtdd_admin_token";
+import { findStaffByMaNV, ensureStaffAdminHeaders } from "@/lib/staff-store";
+import { verifyPassword, normalizeCode } from "@/lib/staff-security";
+import { setAdminCookies } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 function redirectLogin(req: NextRequest, message: string) {
   const url = new URL("/admin/login", req.url);
   url.searchParams.set("error", message);
-
-  const res = NextResponse.redirect(url, { status: 303 });
-
-  res.cookies.set(ADMIN_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
-
-  res.cookies.set("vtdd_admin_name", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
-
-  return res;
+  return NextResponse.redirect(url, { status: 303 });
 }
 
-async function verifyAdminPin(input: string) {
-  const settings = await getSystemSettings();
-  const pinHash = String(settings.ADMIN_PIN_HASH || "").trim();
+function normalizePermission(value: any): "admin" | "mod" | "" {
+  const v = String(value || "").trim().toLowerCase();
+  if (v === "admin") return "admin";
+  if (v === "mod" || v === "moderator") return "mod";
+  return "";
+}
 
-  if (pinHash) {
-    return verifyPassword(input, pinHash);
+async function checkPassword(input: string, saved: string) {
+  const raw = String(saved || "").trim();
+  if (!raw) return false;
+
+  try {
+    if (verifyPassword(input, raw)) return true;
+  } catch {
+    // Cho phép fallback phía dưới với mật khẩu cũ dạng plain text.
   }
 
-  const envPassword = String(process.env.ADMIN_PASSWORD || "").trim();
+  return input === raw;
+}
 
-  if (!envPassword) {
-    throw new Error("Thiếu ADMIN_PASSWORD trong .env.local hoặc ADMIN_PIN_HASH trong System_Settings.");
-  }
-
-  return input === envPassword;
+function setSharedStaffCookie(res: NextResponse, name: string, value: string) {
+  res.cookies.set(name, encodeURIComponent(value || ""), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 12,
+  });
 }
 
 export async function POST(req: NextRequest) {
   try {
+    await ensureStaffAdminHeaders();
+
     const contentType = req.headers.get("content-type") || "";
+    let maNV = "";
     let password = "";
 
     if (contentType.includes("application/json")) {
       const body = await req.json();
+      maNV = normalizeCode(body.maNV);
       password = String(body.password || "").trim();
     } else {
       const form = await req.formData();
+      maNV = normalizeCode(form.get("maNV"));
       password = String(form.get("password") || "").trim();
     }
 
-    if (!password) {
-      return redirectLogin(req, "Vui lòng nhập PIN hoặc mật khẩu quản trị.");
+    if (!maNV || !password) {
+      return redirectLogin(req, "Vui lòng nhập mã nhân viên và mật khẩu.");
     }
 
-    const ok = await verifyAdminPin(password);
+    const staff = await findStaffByMaNV(maNV);
+
+    if (!staff) {
+      return redirectLogin(req, "Tài khoản không tồn tại trong hệ thống.");
+    }
+
+    if (String(staff.status || "").trim().toLowerCase() !== "active") {
+      return redirectLogin(req, "Tài khoản chưa Active hoặc đã bị khóa.");
+    }
+
+    const permission = normalizePermission(staff.permission);
+
+    if (!permission) {
+      return redirectLogin(req, "Tài khoản này không thuộc đội ngũ quản trị viên.");
+    }
+
+    const ok = await checkPassword(password, staff.password);
 
     if (!ok) {
-      return redirectLogin(req, "Sai PIN hoặc mật khẩu quản trị.");
+      return redirectLogin(req, "Mật khẩu không đúng.");
     }
 
     const url = new URL("/admin", req.url);
     const res = NextResponse.redirect(url, { status: 303 });
 
-    res.cookies.set(ADMIN_COOKIE, "admin-ok", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 6,
+    setAdminCookies(res, {
+      maNV: staff.maNV,
+      name: staff.staffName || staff.maNV,
+      permission,
+      modules: staff.modulePermissions || "",
     });
 
-    res.cookies.set("vtdd_admin_name", encodeURIComponent("Admin"), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 6,
-    });
+    // Dùng chung API cập nhật thông tin với trang nhân viên.
+    setSharedStaffCookie(res, "vtdd_staff_nv", staff.maNV || "");
+    setSharedStaffCookie(res, "vtdd_staff_st", staff.maST || "");
+    setSharedStaffCookie(res, "vtdd_staff_name", staff.staffName || staff.maNV || "Admin");
+    setSharedStaffCookie(res, "vtdd_staff_store_name", staff.storeName || "");
+    setSharedStaffCookie(res, "vtdd_staff_department", staff.department || "");
+    setSharedStaffCookie(res, "vtdd_staff_gmail", staff.gmail || "");
+    setSharedStaffCookie(res, "vtdd_staff_force_setup", "0");
 
     return res;
   } catch (err: any) {
-    return redirectLogin(req, "Lỗi hệ thống: " + (err?.message || "Không đăng nhập được."));
+    return redirectLogin(req, "Lỗi đăng nhập Admin: " + (err?.message || "Không đăng nhập được."));
   }
 }
