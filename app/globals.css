@@ -10130,3 +10130,260 @@ a {
 .admin-profile-msg { margin-top: 12px; padding: 12px; border-radius: 14px; background: #fffbea; border: 1px solid rgba(250,204,21,.44); color: #854d0e; font-size: 13px; font-weight: 850; }
 .admin-profile-save { width: 100%; min-height: 54px; margin-top: 16px; border: 0; border-radius: 17px; background: #ffd400; color: #111827; font-size: 12px; font-weight: 950; letter-spacing: .06em; text-transform: uppercase; }
 @media (max-width: 820px) { .admin-login-actions-v3, .admin-profile-2col { grid-template-columns: 1fr; } }
+
+/* =========================================================
+   FIX CMS ARTICLE IMAGE OVERFLOW - MOBILE SAFE
+   Ảnh upload từ TinyMCE không được tràn khỏi khung bài viết
+========================================================= */
+
+.cms-preview-body,
+.cms-public-body,
+.cms-page-body,
+.cms-detail-body,
+.cms-content,
+.cms-article-content,
+.cms-article-body,
+.home-cms-body,
+.home-cms-content,
+.article-content,
+.public-article-body,
+main article {
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.cms-preview-body img,
+.cms-public-body img,
+.cms-page-body img,
+.cms-detail-body img,
+.cms-content img,
+.cms-article-content img,
+.cms-article-body img,
+.home-cms-body img,
+.home-cms-content img,
+.article-content img,
+.public-article-body img,
+main article img {
+  display: block !important;
+  max-width: 100% !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 14px auto !important;
+  border-radius: 16px;
+  object-fit: contain !important;
+}
+
+.cms-preview-body figure,
+.cms-public-body figure,
+.cms-page-body figure,
+.cms-detail-body figure,
+.cms-content figure,
+.cms-article-content figure,
+.cms-article-body figure,
+.home-cms-body figure,
+.home-cms-content figure,
+.article-content figure,
+.public-article-body figure,
+main article figure {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 14px 0 !important;
+  overflow: hidden;
+}
+
+.cms-preview-body figure img,
+.cms-public-body figure img,
+.cms-page-body figure img,
+.cms-detail-body figure img,
+.cms-content figure img,
+.cms-article-content figure img,
+.cms-article-body figure img,
+.home-cms-body figure img,
+.home-cms-content figure img,
+.article-content figure img,
+.public-article-body figure img,
+main article figure img {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.cms-preview-body table,
+.cms-public-body table,
+.cms-page-body table,
+.cms-detail-body table,
+.cms-content table,
+.cms-article-content table,
+.cms-article-body table,
+.home-cms-body table,
+.home-cms-content table,
+.article-content table,
+.public-article-body table,
+main article table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.cms-preview-body iframe,
+.cms-public-body iframe,
+.cms-page-body iframe,
+.cms-detail-body iframe,
+.cms-content iframe,
+.cms-article-content iframe,
+.cms-article-body iframe,
+.home-cms-body iframe,
+.home-cms-content iframe,
+.article-content iframe,
+.public-article-body iframe,
+main article iframe {
+  display: block;
+  max-width: 100% !important;
+  width: 100% !important;
+  aspect-ratio: 16 / 9;
+  height: auto !important;
+  border-radius: 16px;
+}
+
+/* =========================================================
+   CMS IMAGE LIGHTBOX - Click ảnh để phóng to
+========================================================= */
+
+.cms-preview-body img,
+.cms-public-body img,
+.cms-page-body img,
+.cms-detail-body img,
+.cms-content img,
+.cms-article-content img,
+.cms-article-body img,
+.home-cms-body img,
+.home-cms-content img,
+.article-content img,
+.public-article-body img,
+main article img {
+  cursor: zoom-in;
+}
+
+.cms-lightbox-open {
+  overflow: hidden !important;
+}
+
+.cms-lightbox-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+  display: grid;
+  place-items: center;
+}
+
+.cms-lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, .88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.cms-lightbox-card {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 1180px);
+  height: min(92dvh, 860px);
+  display: grid;
+  place-items: center;
+  animation: cmsLightboxIn .18s ease-out;
+}
+
+.cms-lightbox-card img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .42);
+}
+
+.cms-lightbox-close {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
+  z-index: 3;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 900;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .28);
+  cursor: pointer;
+}
+
+.cms-lightbox-close:active {
+  transform: scale(.94);
+}
+
+.cms-lightbox-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 40px);
+  padding: 9px 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .12);
+  border: 1px solid rgba(255, 255, 255, .16);
+  color: rgba(255, 255, 255, .82);
+  font-size: 12px;
+  font-weight: 850;
+  text-align: center;
+}
+
+@keyframes cmsLightboxIn {
+  from {
+    opacity: 0;
+    transform: scale(.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 560px) {
+  .cms-lightbox-layer {
+    padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom));
+  }
+
+  .cms-lightbox-card {
+    width: 100%;
+    height: 90dvh;
+  }
+
+  .cms-lightbox-card img {
+    border-radius: 14px;
+  }
+
+  .cms-lightbox-close {
+    width: 44px;
+    height: 44px;
+    font-size: 30px;
+  }
+
+  .cms-lightbox-hint {
+    display: none;
+  }
+}

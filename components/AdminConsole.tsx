@@ -2600,7 +2600,7 @@ function CmsEditor({
                   "alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | " +
                   "link image media table | removeformat | code preview fullscreen | help",
                 content_style:
-                  "body{font-family:Roboto,Arial,sans-serif;font-size:15px;line-height:1.65;color:#07111f;padding:12px;} img{max-width:100%;height:auto;border-radius:18px;} h2{font-size:28px;} h3{font-size:22px;} blockquote{border-left:5px solid #ffd400;background:#fffbeb;border-radius:14px;margin:12px 0;padding:12px 16px;}",
+                  "body{font-family:Roboto,Arial,sans-serif;font-size:15px;line-height:1.65;color:#07111f;padding:12px;overflow-x:hidden;} img{display:block;max-width:100%!important;width:auto!important;height:auto!important;margin:14px auto;border-radius:16px;object-fit:contain;} figure{max-width:100%!important;width:100%!important;margin:14px 0!important;overflow:hidden;} figure img{width:100%!important;max-width:100%!important;} table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;} iframe{display:block;max-width:100%!important;width:100%!important;aspect-ratio:16/9;height:auto!important;border-radius:16px;} h2{font-size:28px;} h3{font-size:22px;} blockquote{border-left:5px solid #ffd400;background:#fffbeb;border-radius:14px;margin:12px 0;padding:12px 16px;}",
               }}
             />
             <small className="cms-editor-note-vtdd">TinyMCE WYSIWYG Editor · Có nhãn Powered by Tiny theo bản miễn phí.</small>

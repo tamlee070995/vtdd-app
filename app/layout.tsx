@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import OnlineHeartbeat from "@/components/OnlineHeartbeat";
 import "./globals.css";
+import CmsImageLightbox from "@/components/CmsImageLightbox";
 
 const roboto = Roboto({
   subsets: ["latin", "vietnamese"],
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={roboto.className}suppressHydrationWarning>
         <OnlineHeartbeat />
         {children}
+        <CmsImageLightbox />
       </body>
     </html>
   );
