@@ -12,20 +12,6 @@ function normalizePermission(value: any): "admin" | "mod" | "" {
   return "";
 }
 
-function redirectLogin(req: NextRequest, message: string) {
-  const url = new URL("/admin/login", req.url);
-  url.searchParams.set("error", message);
-  return NextResponse.redirect(url, { status: 303 });
-}
-
-function fail(req: NextRequest, message: string, jsonMode: boolean, status = 400) {
-  if (jsonMode) {
-    return NextResponse.json({ success: false, message }, { status });
-  }
-
-  return redirectLogin(req, message);
-}
-
 async function checkPassword(input: string, saved: string) {
   const raw = String(saved || "").trim();
   if (!raw) return false;
@@ -33,10 +19,20 @@ async function checkPassword(input: string, saved: string) {
   try {
     if (verifyPassword(input, raw)) return true;
   } catch {
-    // Cho phép fallback phía dưới với mật khẩu cũ dạng plain text.
+    // fallback mật khẩu cũ dạng plain text
   }
 
   return input === raw;
+}
+
+function jsonError(message: string, status = 400) {
+  return NextResponse.json(
+    {
+      success: false,
+      message,
+    },
+    { status }
+  );
 }
 
 function setSharedStaffCookie(res: NextResponse, name: string, value: string) {
@@ -50,19 +46,17 @@ function setSharedStaffCookie(res: NextResponse, name: string, value: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const contentType = req.headers.get("content-type") || "";
-  const jsonMode = contentType.includes("application/json");
-
   try {
     await ensureStaffAdminHeaders();
 
+    const contentType = req.headers.get("content-type") || "";
     let maNV = "";
     let password = "";
 
-    if (jsonMode) {
-      const body = await req.json().catch(() => null);
-      maNV = normalizeCode(body?.maNV);
-      password = String(body?.password || "").trim();
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      maNV = normalizeCode(body.maNV);
+      password = String(body.password || "").trim();
     } else {
       const form = await req.formData();
       maNV = normalizeCode(form.get("maNV"));
@@ -70,34 +64,36 @@ export async function POST(req: NextRequest) {
     }
 
     if (!maNV || !password) {
-      return fail(req, "Vui lòng nhập mã nhân viên và mật khẩu.", jsonMode, 400);
+      return jsonError("Vui lòng nhập mã nhân viên và mật khẩu.");
     }
 
     const staff = await findStaffByMaNV(maNV);
 
     if (!staff) {
-      return fail(req, "Tài khoản không tồn tại trong hệ thống.", jsonMode, 404);
+      return jsonError("Tài khoản không tồn tại trong hệ thống.", 404);
     }
 
     if (String(staff.status || "").trim().toLowerCase() !== "active") {
-      return fail(req, "Tài khoản chưa Active hoặc đã bị khóa.", jsonMode, 403);
+      return jsonError("Tài khoản chưa Active hoặc đã bị khóa.", 403);
     }
 
     const permission = normalizePermission(staff.permission);
 
     if (!permission) {
-      return fail(req, "Tài khoản này không thuộc đội ngũ quản trị viên.", jsonMode, 403);
+      return jsonError("Tài khoản này không thuộc đội ngũ quản trị viên.", 403);
     }
 
     const ok = await checkPassword(password, staff.password);
 
     if (!ok) {
-      return fail(req, "Mật khẩu không đúng.", jsonMode, 401);
+      return jsonError("Mật khẩu không đúng.", 401);
     }
 
-    const res = jsonMode
-      ? NextResponse.json({ success: true, redirectTo: "/admin" })
-      : NextResponse.redirect(new URL("/admin", req.url), { status: 303 });
+    const res = NextResponse.json({
+      success: true,
+      message: "Đăng nhập Admin thành công.",
+      redirectTo: "/admin",
+    });
 
     setAdminCookies(res, {
       maNV: staff.maNV,
@@ -106,10 +102,9 @@ export async function POST(req: NextRequest) {
       modules: staff.modulePermissions || "",
     });
 
-    // Dùng chung API cập nhật thông tin với trang nhân viên.
-    setSharedStaffCookie(res, "vtdd_staff_nv", staff.maNV || "");
+    setSharedStaffCookie(res, "vtdd_staff_nv", staff.maNV);
     setSharedStaffCookie(res, "vtdd_staff_st", staff.maST || "");
-    setSharedStaffCookie(res, "vtdd_staff_name", staff.staffName || staff.maNV || "Admin");
+    setSharedStaffCookie(res, "vtdd_staff_name", staff.staffName || "Admin");
     setSharedStaffCookie(res, "vtdd_staff_store_name", staff.storeName || "");
     setSharedStaffCookie(res, "vtdd_staff_department", staff.department || "");
     setSharedStaffCookie(res, "vtdd_staff_gmail", staff.gmail || "");
@@ -117,6 +112,6 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (err: any) {
-    return fail(req, "Lỗi đăng nhập Admin: " + (err?.message || "Không đăng nhập được."), jsonMode, 500);
+    return jsonError("Lỗi đăng nhập Admin: " + (err?.message || "Không đăng nhập được."), 500);
   }
 }
