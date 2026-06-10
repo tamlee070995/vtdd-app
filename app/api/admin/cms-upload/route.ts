@@ -1,85 +1,169 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
-import path from "path";
-import { mkdir, writeFile } from "fs/promises";
-import { requireAdminApi, type AdminModuleKey } from "@/lib/admin-auth";
+import crypto from "node:crypto";
+import { requireAdminApi } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const CMS_MODULES = new Set(["quy-trinh-thu-cu", "may-moi", "may-cu", "demo"]);
-
-function getExt(file: File) {
-  const name = String(file.name || "").toLowerCase();
+function isValidImage(file: File) {
   const type = String(file.type || "").toLowerCase();
 
-  if (type === "image/png" || name.endsWith(".png")) return "png";
-  if (type === "image/jpeg" || name.endsWith(".jpg") || name.endsWith(".jpeg")) return "jpg";
-  if (type === "image/webp" || name.endsWith(".webp")) return "webp";
-  if (type === "image/gif" || name.endsWith(".gif")) return "gif";
+  return [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+    "image/gif",
+  ].includes(type);
+}
 
-  return "";
+function getCloudinaryEnv() {
+  const cloudName = String(process.env.CLOUDINARY_CLOUD_NAME || "").trim();
+  const apiKey = String(process.env.CLOUDINARY_API_KEY || "").trim();
+  const apiSecret = String(process.env.CLOUDINARY_API_SECRET || "").trim();
+  const folder = String(process.env.CLOUDINARY_FOLDER || "vtdd-cms").trim();
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error(
+      "Thiếu CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY hoặc CLOUDINARY_API_SECRET."
+    );
+  }
+
+  return {
+    cloudName,
+    apiKey,
+    apiSecret,
+    folder,
+  };
+}
+
+function signCloudinaryUpload(
+  params: Record<string, string | number>,
+  apiSecret: string
+) {
+  const payload = Object.keys(params)
+    .sort()
+    .map((key) => `${key}=${params[key]}`)
+    .join("&");
+
+  return crypto
+    .createHash("sha1")
+    .update(payload + apiSecret)
+    .digest("hex");
+}
+
+function safePublicId(originalName: string) {
+  const name = String(originalName || "cms-image")
+    .replace(/\.[^/.]+$/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/[^a-zA-Z0-9-_]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+
+  return `${name || "cms-image"}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 }
 
 export async function POST(req: NextRequest) {
+  const { response } = await requireAdminApi(req);
+
+  if (response) return response;
+
   try {
-    const form = await req.formData();
-    const slug = String(form.get("slug") || "").trim();
+    const { cloudName, apiKey, apiSecret, folder } = getCloudinaryEnv();
 
-    if (!CMS_MODULES.has(slug)) {
-      return NextResponse.json(
-        { success: false, message: "Hạng mục CMS không hợp lệ." },
-        { status: 400 }
-      );
-    }
-
-    const { response } = await requireAdminApi(req, {
-      write: true,
-      module: slug as AdminModuleKey,
-    });
-
-    if (response) return response;
-
-    const file = form.get("file");
+    const formData = await req.formData();
+    const file = formData.get("file");
 
     if (!(file instanceof File)) {
       return NextResponse.json(
-        { success: false, message: "Không nhận được file ảnh." },
+        {
+          success: false,
+          message: "Không tìm thấy file ảnh.",
+        },
         { status: 400 }
       );
     }
 
-    const ext = getExt(file);
-
-    if (!ext) {
+    if (!isValidImage(file)) {
       return NextResponse.json(
-        { success: false, message: "Chỉ hỗ trợ ảnh PNG, JPG, WEBP hoặc GIF." },
+        {
+          success: false,
+          message: "Chỉ hỗ trợ PNG, JPG, JPEG, WEBP hoặc GIF.",
+        },
         { status: 400 }
       );
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    const maxSize = 10 * 1024 * 1024;
+
+    if (file.size > maxSize) {
       return NextResponse.json(
-        { success: false, message: "Ảnh quá nặng. Vui lòng dùng ảnh dưới 5MB." },
+        {
+          success: false,
+          message: "Ảnh quá lớn. Vui lòng dùng ảnh dưới 10MB.",
+        },
         { status: 400 }
       );
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const dir = path.join(process.cwd(), "public", "uploads", "cms", slug);
-    await mkdir(dir, { recursive: true });
+    const timestamp = Math.floor(Date.now() / 1000);
+    const publicId = safePublicId(file.name || "cms-image");
 
-    const filename = `${Date.now()}-${randomUUID()}.${ext}`;
-    const fullPath = path.join(dir, filename);
-    await writeFile(fullPath, buffer);
+    const signParams = {
+      folder,
+      public_id: publicId,
+      timestamp,
+    };
+
+    const signature = signCloudinaryUpload(signParams, apiSecret);
+
+    const uploadForm = new FormData();
+    uploadForm.append("file", file);
+    uploadForm.append("api_key", apiKey);
+    uploadForm.append("timestamp", String(timestamp));
+    uploadForm.append("signature", signature);
+    uploadForm.append("folder", folder);
+    uploadForm.append("public_id", publicId);
+
+    const uploadRes = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      {
+        method: "POST",
+        body: uploadForm,
+      }
+    );
+
+    const data = await uploadRes.json().catch(() => null);
+
+    if (!uploadRes.ok || !data?.secure_url) {
+      throw new Error(
+        data?.error?.message || "Cloudinary không upload được ảnh."
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      location: `/uploads/cms/${slug}/${filename}`,
+      location: data.secure_url,
+      url: data.secure_url,
+      publicId: data.public_id,
+      width: data.width,
+      height: data.height,
+      format: data.format,
     });
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, message: err?.message || "Không upload được ảnh CMS." },
+      {
+        success: false,
+        message:
+          "Failed to upload image: " +
+          (err?.message || "Không upload được ảnh."),
+      },
       { status: 500 }
     );
   }
