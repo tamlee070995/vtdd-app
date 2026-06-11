@@ -502,6 +502,75 @@ const SYSTEM_UI_CSS = `
   font-weight: 850;
 }
 
+.vtdd-product-suggest {
+  margin-top: 9px;
+  padding: 10px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .20), transparent 34%),
+    #fffbea;
+  border: 1px solid rgba(250, 204, 21, .48);
+  box-shadow: 0 10px 24px rgba(245, 158, 11, .08);
+}
+
+.vtdd-product-suggest > span {
+  display: block;
+  color: #854d0e;
+  font-size: 10.5px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.vtdd-product-suggest > div {
+  margin-top: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vtdd-product-suggest button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #ffd400;
+  font-size: 11px;
+  line-height: 1.15;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.vtdd-product-suggest button:active {
+  transform: scale(.96);
+}
+
+.vtdd-product-empty-suggest {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.vtdd-product-empty-suggest span {
+  color: #854d0e;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.vtdd-product-empty-suggest button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #ffd400;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+
 .vtdd-product-list {
   flex: 1;
   min-height: 0;
@@ -708,6 +777,10 @@ function normalizeSearchText(value: any) {
     .trim();
 }
 
+function compactSearchText(value: any) {
+  return normalizeSearchText(value).replace(/\s+/g, "");
+}
+
 function getProductSearchParts(value: any) {
   const raw = String(value || "");
   const modelRaw = raw.split("_")[0] || raw;
@@ -715,6 +788,7 @@ function getProductSearchParts(value: any) {
   const model = normalizeSearchText(modelRaw);
 
   return {
+    raw,
     full,
     model,
     fullCompact: full.replace(/\s+/g, ""),
@@ -733,6 +807,11 @@ function productTokenMatches(
 
   const isNumberOnly = /^\d+$/.test(token);
 
+  /*
+    Fix lỗi:
+    - "iphone 8" không match nhầm IPHONE 11_128G vì số 8 nằm trong 128G.
+    - Nhưng vẫn cho "iphone16" tìm được IPHONE 16 do dùng compactSearchText.
+  */
   if (isNumberOnly && queryHasText && token.length <= 2) {
     return product.modelTokens.some((item) => item === token);
   }
@@ -747,7 +826,7 @@ function productTokenMatches(
 function rankProductSearch(item: string, query: string) {
   const product = getProductSearchParts(item);
   const q = normalizeSearchText(query);
-  const qCompact = q.replace(/\s+/g, "");
+  const qCompact = compactSearchText(query);
 
   if (!q) return 99;
   if (product.model === q) return 0;
@@ -756,10 +835,89 @@ function rankProductSearch(item: string, query: string) {
   if (product.full.startsWith(q)) return 3;
   if (product.model.includes(q)) return 4;
   if (product.full.includes(q)) return 5;
-  if (qCompact && product.modelCompact.includes(qCompact)) return 6;
-  if (qCompact && product.fullCompact.includes(qCompact)) return 7;
+
+  // Cho phép gõ dính liền: IPHONE16 vẫn ra IPHONE 16 / IPHONE 16_128G.
+  if (qCompact && product.modelCompact.startsWith(qCompact)) return 6;
+  if (qCompact && product.fullCompact.startsWith(qCompact)) return 7;
+  if (qCompact && product.modelCompact.includes(qCompact)) return 8;
+  if (qCompact && product.fullCompact.includes(qCompact)) return 9;
 
   return 50;
+}
+
+function levenshteinDistance(a: string, b: string) {
+  const x = compactSearchText(a);
+  const y = compactSearchText(b);
+
+  if (!x) return y.length;
+  if (!y) return x.length;
+  if (x === y) return 0;
+
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= y.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= x.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= y.length; i++) {
+    for (let j = 1; j <= x.length; j++) {
+      matrix[i][j] =
+        y.charAt(i - 1) === x.charAt(j - 1)
+          ? matrix[i - 1][j - 1]
+          : Math.min(
+              matrix[i - 1][j - 1] + 1,
+              matrix[i][j - 1] + 1,
+              matrix[i - 1][j] + 1
+            );
+    }
+  }
+
+  return matrix[y.length][x.length];
+}
+
+function getProductSuggestions(options: string[], keyword: string, limit = 2) {
+  const q = normalizeSearchText(keyword);
+  const qCompact = compactSearchText(keyword);
+
+  if (!q || qCompact.length < 3) return [];
+
+  return options
+    .map((item) => {
+      const product = getProductSearchParts(item);
+
+      let score = 999;
+
+      if (product.modelCompact.startsWith(qCompact)) score = 0;
+      else if (product.fullCompact.startsWith(qCompact)) score = 1;
+      else if (product.modelCompact.includes(qCompact)) score = 2;
+      else if (product.fullCompact.includes(qCompact)) score = 3;
+      else {
+        const modelDistance = levenshteinDistance(qCompact, product.modelCompact);
+        const fullDistance = levenshteinDistance(qCompact, product.fullCompact);
+        const distance = Math.min(modelDistance, fullDistance);
+
+        const allowedDistance =
+          qCompact.length <= 5 ? 1 :
+          qCompact.length <= 8 ? 2 :
+          3;
+
+        if (distance <= allowedDistance) {
+          score = 10 + distance;
+        }
+      }
+
+      return { item, score };
+    })
+    .filter((x) => x.score < 999)
+    .sort((a, b) => {
+      if (a.score !== b.score) return a.score - b.score;
+
+      return a.item.localeCompare(b.item, "vi", {
+        numeric: true,
+        sensitivity: "base",
+      });
+    })
+    .slice(0, limit)
+    .map((x) => x.item);
 }
 
 function ProductPicker({ label, value, placeholder, options, disabled = false, onSelect }: ProductPickerProps) {
@@ -772,18 +930,37 @@ function ProductPicker({ label, value, placeholder, options, disabled = false, o
 
     const words = q.split(/\s+/).filter(Boolean);
     const queryHasText = words.some((word) => /[a-z]/.test(word));
+    const qCompact = compactSearchText(keyword);
 
     return options
       .filter((item) => {
         const product = getProductSearchParts(item);
-        return words.every((word) => productTokenMatches(word, product, queryHasText));
+
+        const normalMatch = words.every((word) =>
+          productTokenMatches(word, product, queryHasText)
+        );
+
+        const compactMatch = !!qCompact && product.fullCompact.includes(qCompact);
+
+        return normalMatch || compactMatch;
       })
       .sort((a, b) => {
         const score = rankProductSearch(a, keyword) - rankProductSearch(b, keyword);
         if (score !== 0) return score;
-        return a.localeCompare(b, "vi", { numeric: true, sensitivity: "base" });
+
+        return a.localeCompare(b, "vi", {
+          numeric: true,
+          sensitivity: "base",
+        });
       });
   }, [options, keyword]);
+
+  const suggestedOptions = useMemo(() => {
+    if (!keyword.trim()) return [];
+
+    const currentSet = new Set(filteredOptions);
+    return getProductSuggestions(options, keyword, 2).filter((item) => !currentSet.has(item));
+  }, [options, keyword, filteredOptions]);
 
   function openPicker() {
     if (disabled) return;
@@ -832,6 +1009,23 @@ function ProductPicker({ label, value, placeholder, options, disabled = false, o
               <div className="vtdd-product-count">
                 Đang hiển thị {filteredOptions.length.toLocaleString("vi-VN")} / {options.length.toLocaleString("vi-VN")} sản phẩm. Có thể kéo lên/xuống để chọn.
               </div>
+
+              {suggestedOptions.length > 0 && (
+                <div className="vtdd-product-suggest">
+                  <span>Có phải bạn đang tìm:</span>
+                  <div>
+                    {suggestedOptions.map((item, index) => (
+                      <button
+                        key={`suggest-${item}-${index}`}
+                        type="button"
+                        onClick={() => chooseProduct(item)}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="vtdd-product-list">
@@ -850,6 +1044,21 @@ function ProductPicker({ label, value, placeholder, options, disabled = false, o
               ) : (
                 <div className="vtdd-product-empty">
                   Không tìm thấy sản phẩm phù hợp. Thử gõ ngắn hơn, ví dụ: iPhone 15, 17T, A56.
+
+                  {suggestedOptions.length > 0 && (
+                    <div className="vtdd-product-empty-suggest">
+                      <span>Có phải bạn đang tìm:</span>
+                      {suggestedOptions.map((item, index) => (
+                        <button
+                          key={`empty-suggest-${item}-${index}`}
+                          type="button"
+                          onClick={() => chooseProduct(item)}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
