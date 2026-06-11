@@ -39,10 +39,10 @@ const SYSTEM_UI_CSS = `
   overflow: hidden;
   min-height: 42px;
   border-radius: 18px;
-  border: 1px solid rgba(250, 204, 21, .45);
-  background: #fffbea;
-  color: #854d0e;
-  box-shadow: 0 12px 24px rgba(245, 158, 11, .10);
+  border: 1px solid rgba(239, 68, 68, .42);
+  background: linear-gradient(135deg, #fff5f5, #ffffff);
+  color: #dc2626;
+  box-shadow: 0 12px 24px rgba(239, 68, 68, .10);
 }
 
 .vtdd-system-marquee span {
@@ -53,8 +53,10 @@ const SYSTEM_UI_CSS = `
   transform: translateY(-50%);
   font-size: 12px;
   line-height: 1;
-  font-weight: 900;
+  font-weight: 950;
   letter-spacing: .02em;
+  color: #dc2626;
+  text-shadow: 0 1px 0 rgba(255,255,255,.75);
   animation: vtddMarquee 18s linear infinite;
 }
 
@@ -281,11 +283,11 @@ const SYSTEM_UI_CSS = `
 .vtdd-system-banner-featured {
   padding: 14px !important;
   border-radius: 20px !important;
-  border: 1px solid rgba(250, 204, 21, .55) !important;
+  border: 1px solid rgba(239, 68, 68, .46) !important;
   background:
-    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .24), transparent 38%),
-    linear-gradient(135deg, #fffbea, #ffffff) !important;
-  box-shadow: 0 14px 34px rgba(245, 158, 11, .13) !important;
+    radial-gradient(circle at 100% 0%, rgba(239, 68, 68, .13), transparent 38%),
+    linear-gradient(135deg, #fff5f5, #ffffff) !important;
+  box-shadow: 0 14px 34px rgba(239, 68, 68, .10) !important;
 }
 
 .vtdd-system-banner-head {
@@ -298,7 +300,7 @@ const SYSTEM_UI_CSS = `
 
 .vtdd-system-banner-head span {
   margin: 0 !important;
-  color: #854d0e !important;
+  color: #dc2626 !important;
 }
 
 .vtdd-system-banner-head strong {
@@ -340,7 +342,7 @@ const SYSTEM_UI_CSS = `
   width: 5px;
   height: 5px;
   border-radius: 999px;
-  background: #f59e0b;
+  background: #ef4444;
 }
 
 .vtdd-system-marquee span {
@@ -611,6 +613,61 @@ const SYSTEM_UI_CSS = `
   font-weight: 850;
 }
 
+
+/* HERO EFFECTIVE DATE - moved from bottom to banner bottom-right */
+.staff-command,
+.customer-personal-hero {
+  position: relative;
+}
+
+.vtdd-hero-effective-pill {
+  position: absolute;
+  right: clamp(18px, 2.4vw, 32px);
+  bottom: clamp(14px, 1.8vw, 22px);
+  z-index: 3;
+  max-width: min(420px, calc(100% - 36px));
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: rgba(255, 255, 255, .12);
+  border: 1px solid rgba(255, 255, 255, .22);
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 950;
+  letter-spacing: .015em;
+  box-shadow: 0 16px 36px rgba(2, 6, 23, .18), inset 0 1px 0 rgba(255, 255, 255, .12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.vtdd-hero-effective-pill::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-right: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, .16);
+}
+
+@media (max-width: 560px) {
+  .vtdd-hero-effective-pill {
+    left: 16px;
+    right: 16px;
+    bottom: 14px;
+    max-width: none;
+    min-height: 44px;
+    padding: 0 13px;
+    font-size: 11.2px;
+  }
+}
+
 @media (min-width: 720px) {
   .vtdd-product-layer {
     align-items: center;
@@ -622,6 +679,577 @@ const SYSTEM_UI_CSS = `
     border-radius: 30px;
   }
 }
+
+/* =========================================================
+   IMPORTANT NOTICE V4 - nhỏ gọn, không bullet, tự xuống dòng theo Admin
+========================================================= */
+.vtdd-system-banner-featured.system-notice-v3 {
+  padding: 12px 13px !important;
+  border-radius: 22px !important;
+  border: 1.5px solid rgba(239, 68, 68, .58) !important;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(239, 68, 68, .12), transparent 34%),
+    linear-gradient(135deg, #fff7f7, #ffffff 72%) !important;
+  box-shadow: 0 12px 28px rgba(239, 68, 68, .10) !important;
+}
+
+.system-notice-v3-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.system-notice-v3-head > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.system-notice-v3-head span {
+  margin: 0 !important;
+  width: fit-content;
+  padding: 6px 9px;
+  border-radius: 999px;
+  display: inline-flex !important;
+  background: #0f172a;
+  color: #ffd400 !important;
+  font-size: 8.8px !important;
+  line-height: 1 !important;
+  font-weight: 950 !important;
+  letter-spacing: .09em !important;
+  text-transform: uppercase;
+}
+
+.system-notice-v3-head strong {
+  padding: 6px 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(239, 68, 68, .08);
+  border: 1px solid rgba(239, 68, 68, .24);
+  color: #dc2626;
+  font-size: 8.8px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.system-notice-v3-list {
+  display: grid;
+  gap: 4px;
+  max-height: clamp(118px, 18vh, 190px);
+  overflow-y: auto;
+  padding-right: 3px;
+  overscroll-behavior: contain;
+}
+
+.system-notice-v3-list p {
+  margin: 0 !important;
+  padding: 5px 0 !important;
+  border-radius: 0;
+  position: relative;
+  background: transparent;
+  border: 0;
+  color: #111827;
+  font-size: 12.2px;
+  line-height: 1.42;
+  font-weight: 900;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  box-shadow: none;
+}
+
+.system-notice-v3-list p + p {
+  border-top: 1px dashed rgba(239, 68, 68, .24);
+}
+
+.system-notice-v3-list p::before {
+  display: none !important;
+  content: none !important;
+}
+
+@media (max-width: 560px) {
+  .vtdd-system-banner-featured.system-notice-v3 {
+    padding: 11px 12px !important;
+    border-radius: 20px !important;
+  }
+
+  .system-notice-v3-head {
+    margin-bottom: 7px;
+  }
+
+  .system-notice-v3-list {
+    max-height: 154px;
+  }
+
+  .system-notice-v3-list p {
+    padding: 4px 0 !important;
+    font-size: 11.8px;
+    line-height: 1.38;
+  }
+}
+
+
+
+/* =========================================================
+   HERO EFFECTIVE DATE V5 - căn giữa, tự giãn theo browser/mobile/tablet
+========================================================= */
+.staff-command .vtdd-hero-effective-pill,
+.customer-personal-hero .vtdd-hero-effective-pill {
+  left: 50% !important;
+  right: auto !important;
+  bottom: clamp(12px, 1.8vw, 22px) !important;
+  transform: translateX(-50%) !important;
+  inline-size: fit-content;
+  width: fit-content;
+  min-width: min(300px, calc(100% - 28px));
+  max-width: min(680px, calc(100% - clamp(28px, 6vw, 74px))) !important;
+  min-height: auto;
+  padding: clamp(10px, 1.25vw, 13px) clamp(13px, 2vw, 22px);
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.28;
+  border-radius: 999px;
+  font-size: clamp(10.8px, 1.2vw, 12.4px);
+}
+
+.staff-command .vtdd-hero-effective-pill::before,
+.customer-personal-hero .vtdd-hero-effective-pill::before {
+  margin-right: clamp(7px, 1vw, 10px);
+}
+
+@media (max-width: 560px) {
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    left: 50% !important;
+    right: auto !important;
+    bottom: 12px !important;
+    transform: translateX(-50%) !important;
+    width: auto;
+    min-width: 0;
+    max-width: calc(100% - 24px) !important;
+    padding: 10px 12px;
+    font-size: 10.8px;
+    line-height: 1.25;
+  }
+}
+
+@media (min-width: 561px) and (max-width: 1024px) {
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    max-width: calc(100% - 56px) !important;
+    font-size: 11.6px;
+  }
+}
+
+
+/* =========================================================
+   VTDD FINAL FIX - Mobile staff hero buttons + ngày áp dụng đúng định dạng
+   - Mobile: Cập nhật thông tin nằm kế bên Đăng xuất
+   - Date pill luôn 1 dòng và tự co theo màn hình
+========================================================= */
+.staff-command .vtdd-hero-effective-pill {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: calc(100% - clamp(24px, 5vw, 72px)) !important;
+  padding: clamp(8px, 1.05vw, 12px) clamp(10px, 1.6vw, 18px) !important;
+  font-size: clamp(9px, 1.05vw, 12px) !important;
+  line-height: 1 !important;
+  letter-spacing: -.02em !important;
+}
+
+@media (max-width: 640px) {
+  .staff-command {
+    min-height: 226px !important;
+    padding: 16px 16px 60px !important;
+    border-radius: 30px !important;
+    display: block !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  .staff-command > div:first-child {
+    position: relative !important;
+    z-index: 4 !important;
+    max-width: 100% !important;
+    padding-right: 0 !important;
+  }
+
+  .staff-command .staff-kicker {
+    margin: 0 !important;
+    width: fit-content !important;
+    max-width: calc(100% - 232px) !important;
+    min-height: 32px !important;
+    padding: 0 11px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 9.2px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .staff-command .staff-logout {
+    position: absolute !important;
+    top: 16px !important;
+    right: 16px !important;
+    z-index: 8 !important;
+    min-height: 40px !important;
+    min-width: 82px !important;
+    padding: 0 14px !important;
+    border-radius: 999px !important;
+    font-size: 9.4px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  .staff-command .staff-hero-actions {
+    position: absolute !important;
+    top: 16px !important;
+    right: 108px !important;
+    z-index: 8 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  .staff-command .staff-profile-trigger {
+    min-height: 40px !important;
+    max-width: 128px !important;
+    padding: 0 11px !important;
+    border-radius: 999px !important;
+    font-size: 8.5px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .staff-command h1 {
+    margin-top: 38px !important;
+    max-width: 100% !important;
+    color: #ffffff !important;
+    font-size: clamp(34px, 10.5vw, 44px) !important;
+    line-height: .88 !important;
+    letter-spacing: -.078em !important;
+    white-space: normal !important;
+    text-wrap: balance !important;
+  }
+
+  .staff-command p {
+    margin-top: 8px !important;
+    max-width: calc(100% - 10px) !important;
+    color: rgba(255, 255, 255, .78) !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    font-weight: 900 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .staff-command .vtdd-hero-effective-pill {
+    left: 50% !important;
+    right: auto !important;
+    bottom: 12px !important;
+    transform: translateX(-50%) !important;
+    width: max-content !important;
+    max-width: calc(100% - 18px) !important;
+    min-height: 34px !important;
+    padding: 0 8px !important;
+    border-radius: 999px !important;
+    font-size: clamp(7.35px, 1.95vw, 9.2px) !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    letter-spacing: -.045em !important;
+  }
+
+  .staff-command .vtdd-hero-effective-pill::before {
+    width: 7px !important;
+    height: 7px !important;
+    margin-right: 6px !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, .16) !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .staff-command {
+    min-height: 232px !important;
+    padding-left: 13px !important;
+    padding-right: 13px !important;
+  }
+
+  .staff-command .staff-kicker {
+    max-width: calc(100% - 218px) !important;
+    font-size: 8.5px !important;
+  }
+
+  .staff-command .staff-logout {
+    right: 13px !important;
+    min-width: 76px !important;
+    padding: 0 12px !important;
+    font-size: 8.6px !important;
+  }
+
+  .staff-command .staff-hero-actions {
+    right: 96px !important;
+  }
+
+  .staff-command .staff-profile-trigger {
+    max-width: 112px !important;
+    padding: 0 9px !important;
+    font-size: 7.75px !important;
+  }
+
+  .staff-command h1 {
+    margin-top: 40px !important;
+    font-size: clamp(31px, 9.7vw, 39px) !important;
+  }
+
+  .staff-command .vtdd-hero-effective-pill {
+    max-width: calc(100% - 14px) !important;
+    font-size: clamp(6.75px, 1.83vw, 8px) !important;
+    padding: 0 6px !important;
+  }
+}
+
+
+/* =========================================================
+   VTDD DATE EXACT ADMIN SETUP - luôn hiển thị đúng giá trị Admin setup
+   - Text có / hoặc - giữ nguyên
+   - Google Sheets serial tự đổi về ngày thật
+   - Pill luôn 1 dòng, tự co theo mobile/tablet/desktop
+========================================================= */
+.staff-command .vtdd-hero-effective-pill,
+.customer-personal-hero .vtdd-hero-effective-pill {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: calc(100% - clamp(18px, 5vw, 72px)) !important;
+  padding-left: clamp(8px, 1.4vw, 16px) !important;
+  padding-right: clamp(8px, 1.4vw, 16px) !important;
+  font-size: clamp(7.2px, 1.55vw, 12px) !important;
+  line-height: 1 !important;
+}
+
+@media (max-width: 420px) {
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    max-width: calc(100% - 12px) !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+    font-size: clamp(6.6px, 1.82vw, 8.1px) !important;
+    letter-spacing: -.055em !important;
+  }
+
+  .staff-command .vtdd-hero-effective-pill::before,
+  .customer-personal-hero .vtdd-hero-effective-pill::before {
+    width: 6px !important;
+    height: 6px !important;
+    margin-right: 5px !important;
+  }
+}
+
+
+
+/* =========================================================
+   VTDD FIX - Effective date displays raw Admin text, bigger, no-wrap responsive
+========================================================= */
+.staff-command .vtdd-hero-effective-pill,
+.customer-personal-hero .vtdd-hero-effective-pill,
+.vtdd-hero-effective-pill {
+  width: auto !important;
+  inline-size: auto !important;
+  min-width: 0 !important;
+  max-width: calc(100% - 28px) !important;
+  padding: clamp(9px, 1.3vw, 13px) clamp(14px, 2vw, 24px) !important;
+  font-size: clamp(12px, 1.28vw, 15px) !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.staff-command .vtdd-hero-effective-pill::before,
+.customer-personal-hero .vtdd-hero-effective-pill::before,
+.vtdd-hero-effective-pill::before {
+  flex: 0 0 auto !important;
+}
+
+@media (max-width: 430px) {
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill,
+  .vtdd-hero-effective-pill {
+    max-width: calc(100% - 34px) !important;
+    padding: 9px 12px !important;
+    font-size: clamp(10.4px, 2.75vw, 12px) !important;
+  }
+}
+
+
+/* =========================================================
+   VTDD FIX - Important notice rich HTML from TinyMCE
+========================================================= */
+.system-notice-v3-rich {
+  max-height: 190px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.system-notice-v3-rich :where(p, div, span, strong, b, em, i, u, li, a) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.system-notice-v3-rich p {
+  margin: 0 0 7px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  color: inherit;
+  font-size: 12.4px;
+  line-height: 1.45;
+  font-weight: inherit;
+  white-space: normal;
+}
+
+.system-notice-v3-rich p:last-child {
+  margin-bottom: 0 !important;
+}
+
+.system-notice-v3-rich ul,
+.system-notice-v3-rich ol {
+  margin: 6px 0 8px 18px;
+  padding: 0;
+}
+
+.system-notice-v3-rich li {
+  margin: 4px 0;
+  font-size: 12.4px;
+  line-height: 1.45;
+}
+
+.system-notice-v3-rich img,
+.system-notice-v3-rich table,
+.system-notice-v3-rich iframe {
+  max-width: 100% !important;
+}
+
+/* =========================================================
+   VTDD STAFF HERO MWG LOGO + EFFECTIVE TEXT FIX
+========================================================= */
+.staff-command .staff-logo-mwg {
+  width: fit-content;
+  min-height: 40px;
+  padding: 0 14px 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(255, 255, 255, .10);
+  border: 1px solid rgba(255, 255, 255, .20);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.13), 0 12px 28px rgba(0,0,0,.18);
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.staff-command .staff-logo-mwg-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: #ffd400;
+  color: #0f172a;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: -.08em;
+  box-shadow: 0 0 0 4px rgba(255, 212, 0, .13);
+}
+
+.staff-command .vtdd-hero-effective-pill,
+.customer-personal-hero .vtdd-hero-effective-pill {
+  font-size: clamp(11.2px, 1.2vw, 13.6px) !important;
+  min-height: 40px !important;
+  padding: 0 clamp(13px, 1.7vw, 20px) !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  letter-spacing: -.018em !important;
+}
+
+@media (max-width: 640px) {
+  .staff-command .staff-logo-mwg {
+    position: relative !important;
+    z-index: 9 !important;
+    min-height: 36px !important;
+    padding: 0 10px 0 7px !important;
+    gap: 7px !important;
+    font-size: 10px !important;
+  }
+
+  .staff-command .staff-logo-mwg-icon {
+    width: 25px !important;
+    height: 25px !important;
+    border-radius: 10px !important;
+    font-size: 8px !important;
+  }
+
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    max-width: calc(100% - 22px) !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: clamp(9.8px, 2.45vw, 11.2px) !important;
+    letter-spacing: -.035em !important;
+  }
+
+  .staff-command .vtdd-hero-effective-pill::before,
+  .customer-personal-hero .vtdd-hero-effective-pill::before {
+    width: 8px !important;
+    height: 8px !important;
+    margin-right: 7px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .staff-command .staff-logo-mwg {
+    font-size: 9px !important;
+    padding-right: 8px !important;
+  }
+
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    font-size: clamp(8.9px, 2.35vw, 10px) !important;
+    max-width: calc(100% - 14px) !important;
+    padding: 0 8px !important;
+  }
+}
+
 `;
 
 function settingEnabled(settings: SystemSettings, key: string) {
@@ -633,34 +1261,72 @@ function getSystemText(settings: SystemSettings, key: string) {
   return String(settings?.[key] || "").trim();
 }
 
-function getEffectiveRange(notify: NotifySettings) {
-  const from = String(notify.priceEffectiveFrom || "").trim();
-  const to = String(notify.priceEffectiveTo || "").trim();
+function cleanEffectiveText(value: any) {
+  return String(value ?? "")
+    .replace(/^'/, "")
+    .replace(/\r/g, "")
+    .replace(/\n+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  if (from && to) return `Bảng giá áp dụng từ ${from} đến ${to}`;
-  if (from) return `Bảng giá áp dụng từ ${from}`;
-  if (to) return `Bảng giá áp dụng đến ${to}`;
+function getEffectiveRange(notify: NotifySettings) {
+  const from = cleanEffectiveText(notify.priceEffectiveFrom);
+  const to = cleanEffectiveText(notify.priceEffectiveTo);
+
+  if (from && to) return `Thời gian áp dụng: ${from} - ${to}`;
+  if (from) return `Thời gian áp dụng: ${from}`;
+  if (to) return `Thời gian áp dụng: ${to}`;
   return "";
 }
 
 function formatSystemMessageLines(message: string) {
   const raw = String(message || "")
     .replace(/\r/g, "")
-    // Giữ đúng thứ tự trên xuống dưới theo nội dung Admin nhập.
-    // Nếu Admin nhập liền một dòng, hệ thống tự tách trước các mục kiểu A/, B/, 1/, 2/, bullet.
+    // Giữ đúng nội dung Admin nhập. Nếu Admin xuống dòng thì web xuống dòng theo.
+    // Nếu Admin nhập liền dòng, hệ thống tự tách trước A/, B/, 1/, 2/ để dễ đọc.
     .replace(/\s+(?=[A-Za-zÀ-ỹ]\s*\/\s*)/g, "\n")
     .replace(/\s+(?=\d+\s*\/\s*)/g, "\n")
-    .replace(/\s+(?=[•▪▫●◆◇*-]\s*)/g, "\n")
     .trim();
 
   if (!raw) return [];
 
   return raw
     .split(/\n+/)
-    .map((line) => line.trim())
+    .map((line) =>
+      line
+        .trim()
+        // Bỏ các dấu bullet/chấm đầu dòng do Admin hoặc text copy từ nguồn khác.
+        .replace(/^[•▪▫●◆◇*·]\s*/g, "")
+        .replace(/^-\s+/g, "")
+        .trim()
+    )
     .filter(Boolean);
 }
 
+
+
+function escapeSystemNoticeHtml(value: string) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function getImportantNoticeHtml(message: string) {
+  const raw = String(message || "").trim();
+  if (!raw) return "";
+
+  const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
+  if (looksLikeHtml) return raw;
+
+  const lines = formatSystemMessageLines(raw);
+  if (lines.length === 0) return "";
+
+  return lines.map((line) => `<p>${escapeSystemNoticeHtml(line)}</p>`).join("");
+}
 
 const TYPE_OPTIONS = [
   { label: "Loại 1", value: "1", index: 3 },
@@ -2037,8 +2703,7 @@ function renderSystemStyle() {
 }
 
 function renderSystemNotices() {
-  const effectiveRange = getEffectiveRange(notifySettings);
-  const fixedBannerLines = formatSystemMessageLines(notifySettings.fixedBanner || "");
+  const importantNoticeHtml = getImportantNoticeHtml(notifySettings.fixedBanner || "");
 
   return (
     <>
@@ -2048,31 +2713,32 @@ function renderSystemNotices() {
         </div>
       ) : null}
 
-      {fixedBannerLines.length > 0 ? (
-        <section className="vtdd-system-banner vtdd-system-banner-featured system-notice-v2" aria-label="Thông báo hệ thống">
-          <div className="system-notice-v2-head">
+      {importantNoticeHtml ? (
+        <section className="vtdd-system-banner vtdd-system-banner-featured system-notice-v3" aria-label="Thông báo hệ thống">
+          <div className="system-notice-v3-head">
             <div>
               <span>Thông báo hệ thống</span>
               <strong>Quan trọng</strong>
             </div>
           </div>
 
-          <div className="system-notice-v2-list">
-            {fixedBannerLines.map((line, index) => (
-              <p key={`system-banner-${index}`}>{line}</p>
-            ))}
-          </div>
+          <div
+            className="system-notice-v3-list system-notice-v3-rich"
+            dangerouslySetInnerHTML={{ __html: importantNoticeHtml }}
+          />
         </section>
       ) : null}
 
-      {effectiveRange ? (
-        <div className="vtdd-system-effective">
-          <span>Ngày áp dụng</span>
-          <b>{effectiveRange}</b>
-        </div>
-      ) : null}
     </>
   );
+}
+
+function renderHeroEffectivePill() {
+  const effectiveRange = getEffectiveRange(notifySettings);
+
+  if (!effectiveRange) return null;
+
+  return <div className="vtdd-hero-effective-pill">{effectiveRange}</div>;
 }
 
 function renderPushNotify() {
@@ -2138,7 +2804,7 @@ function renderSystemLock() {
       <section className="staff-os-shell">
         <header className="staff-command">
           <div>
-            <div className="staff-kicker">STAFF PORTAL</div>
+            <div className="staff-logo-mwg" aria-label="MWG"><span className="staff-logo-mwg-icon">VTDD</span><span>MWG</span></div>
             <h1>Tra cứu thu cũ</h1>
             <p>
               {staffName ? `${staffName} • ` : ""}NV: {maNV} • ST: {maST}
@@ -2158,6 +2824,8 @@ function renderSystemLock() {
               Cập nhật thông tin
             </button>
           </div>
+
+          {renderHeroEffectivePill()}
         </header>
 
         {renderSystemNotices()}

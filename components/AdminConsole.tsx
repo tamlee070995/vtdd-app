@@ -386,8 +386,17 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
         ...(extra || {}),
       };
 
+      const apiPayload = { ...payload };
+
+      ["PRICE_EFFECTIVE_FROM", "PRICE_EFFECTIVE_TO"].forEach((key) => {
+        const value = String(apiPayload[key] || "").trim();
+        if (value && !value.startsWith("'")) {
+          apiPayload[key] = `'${value}`;
+        }
+      });
+
       const data = await postJSON("/api/admin/settings", {
-        settings: payload,
+        settings: apiPayload,
       });
 
       setSettings(payload);
@@ -859,14 +868,60 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
                 placeholder="Nhập nội dung chạy ngang trên banner..."
               />
             </label>
-            <label>
-              <span>Thông báo cố định</span>
-              <textarea
+            <div className="adminx-form-field adminx-form-wide adminx-notice-rich-field">
+              <span>Thông báo quan trọng trên trang nhân viên</span>
+              <Editor
+                tinymceScriptSrc="/tinymce/tinymce.min.js"
+                licenseKey="gpl"
                 value={settings.FIXED_BANNER_MESSAGE || ""}
-                onChange={(e) => setSetting("FIXED_BANNER_MESSAGE", e.target.value)}
-                placeholder="Nhập thông báo cố định trên trang tra giá..."
+                onEditorChange={(value) => setSetting("FIXED_BANNER_MESSAGE", value)}
+                init={{
+                  height: 300,
+                  menubar: "edit view insert format tools table help",
+                  branding: true,
+                  promotion: false,
+                  automatic_uploads: true,
+                  paste_data_images: true,
+                  images_reuse_filename: false,
+                  image_title: true,
+                  image_caption: true,
+                  object_resizing: true,
+                  convert_urls: false,
+                  relative_urls: false,
+                  remove_script_host: false,
+                  file_picker_types: "image media file",
+                  images_upload_handler: async (blobInfo, progress) => {
+                    const formData = new FormData();
+                    formData.append("file", blobInfo.blob(), blobInfo.filename());
+                    formData.append("slug", "important-notice");
+
+                    const res = await fetch("/api/admin/cms-upload", {
+                      method: "POST",
+                      body: formData,
+                      cache: "no-store",
+                    });
+
+                    const data = await res.json().catch(() => null);
+
+                    if (!res.ok || !data?.success || !data?.location) {
+                      throw new Error(data?.message || "Upload ảnh thất bại.");
+                    }
+
+                    if (typeof progress === "function") progress(100);
+                    return data.location;
+                  },
+                  plugins:
+                    "advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount",
+                  toolbar:
+                    "undo redo | blocks | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table link image media | removeformat code fullscreen help",
+                  content_style:
+                    "body{font-family:Roboto,Arial,sans-serif;font-size:14px;line-height:1.55;color:#0f172a;padding:12px;} img{display:block;max-width:100%!important;height:auto!important;margin:10px auto;border-radius:14px;} table{max-width:100%;border-collapse:collapse;} td,th{border:1px solid #e2e8f0;padding:6px;} p{margin:0 0 8px;} ul,ol{margin:6px 0 8px 20px;padding:0;}",
+                }}
               />
-            </label>
+              <small className="adminx-field-hint">
+                Nội dung này chỉ hiển thị ở trang nhân viên. Khách hàng sẽ không thấy box thông báo quan trọng.
+              </small>
+            </div>
             <label>
               <span>Push notify hiển thị 1 lần</span>
               <textarea
@@ -1998,6 +2053,48 @@ const ADMINX_STYLE = `
 }
 @media (max-width: 980px) { .adminx-permission-card-v3 { grid-template-columns: 1fr; } }
 
+
+/* ===== VTDD ADMIN - TinyMCE cho thông báo quan trọng ===== */
+.adminx-form-field {
+  display: grid;
+  gap: 7px;
+}
+
+.adminx-form-field > span {
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-form-wide {
+  grid-column: 1 / -1;
+}
+
+.adminx-notice-rich-field .tox-tinymce {
+  border-radius: 18px !important;
+  border-color: #cbd5e1 !important;
+  overflow: hidden !important;
+}
+
+.adminx-notice-rich-field .tox .tox-statusbar {
+  background: #f8fafc !important;
+}
+
+.adminx-notice-rich-field .tox .tox-promotion {
+  display: none !important;
+}
+
+.adminx-field-hint {
+  display: block;
+  color: #64748b;
+  font-size: 11.5px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
 `;
 
 const ADMINX_ONLINE_STYLE = `
@@ -2600,7 +2697,7 @@ function CmsEditor({
                   "alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | " +
                   "link image media table | removeformat | code preview fullscreen | help",
                 content_style:
-                  "body{font-family:Roboto,Arial,sans-serif;font-size:15px;line-height:1.65;color:#07111f;padding:12px;overflow-x:hidden;} img{display:block;max-width:100%!important;width:auto!important;height:auto!important;margin:14px auto;border-radius:16px;object-fit:contain;} figure{max-width:100%!important;width:100%!important;margin:14px 0!important;overflow:hidden;} figure img{width:100%!important;max-width:100%!important;} table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;} iframe{display:block;max-width:100%!important;width:100%!important;aspect-ratio:16/9;height:auto!important;border-radius:16px;} h2{font-size:28px;} h3{font-size:22px;} blockquote{border-left:5px solid #ffd400;background:#fffbeb;border-radius:14px;margin:12px 0;padding:12px 16px;}",
+                  "body{font-family:Roboto,Arial,sans-serif;font-size:15px;line-height:1.65;color:#07111f;padding:12px;} img{max-width:100%;height:auto;border-radius:18px;} h2{font-size:28px;} h3{font-size:22px;} blockquote{border-left:5px solid #ffd400;background:#fffbeb;border-radius:14px;margin:12px 0;padding:12px 16px;}",
               }}
             />
             <small className="cms-editor-note-vtdd">TinyMCE WYSIWYG Editor · Có nhãn Powered by Tiny theo bản miễn phí.</small>

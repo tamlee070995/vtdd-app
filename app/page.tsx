@@ -128,7 +128,7 @@ export default async function HomePage() {
           </span>
 
           <span>
-            <strong>VTDD</strong>
+            <strong>ICT</strong>
             <small>Viễn Thông Di Động</small>
           </span>
         </Link>
@@ -187,7 +187,7 @@ export default async function HomePage() {
 
       <footer className={styles.footer}>
         <span />
-        <b>copyright 36964</b>
+        <b>Copyright © - Vien Thong Di Dong</b>
         <span />
       </footer>
     </main>

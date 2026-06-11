@@ -533,6 +533,61 @@ const SYSTEM_UI_CSS = `
   font-weight: 850;
 }
 
+
+/* HERO EFFECTIVE DATE - moved from bottom to banner bottom-right */
+.staff-command,
+.customer-personal-hero {
+  position: relative;
+}
+
+.vtdd-hero-effective-pill {
+  position: absolute;
+  right: clamp(18px, 2.4vw, 32px);
+  bottom: clamp(14px, 1.8vw, 22px);
+  z-index: 3;
+  max-width: min(420px, calc(100% - 36px));
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: rgba(255, 255, 255, .12);
+  border: 1px solid rgba(255, 255, 255, .22);
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 950;
+  letter-spacing: .015em;
+  box-shadow: 0 16px 36px rgba(2, 6, 23, .18), inset 0 1px 0 rgba(255, 255, 255, .12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.vtdd-hero-effective-pill::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-right: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, .16);
+}
+
+@media (max-width: 560px) {
+  .vtdd-hero-effective-pill {
+    left: 16px;
+    right: 16px;
+    bottom: 14px;
+    max-width: none;
+    min-height: 44px;
+    padding: 0 13px;
+    font-size: 11.2px;
+  }
+}
+
 @media (min-width: 720px) {
   .vtdd-product-layer {
     align-items: center;
@@ -544,6 +599,562 @@ const SYSTEM_UI_CSS = `
     border-radius: 30px;
   }
 }
+
+/* =========================================================
+   HERO EFFECTIVE DATE V5 - căn giữa, tự giãn theo browser/mobile/tablet
+========================================================= */
+.staff-command .vtdd-hero-effective-pill,
+.customer-personal-hero .vtdd-hero-effective-pill {
+  left: 50% !important;
+  right: auto !important;
+  bottom: clamp(12px, 1.8vw, 22px) !important;
+  transform: translateX(-50%) !important;
+  inline-size: fit-content;
+  width: fit-content;
+  min-width: min(300px, calc(100% - 28px));
+  max-width: min(680px, calc(100% - clamp(28px, 6vw, 74px))) !important;
+  min-height: auto;
+  padding: clamp(10px, 1.25vw, 13px) clamp(13px, 2vw, 22px);
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.28;
+  border-radius: 999px;
+  font-size: clamp(10.8px, 1.2vw, 12.4px);
+}
+
+.staff-command .vtdd-hero-effective-pill::before,
+.customer-personal-hero .vtdd-hero-effective-pill::before {
+  margin-right: clamp(7px, 1vw, 10px);
+}
+
+@media (max-width: 560px) {
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    left: 50% !important;
+    right: auto !important;
+    bottom: 12px !important;
+    transform: translateX(-50%) !important;
+    width: auto;
+    min-width: 0;
+    max-width: calc(100% - 24px) !important;
+    padding: 10px 12px;
+    font-size: 10.8px;
+    line-height: 1.25;
+  }
+}
+
+@media (min-width: 561px) and (max-width: 1024px) {
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    max-width: calc(100% - 56px) !important;
+    font-size: 11.6px;
+  }
+}
+
+/* =========================================================
+   CUSTOMER HERO V4 - thiết kế banner khách hàng mới
+========================================================= */
+.customer-personal-hero {
+  min-height: clamp(320px, 33vw, 390px) !important;
+  padding: clamp(22px, 3vw, 34px) clamp(18px, 3vw, 36px) 82px !important;
+  border-radius: 34px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate;
+  display: grid !important;
+  align-content: center !important;
+  justify-items: center !important;
+  text-align: center !important;
+  background:
+    radial-gradient(circle at 50% -16%, rgba(255, 212, 0, .58), transparent 34%),
+    radial-gradient(circle at 0% 100%, rgba(34, 211, 238, .13), transparent 34%),
+    radial-gradient(circle at 100% 100%, rgba(255, 212, 0, .16), transparent 36%),
+    linear-gradient(135deg, #07111f 0%, #0f172a 48%, #020617 100%) !important;
+  box-shadow: 0 26px 76px rgba(15, 23, 42, .22) !important;
+}
+
+.customer-personal-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  opacity: .28;
+  background:
+    linear-gradient(to right, rgba(255,255,255,.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, #000 0%, rgba(0,0,0,.7) 54%, transparent 100%);
+}
+
+.customer-personal-hero::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -120px;
+  z-index: -1;
+  width: min(760px, 108vw);
+  height: 230px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 212, 0, .20), transparent 66%);
+  filter: blur(4px);
+}
+
+.customer-personal-brand {
+  position: relative;
+  z-index: 2;
+  justify-self: center !important;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 13px 8px 8px;
+  border-radius: 999px;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  background: rgba(255,255,255,.10) !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
+}
+
+.customer-personal-brand span {
+  color: #ffffff !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  font-weight: 950 !important;
+  letter-spacing: -.01em;
+}
+
+.customer-personal-kicker {
+  position: relative;
+  z-index: 2;
+  justify-self: center !important;
+  width: fit-content;
+  margin: 18px auto 0 !important;
+  padding: 8px 12px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  color: rgba(255,255,255,.82) !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  font-weight: 950 !important;
+  letter-spacing: .10em !important;
+  text-transform: uppercase;
+}
+
+.customer-personal-hero h1 {
+  position: relative;
+  z-index: 2;
+  max-width: 680px;
+  margin: 14px auto 0 !important;
+  color: #ffffff !important;
+  font-size: clamp(52px, 9vw, 92px) !important;
+  line-height: .82 !important;
+  font-weight: 950 !important;
+  letter-spacing: -.08em !important;
+  text-align: center !important;
+  text-transform: uppercase;
+  text-shadow: 0 18px 48px rgba(0,0,0,.24);
+}
+
+.customer-personal-hero h1 span {
+  display: block !important;
+  color: #ffd400 !important;
+}
+
+.customer-personal-hero p {
+  position: relative;
+  z-index: 2;
+  max-width: 560px !important;
+  margin: 16px auto 0 !important;
+  color: rgba(255,255,255,.74) !important;
+  font-size: 14px !important;
+  line-height: 1.48 !important;
+  font-weight: 850 !important;
+  text-align: center !important;
+}
+
+.customer-personal-hero .vtdd-hero-effective-pill {
+  bottom: 22px !important;
+  background: rgba(255,255,255,.14) !important;
+  border-color: rgba(255,255,255,.22) !important;
+  box-shadow: 0 18px 42px rgba(2,6,23,.24), inset 0 1px 0 rgba(255,255,255,.12) !important;
+}
+
+@media (max-width: 560px) {
+  .customer-personal-hero {
+    min-height: 330px !important;
+    padding: 20px 16px 74px !important;
+    border-radius: 30px !important;
+  }
+
+  .customer-personal-brand {
+    padding: 7px 11px 7px 7px;
+  }
+
+  .customer-personal-brand span {
+    font-size: 12px !important;
+  }
+
+  .customer-personal-kicker {
+    margin-top: 16px !important;
+    font-size: 9px !important;
+  }
+
+  .customer-personal-hero h1 {
+    font-size: clamp(48px, 17vw, 68px) !important;
+    line-height: .84 !important;
+  }
+
+  .customer-personal-hero p {
+    font-size: 12.8px !important;
+    line-height: 1.45 !important;
+  }
+
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    bottom: 14px !important;
+  }
+}
+
+
+/* =========================================================
+   FINAL CUSTOMER DESKTOP CSS FIX - cân layout desktop
+   Fix lỗi desktop: form lệch trái, result card bị tách xa, khoảng trắng lớn
+========================================================= */
+@media (min-width: 1024px) {
+  .customer-personal-page {
+    padding: clamp(22px, 2.2vw, 34px) !important;
+    display: block !important;
+    overflow-x: hidden !important;
+  }
+
+  .customer-personal-shell {
+    width: min(1180px, calc(100vw - clamp(44px, 6vw, 90px))) !important;
+    max-width: 1180px !important;
+    margin: 0 auto !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(330px, 390px) !important;
+    gap: 16px 18px !important;
+    align-items: start !important;
+  }
+
+  .customer-personal-hero {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    min-height: clamp(250px, 25vw, 330px) !important;
+    margin: 0 !important;
+  }
+
+  .customer-personal-shell > .vtdd-system-marquee,
+  .customer-personal-shell > .vtdd-system-banner,
+  .customer-personal-shell > .vtdd-system-effective,
+  .customer-personal-shell > .vtdd-tab-locked-note {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+  }
+
+  .customer-mode-card {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .customer-form-card {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: clamp(18px, 2vw, 24px) !important;
+    border-radius: 30px !important;
+  }
+
+  .customer-result-card {
+    grid-column: 2 !important;
+    grid-row: 3 / span 2 !important;
+    position: sticky !important;
+    top: clamp(14px, 2vw, 24px) !important;
+    width: 100% !important;
+    max-width: 390px !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    border-radius: 30px !important;
+    align-self: start !important;
+  }
+
+  .customer-result-card:not(.show) {
+    display: none !important;
+  }
+
+  .customer-result-card.show {
+    display: block !important;
+  }
+
+  .customer-type-pill-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1180px) {
+  .customer-personal-shell {
+    width: min(100%, calc(100vw - 32px)) !important;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 350px) !important;
+    gap: 14px !important;
+  }
+
+  .customer-result-card {
+    max-width: 350px !important;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1023px) {
+  .customer-personal-page {
+    padding: 18px !important;
+  }
+
+  .customer-personal-shell {
+    width: min(720px, 100%) !important;
+    max-width: 720px !important;
+    margin: 0 auto !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .customer-result-card {
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+}
+
+
+/* =========================================================
+   VTDD FIX - Customer hero date 1 dòng, tự co trên mobile/tablet
+========================================================= */
+.customer-personal-hero .vtdd-hero-effective-pill {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: calc(100% - clamp(28px, 6vw, 80px)) !important;
+  padding: clamp(9px, 1.15vw, 12px) clamp(12px, 1.9vw, 20px) !important;
+  font-size: clamp(10px, 1.06vw, 12px) !important;
+  line-height: 1 !important;
+}
+
+@media (max-width: 640px) {
+  .customer-personal-hero {
+    min-height: 236px !important;
+    padding-bottom: 66px !important;
+  }
+
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    left: 50% !important;
+    right: auto !important;
+    bottom: 13px !important;
+    transform: translateX(-50%) !important;
+    width: max-content !important;
+    max-width: calc(100% - 24px) !important;
+    min-height: 38px !important;
+    padding: 0 12px !important;
+    border-radius: 999px !important;
+    font-size: clamp(8.6px, 2.35vw, 10.2px) !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .customer-personal-hero .vtdd-hero-effective-pill::before {
+    width: 7px !important;
+    height: 7px !important;
+    margin-right: 7px !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, .16) !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    max-width: calc(100% - 20px) !important;
+    font-size: 8.15px !important;
+    padding: 0 9px !important;
+  }
+}
+
+
+/* =========================================================
+   VTDD FINAL FIX - Customer date pill đúng định dạng + luôn 1 dòng
+========================================================= */
+.customer-personal-hero .vtdd-hero-effective-pill {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: calc(100% - clamp(24px, 5vw, 72px)) !important;
+  padding: clamp(8px, 1.05vw, 12px) clamp(10px, 1.6vw, 18px) !important;
+  font-size: clamp(9px, 1.05vw, 12px) !important;
+  line-height: 1 !important;
+  letter-spacing: -.02em !important;
+}
+
+@media (max-width: 640px) {
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    left: 50% !important;
+    right: auto !important;
+    bottom: 12px !important;
+    transform: translateX(-50%) !important;
+    width: max-content !important;
+    max-width: calc(100% - 18px) !important;
+    min-height: 34px !important;
+    padding: 0 8px !important;
+    border-radius: 999px !important;
+    font-size: clamp(7.35px, 1.95vw, 9.2px) !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    letter-spacing: -.045em !important;
+  }
+
+  .customer-personal-hero .vtdd-hero-effective-pill::before {
+    width: 7px !important;
+    height: 7px !important;
+    margin-right: 6px !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, .16) !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    max-width: calc(100% - 14px) !important;
+    font-size: clamp(6.75px, 1.83vw, 8px) !important;
+    padding: 0 6px !important;
+  }
+}
+
+
+/* =========================================================
+   VTDD DATE EXACT ADMIN SETUP - luôn hiển thị đúng giá trị Admin setup
+   - Text có / hoặc - giữ nguyên
+   - Google Sheets serial tự đổi về ngày thật
+   - Pill luôn 1 dòng, tự co theo mobile/tablet/desktop
+========================================================= */
+.staff-command .vtdd-hero-effective-pill,
+.customer-personal-hero .vtdd-hero-effective-pill {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: calc(100% - clamp(18px, 5vw, 72px)) !important;
+  padding-left: clamp(8px, 1.4vw, 16px) !important;
+  padding-right: clamp(8px, 1.4vw, 16px) !important;
+  font-size: clamp(7.2px, 1.55vw, 12px) !important;
+  line-height: 1 !important;
+}
+
+@media (max-width: 420px) {
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    max-width: calc(100% - 12px) !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+    font-size: clamp(6.6px, 1.82vw, 8.1px) !important;
+    letter-spacing: -.055em !important;
+  }
+
+  .staff-command .vtdd-hero-effective-pill::before,
+  .customer-personal-hero .vtdd-hero-effective-pill::before {
+    width: 6px !important;
+    height: 6px !important;
+    margin-right: 5px !important;
+  }
+}
+
+
+
+/* =========================================================
+   VTDD FIX - Effective date displays raw Admin text, bigger, no-wrap responsive
+========================================================= */
+.staff-command .vtdd-hero-effective-pill,
+.customer-personal-hero .vtdd-hero-effective-pill,
+.vtdd-hero-effective-pill {
+  width: auto !important;
+  inline-size: auto !important;
+  min-width: 0 !important;
+  max-width: calc(100% - 28px) !important;
+  padding: clamp(9px, 1.3vw, 13px) clamp(14px, 2vw, 24px) !important;
+  font-size: clamp(12px, 1.28vw, 15px) !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.staff-command .vtdd-hero-effective-pill::before,
+.customer-personal-hero .vtdd-hero-effective-pill::before,
+.vtdd-hero-effective-pill::before {
+  flex: 0 0 auto !important;
+}
+
+@media (max-width: 430px) {
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill,
+  .vtdd-hero-effective-pill {
+    max-width: calc(100% - 34px) !important;
+    padding: 9px 12px !important;
+    font-size: clamp(10.4px, 2.75vw, 12px) !important;
+  }
+}
+
+/* =========================================================
+   VTDD CUSTOMER EFFECTIVE TEXT FIX
+========================================================= */
+.customer-personal-hero .vtdd-hero-effective-pill {
+  font-size: clamp(11.2px, 1.2vw, 13.6px) !important;
+  min-height: 40px !important;
+  padding: 0 clamp(13px, 1.7vw, 20px) !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  letter-spacing: -.018em !important;
+}
+
+@media (max-width: 640px) {
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    max-width: calc(100% - 22px) !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: clamp(9.8px, 2.45vw, 11.2px) !important;
+    letter-spacing: -.035em !important;
+  }
+
+  .customer-personal-hero .vtdd-hero-effective-pill::before {
+    width: 8px !important;
+    height: 8px !important;
+    margin-right: 7px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    font-size: clamp(8.9px, 2.35vw, 10px) !important;
+    max-width: calc(100% - 14px) !important;
+    padding: 0 8px !important;
+  }
+}
+
 `;
 
 function settingEnabled(settings: SystemSettings, key: string) {
@@ -555,14 +1166,47 @@ function getSystemText(settings: SystemSettings, key: string) {
   return String(settings?.[key] || "").trim();
 }
 
-function getEffectiveRange(notify: NotifySettings) {
-  const from = String(notify.priceEffectiveFrom || "").trim();
-  const to = String(notify.priceEffectiveTo || "").trim();
+function cleanEffectiveText(value: any) {
+  return String(value ?? "")
+    .replace(/^'/, "")
+    .replace(/\r/g, "")
+    .replace(/\n+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  if (from && to) return `Bảng giá áp dụng từ ${from} đến ${to}`;
-  if (from) return `Bảng giá áp dụng từ ${from}`;
-  if (to) return `Bảng giá áp dụng đến ${to}`;
+function getEffectiveRange(notify: NotifySettings) {
+  const from = cleanEffectiveText(notify.priceEffectiveFrom);
+  const to = cleanEffectiveText(notify.priceEffectiveTo);
+
+  if (from && to) return `Thời gian áp dụng: ${from} - ${to}`;
+  if (from) return `Thời gian áp dụng: ${from}`;
+  if (to) return `Thời gian áp dụng: ${to}`;
   return "";
+}
+
+function formatSystemMessageLines(message: string) {
+  const raw = String(message || "")
+    .replace(/\r/g, "")
+    // Giữ đúng nội dung Admin nhập. Nếu Admin xuống dòng thì web xuống dòng theo.
+    // Nếu Admin nhập liền dòng, hệ thống tự tách trước A/, B/, 1/, 2/ để dễ đọc.
+    .replace(/\s+(?=[A-Za-zÀ-ỹ]\s*\/\s*)/g, "\n")
+    .replace(/\s+(?=\d+\s*\/\s*)/g, "\n")
+    .trim();
+
+  if (!raw) return [];
+
+  return raw
+    .split(/\n+/)
+    .map((line) =>
+      line
+        .trim()
+        // Bỏ các dấu bullet/chấm đầu dòng do Admin hoặc text copy từ nguồn khác.
+        .replace(/^[•▪▫●◆◇*·]\s*/g, "")
+        .replace(/^-\s+/g, "")
+        .trim()
+    )
+    .filter(Boolean);
 }
 
 
@@ -984,7 +1628,7 @@ export default function CustomerPage() {
         setSystemSettings(json.data.system || {});
         setNotifySettings({
           marquee: "",
-          fixedBanner: "",
+          fixedBanner: json.data.notify?.fixedBanner || "",
           pushMessage: "",
           pushVersion: "",
           priceEffectiveFrom: json.data.notify?.priceEffectiveFrom || "",
@@ -1169,18 +1813,23 @@ export default function CustomerPage() {
   }
 
   function renderSystemNotices() {
-    const effectiveRange = getEffectiveRange(notifySettings);
-
     return (
       <>
-        {effectiveRange ? (
-          <div className="vtdd-system-effective">
-            <span>Ngày áp dụng</span>
-            <b>{effectiveRange}</b>
+        {notifySettings.marquee ? (
+          <div className="vtdd-system-marquee">
+            <span>{notifySettings.marquee}</span>
           </div>
         ) : null}
       </>
     );
+  }
+
+  function renderHeroEffectivePill() {
+    const effectiveRange = getEffectiveRange(notifySettings);
+
+    if (!effectiveRange) return null;
+
+    return <div className="vtdd-hero-effective-pill">{effectiveRange}</div>;
   }
 
   function renderPushNotify() {
@@ -1276,6 +1925,8 @@ export default function CustomerPage() {
           <p>
             Tra cứu nhanh giá tham khảo khi thu cũ đổi mới. Giá cuối cùng sẽ được xác nhận sau khi kiểm tra máy thực tế tại siêu thị.
           </p>
+
+          {renderHeroEffectivePill()}
         </header>
 
         {renderSystemNotices()}
