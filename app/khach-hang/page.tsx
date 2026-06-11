@@ -619,7 +619,69 @@ function normalizeSearchText(value: any) {
     .replace(/đ/g, "d")
     .replace(/Đ/g, "D")
     .toLowerCase()
+    .replace(/[_\-\/]+/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
+}
+
+function getProductSearchParts(value: any) {
+  const raw = String(value || "");
+  const modelRaw = raw.split("_")[0] || raw;
+  const full = normalizeSearchText(raw);
+  const model = normalizeSearchText(modelRaw);
+
+  return {
+    full,
+    model,
+    fullCompact: full.replace(/\s+/g, ""),
+    modelCompact: model.replace(/\s+/g, ""),
+    fullTokens: full ? full.split(" ") : [],
+    modelTokens: model ? model.split(" ") : [],
+  };
+}
+
+function productTokenMatches(
+  token: string,
+  product: ReturnType<typeof getProductSearchParts>,
+  queryHasText: boolean
+) {
+  if (!token) return true;
+
+  const isNumberOnly = /^\d+$/.test(token);
+
+  /*
+    Fix lỗi:
+    Gõ "iphone 8" không được match IPHONE 11_128G
+    vì số 8 trong 128G là bộ nhớ, không phải model.
+  */
+  if (isNumberOnly && queryHasText && token.length <= 2) {
+    return product.modelTokens.some((item) => item === token);
+  }
+
+  if (product.fullTokens.some((item) => item === token || item.startsWith(token))) return true;
+  if (product.full.includes(token)) return true;
+  if (product.fullCompact.includes(token)) return true;
+
+  return false;
+}
+
+function rankProductSearch(item: string, query: string) {
+  const product = getProductSearchParts(item);
+  const q = normalizeSearchText(query);
+  const qCompact = q.replace(/\s+/g, "");
+
+  if (!q) return 99;
+  if (product.model === q) return 0;
+  if (product.full === q) return 1;
+  if (product.model.startsWith(q)) return 2;
+  if (product.full.startsWith(q)) return 3;
+  if (product.model.includes(q)) return 4;
+  if (product.full.includes(q)) return 5;
+  if (qCompact && product.modelCompact.includes(qCompact)) return 6;
+  if (qCompact && product.fullCompact.includes(qCompact)) return 7;
+
+  return 50;
 }
 
 function ProductPicker({ label, value, placeholder, options, disabled = false, onSelect }: ProductPickerProps) {
@@ -631,11 +693,22 @@ function ProductPicker({ label, value, placeholder, options, disabled = false, o
     if (!q) return options;
 
     const words = q.split(/\s+/).filter(Boolean);
+    const queryHasText = words.some((word) => /[a-z]/.test(word));
 
-    return options.filter((item) => {
-      const normalized = normalizeSearchText(item);
-      return words.every((word) => normalized.includes(word));
-    });
+    return options
+      .filter((item) => {
+        const product = getProductSearchParts(item);
+        return words.every((word) => productTokenMatches(word, product, queryHasText));
+      })
+      .sort((a, b) => {
+        const score = rankProductSearch(a, keyword) - rankProductSearch(b, keyword);
+        if (score !== 0) return score;
+
+        return a.localeCompare(b, "vi", {
+          numeric: true,
+          sensitivity: "base",
+        });
+      });
   }, [options, keyword]);
 
   function openPicker() {
