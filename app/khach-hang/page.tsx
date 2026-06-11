@@ -469,28 +469,6 @@ const SYSTEM_UI_CSS = `
   transform: scale(.96);
 }
 
-.vtdd-product-empty-suggest {
-  margin-top: 12px;
-  display: grid;
-  gap: 8px;
-}
-
-.vtdd-product-empty-suggest span {
-  color: #854d0e;
-  font-size: 11px;
-  font-weight: 950;
-}
-
-.vtdd-product-empty-suggest button {
-  min-height: 40px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 999px;
-  background: #0f172a;
-  color: #ffd400;
-  font-size: 11px;
-  font-weight: 950;
-}
 
 
 .vtdd-product-list {
@@ -961,21 +939,6 @@ function ProductPicker({ label, value, placeholder, options, disabled = false, o
               ) : (
                 <div className="vtdd-product-empty">
                   Không tìm thấy sản phẩm phù hợp. Thử gõ ngắn hơn, ví dụ: iPhone 15, 17T, A56.
-
-                  {suggestedOptions.length > 0 && (
-                    <div className="vtdd-product-empty-suggest">
-                      <span>Có phải bạn đang tìm:</span>
-                      {suggestedOptions.map((item, index) => (
-                        <button
-                          key={`empty-suggest-${item}-${index}`}
-                          type="button"
-                          onClick={() => chooseProduct(item)}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
