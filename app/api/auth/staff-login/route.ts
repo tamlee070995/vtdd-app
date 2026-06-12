@@ -1,46 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   decryptText,
-  isDefaultPasswordStored,
   normalizeCode,
   normalizeText,
   verifyPassword,
 } from "@/lib/staff-security";
+import {
+  clearStaffSessionCookies,
+  setStaffSessionCookies,
+  shouldForceStaffSetup,
+} from "@/lib/staff-auth";
 import { findStaffByMaNV } from "@/lib/staff-store";
 
-const STAFF_COOKIES = [
-  "vtdd_staff_nv",
-  "vtdd_staff_st",
-  "vtdd_staff_name",
-  "vtdd_staff_store_name",
-  "vtdd_staff_department",
-  "vtdd_staff_gmail",
-  "vtdd_staff_force_setup",
-];
-
 export const dynamic = "force-dynamic";
-
-function clearStaffCookies(res: NextResponse) {
-  STAFF_COOKIES.forEach((name) => {
-    res.cookies.set(name, "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 0,
-    });
-  });
-}
-
-function setCookie(res: NextResponse, name: string, value: string) {
-  res.cookies.set(name, encodeURIComponent(value || ""), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
-}
 
 function redirectLogin(req: NextRequest, message: string) {
   const url = new URL("/login", req.url);
@@ -53,34 +25,8 @@ function redirectLogin(req: NextRequest, message: string) {
     },
   });
 
-  clearStaffCookies(res);
+  clearStaffSessionCookies(res);
   return res;
-}
-
-function shouldForceSetup(staff: any, gmail: string, securityQuestion: string) {
-  const needSetupFlag = String(staff.needSetup || "").trim().toLowerCase();
-
-  const needSetupByFlag =
-    needSetupFlag === "1" ||
-    needSetupFlag === "true" ||
-    needSetupFlag === "yes";
-
-  const needSetupByOldDefaultPassword = isDefaultPasswordStored(staff.password);
-
-  const needSetupByMissingSecurity =
-    !gmail ||
-    !securityQuestion ||
-    !staff.securityAnswer;
-
-  const needSetupByOldPlainPassword =
-    !String(staff.password || "").startsWith("pwd:v1:");
-
-  return (
-    needSetupByFlag ||
-    needSetupByOldDefaultPassword ||
-    needSetupByMissingSecurity ||
-    needSetupByOldPlainPassword
-  );
 }
 
 export async function POST(req: NextRequest) {
@@ -123,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     const gmail = decryptText(staff.gmail);
     const securityQuestion = decryptText(staff.securityQuestion);
-    const forceSetup = shouldForceSetup(staff, gmail, securityQuestion);
+    const forceSetup = shouldForceStaffSetup(staff, gmail, securityQuestion);
 
     const url = new URL("/staff", req.url);
 
@@ -134,13 +80,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    setCookie(res, "vtdd_staff_nv", staff.maNV);
-    setCookie(res, "vtdd_staff_st", staff.maST);
-    setCookie(res, "vtdd_staff_name", staff.staffName || "Nhân viên");
-    setCookie(res, "vtdd_staff_store_name", staff.storeName || "");
-    setCookie(res, "vtdd_staff_department", staff.department || "");
-    setCookie(res, "vtdd_staff_gmail", gmail || "");
-    setCookie(res, "vtdd_staff_force_setup", forceSetup ? "1" : "0");
+    setStaffSessionCookies(res, {
+      maNV: staff.maNV,
+      maST: staff.maST,
+      staffName: staff.staffName || "Nhân viên",
+      storeName: staff.storeName || "",
+      department: staff.department || "",
+      gmail: gmail || "",
+      forceSetup,
+    });
 
     return res;
   } catch (err: any) {

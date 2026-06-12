@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { findStaffByMaNV, ensureStaffAdminHeaders } from "@/lib/staff-store";
 import { verifyPassword, normalizeCode } from "@/lib/staff-security";
 import { setAdminCookies } from "@/lib/admin-auth";
+import { setStaffSessionCookies } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -33,16 +34,6 @@ function jsonError(message: string, status = 400) {
     },
     { status }
   );
-}
-
-function setSharedStaffCookie(res: NextResponse, name: string, value: string) {
-  res.cookies.set(name, encodeURIComponent(value || ""), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
 }
 
 export async function POST(req: NextRequest) {
@@ -102,13 +93,15 @@ export async function POST(req: NextRequest) {
       modules: staff.modulePermissions || "",
     });
 
-    setSharedStaffCookie(res, "vtdd_staff_nv", staff.maNV);
-    setSharedStaffCookie(res, "vtdd_staff_st", staff.maST || "");
-    setSharedStaffCookie(res, "vtdd_staff_name", staff.staffName || "Admin");
-    setSharedStaffCookie(res, "vtdd_staff_store_name", staff.storeName || "");
-    setSharedStaffCookie(res, "vtdd_staff_department", staff.department || "");
-    setSharedStaffCookie(res, "vtdd_staff_gmail", staff.gmail || "");
-    setSharedStaffCookie(res, "vtdd_staff_force_setup", "0");
+    setStaffSessionCookies(res, {
+      maNV: staff.maNV,
+      maST: staff.maST || "",
+      staffName: staff.staffName || "Admin",
+      storeName: staff.storeName || "",
+      department: staff.department || "",
+      gmail: "",
+      forceSetup: false,
+    });
 
     return res;
   } catch (err: any) {

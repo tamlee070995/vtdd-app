@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findStaffByMaNV, updateStaffSecurity } from "@/lib/staff-store";
+import { updateStaffSecurity } from "@/lib/staff-store";
+import { getCurrentStaffFromRequest, setStaffSessionCookies } from "@/lib/staff-auth";
 import {
   decryptText,
   encryptText,
@@ -37,9 +38,9 @@ function safeDecrypt(value: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const maNV = req.cookies.get("vtdd_staff_nv")?.value || "";
+    const currentStaff = await getCurrentStaffFromRequest(req);
 
-    if (!maNV) {
+    if (!currentStaff) {
       return NextResponse.json(
         { success: false, message: "Chưa đăng nhập nhân viên." },
         { status: 401 }
@@ -87,14 +88,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const staff = await findStaffByMaNV(maNV);
-
-    if (!staff) {
-      return NextResponse.json(
-        { success: false, message: "Không tìm thấy tài khoản nhân viên." },
-        { status: 404 }
-      );
-    }
+    const staff = currentStaff.staff;
 
     if (!verifyPassword(currentPassword, staff.password)) {
       return NextResponse.json(
@@ -108,7 +102,7 @@ export async function POST(req: NextRequest) {
     const hasGmail = Boolean(safeDecrypt(staff.gmail));
 
     const forceSetup =
-      req.cookies.get("vtdd_staff_force_setup")?.value === "1" ||
+      currentStaff.forceSetup ||
       staff.needSetup === "1" ||
       isDefaultPasswordStored(staff.password) ||
       hasOldPlainPassword ||
@@ -190,20 +184,14 @@ export async function POST(req: NextRequest) {
           : "Đã cập nhật thông tin cá nhân thành công.",
     });
 
-    res.cookies.set("vtdd_staff_force_setup", "0", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 12,
-    });
-
-    res.cookies.set("vtdd_staff_gmail", encodeURIComponent(gmail), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 12,
+    setStaffSessionCookies(res, {
+      maNV: staff.maNV,
+      maST: staff.maST,
+      staffName: staff.staffName || "Nhân viên",
+      storeName: staff.storeName || "",
+      department: staff.department || "",
+      gmail,
+      forceSetup: false,
     });
 
     return res;

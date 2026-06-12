@@ -21,10 +21,26 @@ export async function GET() {
   if (response) return response;
 
   const items = await getHomeCmsItems();
+  const visibleItems = { ...items };
+
+  HOME_CMS_SLUGS.forEach((slug) => {
+    if (adminCanAccessModule(admin, slug as AdminModuleKey)) return;
+
+    visibleItems[slug] = {
+      ...items[slug],
+      title: "",
+      summary: "",
+      body: "",
+      draftTitle: "",
+      draftSummary: "",
+      draftBody: "",
+      published: false,
+    };
+  });
 
   return NextResponse.json({
     success: true,
-    items,
+    items: visibleItems,
     permission: admin?.permission || "",
     modules: admin?.modules || [],
   });

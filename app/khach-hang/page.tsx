@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { getActiveSystemLock } from "@/lib/system-lock";
 
 type SheetRow = any[];
 
@@ -200,6 +202,74 @@ const SYSTEM_UI_CSS = `
   font-weight: 900;
   letter-spacing: .06em;
   text-transform: uppercase;
+}
+
+.vtdd-data-reload-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, .42);
+  backdrop-filter: blur(10px);
+}
+.vtdd-data-reload-card {
+  width: min(100%, 430px);
+  padding: 18px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .22);
+  display: grid;
+  gap: 10px;
+}
+.vtdd-data-reload-card span {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.vtdd-data-reload-card h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 1000;
+}
+.vtdd-data-reload-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 750;
+}
+.vtdd-data-reload-countdown {
+  margin-top: 2px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 900;
+  text-align: center;
+}
+.vtdd-data-reload-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+.vtdd-data-reload-actions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: #ffd400;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 1000;
+  cursor: pointer;
 }
 
 .vtdd-push-layer {
@@ -1155,6 +1225,182 @@ const SYSTEM_UI_CSS = `
   }
 }
 
+
+/* =========================================================
+   VTDD CUSTOMER DESKTOP HERO - REDESIGN CODE ONLY
+   Áp dụng desktop, mobile/tablet giữ nguyên layout hiện tại
+========================================================= */
+@media (min-width: 1024px) {
+  .customer-personal-hero {
+    min-height: clamp(340px, 30vw, 420px) !important;
+    padding: clamp(32px, 3vw, 46px) clamp(38px, 4vw, 64px) 86px !important;
+    border-radius: 38px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.02fr) minmax(330px, .72fr) !important;
+    grid-template-rows: auto auto 1fr !important;
+    align-items: center !important;
+    align-content: center !important;
+    justify-items: start !important;
+    column-gap: clamp(36px, 5vw, 86px) !important;
+    row-gap: 14px !important;
+    text-align: left !important;
+    background:
+      radial-gradient(circle at 16% 18%, rgba(255, 212, 0, .24), transparent 28%),
+      radial-gradient(circle at 58% -12%, rgba(255, 212, 0, .44), transparent 32%),
+      radial-gradient(circle at 100% 100%, rgba(34, 211, 238, .16), transparent 30%),
+      linear-gradient(135deg, #020617 0%, #0f172a 44%, #111827 72%, #292400 100%) !important;
+    box-shadow: 0 28px 84px rgba(15, 23, 42, .24) !important;
+  }
+
+  .customer-personal-hero::before {
+    opacity: .32 !important;
+    background:
+      linear-gradient(to right, rgba(255,255,255,.12) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.07) 1px, transparent 1px) !important;
+    background-size: 30px 30px !important;
+    mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,.92) 56%, transparent 100%) !important;
+  }
+
+  .customer-personal-hero::after {
+    left: auto !important;
+    right: clamp(-160px, -10vw, -90px) !important;
+    bottom: clamp(-140px, -8vw, -90px) !important;
+    width: clamp(430px, 42vw, 680px) !important;
+    height: clamp(430px, 42vw, 680px) !important;
+    transform: none !important;
+    border-radius: 999px !important;
+    background:
+      radial-gradient(circle, rgba(255, 212, 0, .30), rgba(255, 212, 0, .10) 38%, transparent 70%) !important;
+    filter: blur(2px) !important;
+  }
+
+  .customer-personal-brand {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    justify-self: start !important;
+    margin: 0 !important;
+    padding: 9px 15px 9px 9px !important;
+    gap: 11px !important;
+    background: rgba(255, 255, 255, .11) !important;
+    border: 1px solid rgba(255, 255, 255, .20) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 16px 36px rgba(0,0,0,.18) !important;
+  }
+
+  .customer-personal-brand span {
+    font-size: 14px !important;
+    font-weight: 950 !important;
+  }
+
+  .customer-personal-kicker {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    justify-self: start !important;
+    margin: 12px 0 0 !important;
+    padding: 9px 13px !important;
+    background: rgba(255, 212, 0, .13) !important;
+    border-color: rgba(255, 212, 0, .28) !important;
+    color: #ffd400 !important;
+    font-size: 10.5px !important;
+  }
+
+  .customer-personal-hero h1 {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+    justify-self: start !important;
+    max-width: 760px !important;
+    margin: 6px 0 0 !important;
+    text-align: left !important;
+    font-size: clamp(72px, 7.8vw, 118px) !important;
+    line-height: .78 !important;
+    letter-spacing: -.095em !important;
+    text-shadow: 0 18px 52px rgba(0,0,0,.32) !important;
+  }
+
+  .customer-personal-hero h1 span {
+    color: #ffd400 !important;
+  }
+
+  .customer-personal-hero p {
+    grid-column: 2 !important;
+    grid-row: 1 / 4 !important;
+    justify-self: stretch !important;
+    align-self: center !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 24px 24px 24px 26px !important;
+    border-radius: 28px !important;
+    text-align: left !important;
+    color: rgba(255,255,255,.88) !important;
+    font-size: clamp(15px, 1.12vw, 17px) !important;
+    line-height: 1.55 !important;
+    font-weight: 900 !important;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,.13), rgba(255,255,255,.055)) !important;
+    border: 1px solid rgba(255,255,255,.16) !important;
+    box-shadow: 0 22px 56px rgba(2,6,23,.28), inset 0 1px 0 rgba(255,255,255,.11) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+  }
+
+  .customer-personal-hero p::before {
+    content: "GIÁ THAM KHẢO NHANH";
+    display: block;
+    width: fit-content;
+    margin-bottom: 13px;
+    padding: 8px 11px;
+    border-radius: 999px;
+    background: #ffd400;
+    color: #0f172a;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 950;
+    letter-spacing: .08em;
+  }
+
+  .customer-personal-hero .vtdd-hero-effective-pill {
+    left: 50% !important;
+    right: auto !important;
+    bottom: 22px !important;
+    transform: translateX(-50%) !important;
+    max-width: calc(100% - 72px) !important;
+    min-height: 44px !important;
+    padding: 0 clamp(18px, 2vw, 26px) !important;
+    font-size: clamp(13px, 1vw, 15px) !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    background: rgba(255,255,255,.15) !important;
+    border-color: rgba(255,255,255,.24) !important;
+  }
+}
+
+/* =========================================================
+   VTDD EFFECTIVE DATE TEXT ONLY - không parse ngày, không convert serial
+========================================================= */
+.staff-command .vtdd-hero-effective-pill,
+.customer-personal-hero .vtdd-hero-effective-pill,
+.vtdd-hero-effective-pill {
+  font-size: clamp(12.8px, 1.25vw, 15.5px) !important;
+  min-height: 40px !important;
+  padding: 0 clamp(14px, 1.8vw, 24px) !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+@media (max-width: 640px) {
+  .staff-command .vtdd-hero-effective-pill,
+  .customer-personal-hero .vtdd-hero-effective-pill,
+  .vtdd-hero-effective-pill {
+    max-width: calc(100% - 22px) !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: clamp(10.6px, 2.7vw, 12px) !important;
+  }
+}
+
 `;
 
 function settingEnabled(settings: SystemSettings, key: string) {
@@ -1603,6 +1849,11 @@ export default function CustomerPage() {
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({});
   const [notifySettings, setNotifySettings] = useState<NotifySettings>(EMPTY_NOTIFY);
   const [showSystemPush, setShowSystemPush] = useState(false);
+  const [dataVersion, setDataVersion] = useState("");
+  const [newDataVersion, setNewDataVersion] = useState("");
+  const [showDataReload, setShowDataReload] = useState(false);
+  const [reloadCountdown, setReloadCountdown] = useState(5);
+  const [lockClockTick, setLockClockTick] = useState(() => Date.now());
 
   const [mode, setMode] = useState<"tradein" | "buyonly">("tradein");
   const [hang, setHang] = useState("");
@@ -1625,6 +1876,7 @@ export default function CustomerPage() {
         setDataMoi(json.data.moi || []);
         setDataCu(json.data.cu || []);
         setDataTablet(json.data.tablet || []);
+        setDataVersion(String(json.dataVersion || json.data?.system?.DATA_VERSION || "1"));
         setSystemSettings(json.data.system || {});
         setNotifySettings({
           marquee: "",
@@ -1643,6 +1895,66 @@ export default function CustomerPage() {
 
     load();
   }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setLockClockTick(Date.now());
+    }, 15000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!dataVersion) return;
+
+    let stopped = false;
+
+    async function checkDataVersion() {
+      try {
+        const res = await fetch("/api/data/version", {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-store" },
+        });
+        const json = await res.json().catch(() => null);
+        const nextVersion = String(json?.dataVersion || "");
+
+        if (!stopped && nextVersion && nextVersion !== dataVersion) {
+          setNewDataVersion(nextVersion);
+          setShowDataReload(true);
+        }
+      } catch {
+        // Không làm phiền khách nếu kiểm tra version lỗi tạm thời.
+      }
+    }
+
+    checkDataVersion();
+
+    const timer = window.setInterval(checkDataVersion, 5000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [dataVersion]);
+
+  useEffect(() => {
+    if (!showDataReload) return;
+
+    setReloadCountdown(5);
+
+    const timer = window.setInterval(() => {
+      setReloadCountdown((current) => {
+        if (current <= 1) {
+          window.clearInterval(timer);
+          window.location.reload();
+          return 0;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [showDataReload, newDataVersion]);
 
   const brands = useMemo(() => {
     return unique(dataMoi.slice(1).map((row) => String(row[0] || "").trim()));
@@ -1697,7 +2009,8 @@ export default function CustomerPage() {
   const canChooseType = !!selectedOldRow && !!spCu;
   const selectedTypeInfo = TYPE_OPTIONS.find((item) => item.value === loai) || null;
 
-  const systemLocked = settingEnabled(systemSettings, "SYSTEM_LOCK_ENABLED");
+  const activeSystemLock = getActiveSystemLock(systemSettings, new Date(lockClockTick));
+  const systemLocked = activeSystemLock.active;
   const customerPageLocked = settingEnabled(systemSettings, "CUSTOMER_PAGE_LOCKED");
   const customerTradeinLocked = settingEnabled(systemSettings, "CUSTOMER_TRADEIN_LOCKED");
   const customerBuyonlyLocked = settingEnabled(systemSettings, "CUSTOMER_BUYONLY_LOCKED");
@@ -1848,7 +2161,9 @@ export default function CustomerPage() {
   }
 
   function renderSystemLock() {
-    const message = getSystemText(systemSettings, "SYSTEM_LOCK_MESSAGE") || "HỆ THỐNG ĐANG CẬP NHẬT KHẨN.";
+    const message = activeSystemLock.active
+      ? activeSystemLock.message
+      : getSystemText(systemSettings, "SYSTEM_LOCK_MESSAGE") || "HỆ THỐNG ĐANG CẬP NHẬT KHẨN.";
 
     return (
       <main className="vtdd-lock-page">
@@ -1856,9 +2171,10 @@ export default function CustomerPage() {
         <section className="vtdd-lock-card">
           <div className="vtdd-lock-icon">!</div>
           <span>Tạm khóa truy cập</span>
-          <h1>Hệ thống đang cập nhật</h1>
+          <h1>{activeSystemLock.scheduled ? "Hệ thống đang bảo trì" : "Hệ thống đang cập nhật"}</h1>
           <p>{message}</p>
-          <a href="/">Quay về trang chủ</a>
+          {activeSystemLock.detail ? <p>{activeSystemLock.detail}</p> : null}
+          <Link href="/">Quay về trang chủ</Link>
         </section>
       </main>
     );
@@ -2099,6 +2415,27 @@ export default function CustomerPage() {
           </a>
         </section>
       </section>
+
+      {showDataReload && (
+        <section className="vtdd-data-reload-layer" role="dialog" aria-modal="true">
+          <div className="vtdd-data-reload-card">
+            <span>Hệ thống mới</span>
+            <h2>Dữ liệu vừa được cập nhật</h2>
+            <p>
+              Phiên bản hiện tại: {dataVersion || "1"} · Phiên bản mới: {newDataVersion || "mới"}.
+              Trang sẽ reload để dùng cấu hình mới nhất.
+            </p>
+            <div className="vtdd-data-reload-countdown">
+              Tự reload sau {reloadCountdown}s nếu chưa thao tác.
+            </div>
+            <div className="vtdd-data-reload-actions">
+              <button type="button" onClick={() => window.location.reload()}>
+                Reload ngay
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Push notify chỉ áp dụng cho trang nhân viên */}
     </main>

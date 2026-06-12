@@ -94,7 +94,7 @@ async function ensureSheetAndHeaders(sheetName: string, headers: string[]) {
     spreadsheetId,
   });
 
-  let targetSheet = meta.data.sheets?.find((s) => s.properties?.title === sheetName);
+  const targetSheet = meta.data.sheets?.find((s) => s.properties?.title === sheetName);
   let sheetId = targetSheet?.properties?.sheetId;
 
   if (sheetId === undefined || sheetId === null) {

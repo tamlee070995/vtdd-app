@@ -1,4 +1,5 @@
 import { getSystemSettings, updateSystemSettings } from "@/lib/system-store";
+import { sanitizeHtml } from "@/lib/html-sanitize";
 
 export type HomeCmsSlug = "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo";
 
@@ -62,10 +63,10 @@ export async function getHomeCmsItems(): Promise<Record<HomeCmsSlug, HomeCmsItem
     const def = CMS_DEFS[slug];
     const draftTitle = clean(settings[`${p}_DRAFT_TITLE`]) || def.fallbackTitle;
     const draftSummary = clean(settings[`${p}_DRAFT_SUMMARY`]) || def.fallbackSummary;
-    const draftBody = clean(settings[`${p}_DRAFT_BODY`]);
+    const draftBody = sanitizeHtml(clean(settings[`${p}_DRAFT_BODY`]));
     const title = clean(settings[`${p}_PUBLISHED_TITLE`]) || draftTitle;
     const summary = clean(settings[`${p}_PUBLISHED_SUMMARY`]) || draftSummary;
-    const body = clean(settings[`${p}_PUBLISHED_BODY`]) || draftBody;
+    const body = sanitizeHtml(clean(settings[`${p}_PUBLISHED_BODY`])) || draftBody;
 
     result[slug] = {
       slug,
@@ -104,7 +105,7 @@ export async function saveHomeCmsDraft(
     {
       [`${p}_DRAFT_TITLE`]: clean(data.title),
       [`${p}_DRAFT_SUMMARY`]: clean(data.summary),
-      [`${p}_DRAFT_BODY`]: String(data.body || ""),
+      [`${p}_DRAFT_BODY`]: sanitizeHtml(String(data.body || "")),
       [`${p}_UPDATED_AT`]: now,
     },
     updatedBy

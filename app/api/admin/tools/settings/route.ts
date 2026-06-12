@@ -1,0 +1,84 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/admin-auth";
+import { appendAdminAudit, updateSystemSettings } from "@/lib/system-store";
+
+export const dynamic = "force-dynamic";
+
+const ALLOWED_TOOL_SETTING_KEYS = new Set([
+  "TOOL_PMH_ENABLED",
+  "TOOL_PMH_SCHEDULE_ENABLED",
+  "TOOL_PMH_START_AT",
+  "TOOL_PMH_END_AT",
+  "TOOL_PMH_LOCK_REASON",
+]);
+
+function clean(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function getClientIp(req: NextRequest) {
+  const forwarded = req.headers.get("forwarded") || "";
+  const forwardedFor = forwarded.match(/for="?([^;,"]+)/i)?.[1] || "";
+
+  return (
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("true-client-ip") ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-client-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    forwardedFor ||
+    ""
+  );
+}
+
+export async function POST(req: NextRequest) {
+  const { admin, response } = await requireAdminApi(req, { module: "tools" });
+  if (response) return response;
+
+  try {
+    const body = await req.json().catch(() => null);
+    const input = body?.settings || {};
+    const updates: Record<string, string> = {};
+
+    Object.entries(input).forEach(([key, value]) => {
+      if (!ALLOWED_TOOL_SETTING_KEYS.has(key)) return;
+      updates[key] = clean(value);
+    });
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ success: false, message: "Không có cấu hình tool hợp lệ để lưu." }, { status: 400 });
+    }
+
+    ["TOOL_PMH_START_AT", "TOOL_PMH_END_AT"].forEach((key) => {
+      const value = clean(updates[key]);
+      if (value && !value.startsWith("'")) updates[key] = `'${value}`;
+    });
+
+    const adminName = admin?.name || admin?.maNV || "Admin";
+    await updateSystemSettings(updates, adminName);
+
+    try {
+      await appendAdminAudit({
+        admin: adminName,
+        action: "UPDATE_TOOL_SETTINGS",
+        target: "Module_05_Tools",
+        newValue: JSON.stringify(updates),
+        ip: getClientIp(req),
+        note: "Cập nhật bật/tắt và lịch hoạt động công cụ hỗ trợ.",
+      });
+    } catch (auditErr: any) {
+      console.warn("SKIP_TOOL_ADMIN_AUDIT:", auditErr?.message || auditErr);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Đã lưu cấu hình công cụ.",
+      settings: updates,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, message: err?.message || "Không lưu được cấu hình công cụ." },
+      { status: 500 }
+    );
+  }
+}

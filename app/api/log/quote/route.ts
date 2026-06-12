@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertSheetRowAt2Queued } from "@/lib/sheets-write";
+import { getCurrentStaffFromRequest } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -34,14 +35,6 @@ function money(value: any) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function safeDecode(value: string) {
-  try {
-    return decodeURIComponent(value || "");
-  } catch {
-    return value || "";
-  }
-}
-
 function getActionLabel(action: string) {
   if (action === "TRA_GIA") return "TRA GIÁ";
   if (action === "COPY") return "COPY BÁO GIÁ";
@@ -71,16 +64,9 @@ function getClientIp(req: NextRequest, body: any) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const currentStaff = await getCurrentStaffFromRequest(req);
 
-    const cookieNV = req.cookies.get("vtdd_staff_nv")?.value || "";
-    const cookieST = req.cookies.get("vtdd_staff_st")?.value || "";
-    const cookieName = req.cookies.get("vtdd_staff_name")?.value || "";
-
-    const maNV = clean(cookieNV || body.maNV);
-    const maST = clean(cookieST || body.maST);
-    const staffName = clean(safeDecode(cookieName) || body.staffName || "");
-
-    if (!maNV || !maST) {
+    if (!currentStaff) {
       return NextResponse.json(
         {
           success: false,
@@ -103,9 +89,9 @@ export async function POST(req: NextRequest) {
     await insertSheetRowAt2Queued(SHEET_NAME, HEADERS, [
       now,
       getActionLabel(clean(body.action)),
-      maNV,
-      maST,
-      staffName,
+      currentStaff.maNV,
+      currentStaff.maST,
+      currentStaff.staffName,
       body.mode === "tradein" ? "Thu cũ đổi mới" : "Thu cũ không đổi mới",
       clean(body.spMoi),
       clean(body.spCu),

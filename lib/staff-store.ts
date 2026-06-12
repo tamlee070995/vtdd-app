@@ -409,10 +409,23 @@ export async function updateStaffPermission(rowNumber: number, permission: "admi
 
 
 function normalizeModulePermissions(value: any) {
-  const allowed = new Set(["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "tools"]);
+  const allowed = new Set([
+    "tcdm",
+    "quy-trinh-thu-cu",
+    "may-moi",
+    "may-cu",
+    "demo",
+    "tools",
+    "action:staff-manage",
+    "action:staff-security",
+    "action:settings-write",
+    "action:reload-data",
+    "action:dashboard-view",
+  ]);
+
   return String(value || "")
     .split(",")
-    .map((item) => item.trim())
+    .map((item) => item.trim().toLowerCase())
     .filter((item, index, arr) => allowed.has(item) && arr.indexOf(item) === index)
     .join(",");
 }

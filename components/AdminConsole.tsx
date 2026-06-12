@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "@tinymce/tinymce-react";
+import { sanitizeHtml } from "@/lib/html-sanitize";
+import AdminToolsDashboard from "@/components/AdminToolsDashboard";
 
 type AdminStaff = {
   rowNumber: number;
@@ -50,11 +52,22 @@ type DashboardLogRow = {
 
 type AdminDashboard = {
   topOldProducts: Array<{ product: string; count: number }>;
+  topStaff: Array<{ maNV: string; staffName: string; count: number; totalValue: number }>;
+  topStores: Array<{ maST: string; count: number; totalValue: number }>;
+  dailyLogs: Array<{ day: string; count: number }>;
+  actionCounts: Array<{ action: string; count: number }>;
   recentLogs: DashboardLogRow[];
   totalLogs: number;
+  totalValue: number;
 };
 
 type AdminRole = "admin" | "mod";
+type AdminActionKey =
+  | "staff-manage"
+  | "staff-security"
+  | "settings-write"
+  | "reload-data"
+  | "dashboard-view";
 
 type AdminConsoleProps = {
   initialSettings: Record<string, string>;
@@ -81,11 +94,16 @@ const EMPTY_ONLINE_STATS: OnlineStats = {
 
 const EMPTY_DASHBOARD: AdminDashboard = {
   topOldProducts: [],
+  topStaff: [],
+  topStores: [],
+  dailyLogs: [],
+  actionCounts: [],
   recentLogs: [],
   totalLogs: 0,
+  totalValue: 0,
 };
 
-type TabKey = "overview" | "staff" | "permission" | "notify" | "system" | "dashboard" | "security";
+type TabKey = "overview" | "staff" | "permission" | "notify" | "system" | "dashboard";
 
 type ToastState = {
   type: "success" | "error";
@@ -111,7 +129,6 @@ const TAB_ITEMS: Array<{
   { key: "notify", label: "Thông báo", desc: "Banner & push", icon: "04" },
   { key: "system", label: "Hệ thống", desc: "Lock & reload", icon: "05" },
   { key: "dashboard", label: "Dashboard", desc: "Tra giá & log", icon: "06" },
-  { key: "security", label: "Bảo mật", desc: "PIN admin", icon: "07" },
 ];
 
 
@@ -122,6 +139,16 @@ const ADMIN_MODULE_OPTIONS = [
   { key: "may-cu", label: "3 Trang máy cũ" },
   { key: "demo", label: "4 Trang demo" },
   { key: "tools", label: "5 Công cụ" },
+];
+
+const ADMIN_ACTION_PREFIX = "action:";
+
+const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
+  { key: "staff-manage", label: "Quản lý nhân viên", desc: "Xem danh sách, Active và Standby tài khoản." },
+  { key: "staff-security", label: "Reset bảo mật", desc: "Reset OTP, mật khẩu và thiết lập bảo mật." },
+  { key: "settings-write", label: "Lưu cấu hình", desc: "Lưu thông báo, lock web và ngày áp dụng." },
+  { key: "reload-data", label: "Reload data", desc: "Tăng Data version để nhân viên nhận dữ liệu mới." },
+  { key: "dashboard-view", label: "Xem dashboard", desc: "Xem log tra giá, top máy và thống kê." },
 ];
 
 function isOn(value: string) {
@@ -144,6 +171,61 @@ function getErrorMessage(err: any) {
 
 function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("vi-VN");
+}
+
+function toDatetimeLocalInput(value: any) {
+  const raw = String(value || "").trim().replace(/^'/, "");
+  if (!raw) return "";
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}T${isoMatch[4]}:${isoMatch[5]}`;
+
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[,\s]+(\d{1,2}):(\d{2})/);
+  if (slashMatch) {
+    const a = Number(slashMatch[1]);
+    const b = Number(slashMatch[2]);
+    const month = a > 12 ? b : a;
+    const day = a > 12 ? a : b;
+
+    return [
+      slashMatch[3],
+      String(month).padStart(2, "0"),
+      String(day).padStart(2, "0"),
+    ].join("-") + `T${slashMatch[4].padStart(2, "0")}:${slashMatch[5]}`;
+  }
+
+  return raw;
+}
+
+function parseAdminAccessItems(value: any) {
+  const moduleKeys = new Set(ADMIN_MODULE_OPTIONS.map((item) => item.key));
+  const actionKeys = new Set(
+    ADMIN_ACTION_OPTIONS.map((item) => `${ADMIN_ACTION_PREFIX}${item.key}`)
+  );
+
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter((item, index, arr) => {
+      const allowed = moduleKeys.has(item) || actionKeys.has(item);
+      return allowed && arr.indexOf(item) === index;
+    });
+}
+
+function summarizeAdminAccess(value: any) {
+  const tokens = parseAdminAccessItems(value);
+  if (tokens.length === 0) return "—";
+
+  return tokens
+    .map((token) => {
+      const moduleOption = ADMIN_MODULE_OPTIONS.find((item) => item.key === token);
+      if (moduleOption) return moduleOption.label;
+
+      const actionKey = token.slice(ADMIN_ACTION_PREFIX.length);
+      const action = ADMIN_ACTION_OPTIONS.find((item) => item.key === actionKey);
+      return action ? action.label : token;
+    })
+    .join(" · ");
 }
 
 function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsoleProps) {
@@ -171,16 +253,13 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
   const [staffStatusFilter, setStaffStatusFilter] = useState<"ALL" | "Active" | "Standby">("ALL");
   const [staffPage, setStaffPage] = useState(1);
 
-  const [oldPin, setOldPin] = useState("");
-  const [newPin, setNewPin] = useState("");
-  const [confirmPin, setConfirmPin] = useState("");
-
   const summary = staffMeta.summary || EMPTY_SUMMARY;
   const isFullAdmin = String(adminRole || "").toLowerCase() === "admin";
 
   const lockCount = useMemo(() => {
     return [
       "SYSTEM_LOCK_ENABLED",
+      "SYSTEM_LOCK_SCHEDULE_ENABLED",
       "STAFF_PAGE_LOCKED",
       "CUSTOMER_PAGE_LOCKED",
       "STAFF_TRADEIN_LOCKED",
@@ -323,7 +402,6 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
     }, 10000);
 
     return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -377,7 +455,7 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
     }
   }
 
-  async function saveSettings(extra?: Record<string, string>) {
+  async function saveSettings(extra?: Record<string, string>, options?: { onlyKeys?: string[] }) {
     try {
       setBusy("settings");
 
@@ -386,9 +464,14 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
         ...(extra || {}),
       };
 
-      const apiPayload = { ...payload };
+      const apiPayload = options?.onlyKeys?.length
+        ? options.onlyKeys.reduce<Record<string, string>>((acc, key) => {
+            acc[key] = payload[key] || "";
+            return acc;
+          }, {})
+        : { ...payload };
 
-      ["PRICE_EFFECTIVE_FROM", "PRICE_EFFECTIVE_TO"].forEach((key) => {
+      ["PRICE_EFFECTIVE_FROM", "PRICE_EFFECTIVE_TO", "SYSTEM_LOCK_START_AT", "SYSTEM_LOCK_END_AT"].forEach((key) => {
         const value = String(apiPayload[key] || "").trim();
         if (value && !value.startsWith("'")) {
           apiPayload[key] = `'${value}`;
@@ -399,7 +482,7 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
         settings: apiPayload,
       });
 
-      setSettings(payload);
+      setSettings({ ...payload, ...(data.settings || {}) });
       showToast("success", data.message || "Đã lưu cấu hình.");
       setBusy("");
     } catch (err: any) {
@@ -410,28 +493,7 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
 
   async function reloadDataVersion() {
     const nextVersion = String(Date.now());
-    await saveSettings({ DATA_VERSION: nextVersion });
-  }
-
-  async function changePin() {
-    try {
-      setBusy("pin");
-
-      const data = await postJSON("/api/admin/change-pin", {
-        oldPin,
-        newPin,
-        confirmPin,
-      });
-
-      setOldPin("");
-      setNewPin("");
-      setConfirmPin("");
-      showToast("success", data.message || "Đã đổi PIN admin.");
-      setBusy("");
-    } catch (err: any) {
-      setBusy("");
-      showToast("error", getErrorMessage(err));
-    }
+    await saveSettings({ DATA_VERSION: nextVersion }, { onlyKeys: ["DATA_VERSION"] });
   }
 
   function setSetting(key: string, value: string) {
@@ -668,13 +730,9 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
                         <span>SETUP: {item.needSetup || "0"}</span>
                         {item.gmail ? <span>{item.gmail}</span> : null}
                         {item.permission ? <span>QUYỀN: {item.permission.toUpperCase()}</span> : <span>QUYỀN: —</span>}
+                        {item.permission === "mod" ? <span>PHẠM VI: {summarizeAdminAccess(item.modulePermissions)}</span> : null}
                       </div>
 
-                      <StaffAdminAccessBox
-                        item={item}
-                        disabled={busy === `UPDATE_PERMISSION-${item.maNV}`}
-                        onSave={runStaffAdminAccess}
-                      />
                     </div>
 
                     <div className="adminx-staff-actions">
@@ -809,7 +867,7 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
                     <p>NV {item.maNV} · ST {item.maST || "—"} · {item.storeName || "Chưa có siêu thị"}</p>
                     <div className="adminx-staff-flags">
                       {item.permission ? <span>QUYỀN: {item.permission.toUpperCase()}</span> : <span>QUYỀN: USER THƯỜNG</span>}
-                      {item.modulePermissions ? <span>MODULES: {item.modulePermissions}</span> : <span>MODULES: —</span>}
+                      <span>PHẠM VI: {summarizeAdminAccess(item.modulePermissions)}</span>
                     </div>
                   </div>
 
@@ -970,45 +1028,142 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
             </div>
           </div>
 
-          <div className="adminx-form-grid">
-            <label>
-              <span>Ngày áp dụng từ</span>
-              <input
-                value={settings.PRICE_EFFECTIVE_FROM || ""}
-                onChange={(e) => setSetting("PRICE_EFFECTIVE_FROM", e.target.value)}
-                placeholder="Để trống = đầu tháng hiện tại"
-              />
-            </label>
-            <label>
-              <span>Ngày áp dụng đến</span>
-              <input
-                value={settings.PRICE_EFFECTIVE_TO || ""}
-                onChange={(e) => setSetting("PRICE_EFFECTIVE_TO", e.target.value)}
-                placeholder="Để trống = cuối tháng hiện tại"
-              />
-            </label>
-            <label>
-              <span>Thông báo lock toàn màn hình</span>
-              <input
-                value={settings.SYSTEM_LOCK_MESSAGE || ""}
-                onChange={(e) => setSetting("SYSTEM_LOCK_MESSAGE", e.target.value)}
-                placeholder="HỆ THỐNG ĐANG CẬP NHẬT KHẨN."
-              />
-            </label>
-            <label>
-              <span>Data version</span>
-              <input value={settings.DATA_VERSION || "1"} readOnly />
-            </label>
-          </div>
+          <div className="adminx-system-sections">
+            <section className="adminx-system-card">
+              <div className="adminx-system-card-head">
+                <span>01</span>
+                <div>
+                  <h3>Thời gian áp dụng bảng giá</h3>
+                  <p>Hiển thị mốc áp dụng trên trang nhân viên và khách hàng.</p>
+                </div>
+              </div>
+              <div className="adminx-form-grid">
+                <label>
+                  <span>Ngày áp dụng từ</span>
+                  <input
+                    value={settings.PRICE_EFFECTIVE_FROM || ""}
+                    onChange={(e) => setSetting("PRICE_EFFECTIVE_FROM", e.target.value)}
+                    placeholder="Để trống = đầu tháng hiện tại"
+                  />
+                </label>
+                <label>
+                  <span>Ngày áp dụng đến</span>
+                  <input
+                    value={settings.PRICE_EFFECTIVE_TO || ""}
+                    onChange={(e) => setSetting("PRICE_EFFECTIVE_TO", e.target.value)}
+                    placeholder="Để trống = cuối tháng hiện tại"
+                  />
+                </label>
+              </div>
+            </section>
 
-          <div className="adminx-lock-grid">
-            <ToggleRow settingKey="SYSTEM_LOCK_ENABLED" title="Lock web khẩn cấp" desc="Hiển thị toàn màn hình cập nhật khẩn." />
-            <ToggleRow settingKey="STAFF_PAGE_LOCKED" title="Khóa trang nhân viên" desc="Chặn truy cập cổng tra giá nhân viên." />
-            <ToggleRow settingKey="CUSTOMER_PAGE_LOCKED" title="Khóa trang khách hàng" desc="Chặn truy cập trang khách hàng cá nhân." />
-            <ToggleRow settingKey="STAFF_TRADEIN_LOCKED" title="Khóa nhân viên - Thu cũ đổi mới" desc="Khóa tab Thu cũ đổi mới trên trang nhân viên." />
-            <ToggleRow settingKey="STAFF_BUYONLY_LOCKED" title="Khóa nhân viên - Chỉ thu cũ" desc="Khóa tab Chỉ thu cũ trên trang nhân viên." />
-            <ToggleRow settingKey="CUSTOMER_TRADEIN_LOCKED" title="Khóa khách - Thu cũ đổi mới" desc="Khóa tab Thu cũ đổi mới trên trang khách hàng." />
-            <ToggleRow settingKey="CUSTOMER_BUYONLY_LOCKED" title="Khóa khách - Chỉ thu cũ" desc="Khóa tab Chỉ thu cũ trên trang khách hàng." />
+            <section className="adminx-system-card">
+              <div className="adminx-system-card-head">
+                <span>02</span>
+                <div>
+                  <h3>Reload dữ liệu</h3>
+                  <p>Tăng phiên bản để người đang mở web thấy thông báo cập nhật và tự reload.</p>
+                </div>
+              </div>
+              <div className="adminx-form-grid">
+                <label>
+                  <span>Data version</span>
+                  <input value={settings.DATA_VERSION || "1"} readOnly />
+                </label>
+              </div>
+            </section>
+
+            <section className="adminx-system-card">
+              <div className="adminx-system-card-head">
+                <span>03</span>
+                <div>
+                  <h3>Lock web khẩn cấp</h3>
+                  <p>Bật ngay màn hình khóa toàn hệ thống khi có sự cố hoặc cập nhật gấp.</p>
+                </div>
+              </div>
+              <div className="adminx-form-grid">
+                <label>
+                  <span>Thông báo lock toàn màn hình</span>
+                  <input
+                    value={settings.SYSTEM_LOCK_MESSAGE || ""}
+                    onChange={(e) => setSetting("SYSTEM_LOCK_MESSAGE", e.target.value)}
+                    placeholder="HỆ THỐNG ĐANG CẬP NHẬT KHẨN."
+                  />
+                </label>
+              </div>
+              <div className="adminx-lock-grid compact">
+                <ToggleRow settingKey="SYSTEM_LOCK_ENABLED" title="Lock web khẩn cấp" desc="Hiển thị toàn màn hình cập nhật khẩn." />
+              </div>
+            </section>
+
+            <section className="adminx-system-card">
+              <div className="adminx-system-card-head">
+                <span>04</span>
+                <div>
+                  <h3>Khóa theo lịch</h3>
+                  <p>Tự khóa khi đến giờ bắt đầu và mở lại sau giờ kết thúc.</p>
+                </div>
+              </div>
+              <div className="adminx-form-grid">
+                <label>
+                  <span>Giờ bắt đầu khóa</span>
+                  <input
+                    type="datetime-local"
+                    value={toDatetimeLocalInput(settings.SYSTEM_LOCK_START_AT)}
+                    onChange={(e) => setSetting("SYSTEM_LOCK_START_AT", e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Giờ kết thúc khóa</span>
+                  <input
+                    type="datetime-local"
+                    value={toDatetimeLocalInput(settings.SYSTEM_LOCK_END_AT)}
+                    onChange={(e) => setSetting("SYSTEM_LOCK_END_AT", e.target.value)}
+                  />
+                </label>
+                <label className="adminx-form-wide">
+                  <span>Lý do khóa theo lịch</span>
+                  <textarea
+                    value={settings.SYSTEM_LOCK_REASON || ""}
+                    onChange={(e) => setSetting("SYSTEM_LOCK_REASON", e.target.value)}
+                    placeholder="VD: Hệ thống tạm khóa để cập nhật bảng giá và bảo trì dữ liệu."
+                  />
+                </label>
+              </div>
+              <div className="adminx-lock-grid compact">
+                <ToggleRow settingKey="SYSTEM_LOCK_SCHEDULE_ENABLED" title="Khóa theo lịch" desc="Dùng khung giờ đã cài ở trên." />
+              </div>
+            </section>
+
+            <section className="adminx-system-card">
+              <div className="adminx-system-card-head">
+                <span>05</span>
+                <div>
+                  <h3>Khóa trang nhân viên</h3>
+                  <p>Chặn toàn bộ trang nhân viên hoặc khóa từng tab nghiệp vụ.</p>
+                </div>
+              </div>
+              <div className="adminx-lock-grid">
+                <ToggleRow settingKey="STAFF_PAGE_LOCKED" title="Khóa trang nhân viên" desc="Chặn truy cập cổng tra giá nhân viên." />
+                <ToggleRow settingKey="STAFF_TRADEIN_LOCKED" title="Khóa nhân viên - Thu cũ đổi mới" desc="Khóa tab Thu cũ đổi mới trên trang nhân viên." />
+                <ToggleRow settingKey="STAFF_BUYONLY_LOCKED" title="Khóa nhân viên - Chỉ thu cũ" desc="Khóa tab Chỉ thu cũ trên trang nhân viên." />
+              </div>
+            </section>
+
+            <section className="adminx-system-card">
+              <div className="adminx-system-card-head">
+                <span>06</span>
+                <div>
+                  <h3>Khóa trang khách hàng</h3>
+                  <p>Chặn trang khách hàng hoặc khóa từng chế độ tra giá cho khách.</p>
+                </div>
+              </div>
+              <div className="adminx-lock-grid">
+                <ToggleRow settingKey="CUSTOMER_PAGE_LOCKED" title="Khóa trang khách hàng" desc="Chặn truy cập trang khách hàng cá nhân." />
+                <ToggleRow settingKey="CUSTOMER_TRADEIN_LOCKED" title="Khóa khách - Thu cũ đổi mới" desc="Khóa tab Thu cũ đổi mới trên trang khách hàng." />
+                <ToggleRow settingKey="CUSTOMER_BUYONLY_LOCKED" title="Khóa khách - Chỉ thu cũ" desc="Khóa tab Chỉ thu cũ trên trang khách hàng." />
+              </div>
+            </section>
           </div>
         </section>
       )}
@@ -1026,6 +1181,29 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
             </button>
           </div>
 
+          <div className="adminx-metric-grid adminx-dashboard-metrics">
+            <div className="adminx-metric-card dark">
+              <span>Tổng lượt log</span>
+              <b>{formatNumber(dashboardData.totalLogs)}</b>
+              <p>Số lượt thao tác tra giá đã ghi nhận.</p>
+            </div>
+            <div className="adminx-metric-card">
+              <span>Tổng giá trị</span>
+              <b>{money(dashboardData.totalValue)}</b>
+              <p>Tổng tiền khách nhận trong các log gần nhất.</p>
+            </div>
+            <div className="adminx-metric-card">
+              <span>Nhân viên</span>
+              <b>{formatNumber(dashboardData.topStaff.length)}</b>
+              <p>Số nhân viên có phát sinh log trong dữ liệu tải về.</p>
+            </div>
+            <div className="adminx-metric-card">
+              <span>Siêu thị</span>
+              <b>{formatNumber(dashboardData.topStores.length)}</b>
+              <p>Số siêu thị có phát sinh log tra giá.</p>
+            </div>
+          </div>
+
           <div className="adminx-dashboard-grid">
             <div className="adminx-analytics-card">
               <h3>Top 10 máy cũ tìm nhiều nhất</h3>
@@ -1037,6 +1215,74 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
                     <div key={`${item.product}-${index}`}>
                       <span>{String(index + 1).padStart(2, "0")}</span>
                       <b>{item.product}</b>
+                      <em>{item.count} lượt</em>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="adminx-analytics-card">
+              <h3>Top nhân viên tra giá</h3>
+              <div className="adminx-ranking-list">
+                {dashboardData.topStaff.length === 0 ? (
+                  <p>Chưa có dữ liệu.</p>
+                ) : (
+                  dashboardData.topStaff.map((item, index) => (
+                    <div key={`${item.maNV}-${index}`}>
+                      <span>{String(index + 1).padStart(2, "0")}</span>
+                      <b>{item.staffName || `NV ${item.maNV}`}</b>
+                      <em>{item.count} lượt · {money(item.totalValue)}</em>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="adminx-analytics-card">
+              <h3>Top siêu thị phát sinh log</h3>
+              <div className="adminx-ranking-list">
+                {dashboardData.topStores.length === 0 ? (
+                  <p>Chưa có dữ liệu.</p>
+                ) : (
+                  dashboardData.topStores.map((item, index) => (
+                    <div key={`${item.maST}-${index}`}>
+                      <span>{String(index + 1).padStart(2, "0")}</span>
+                      <b>ST {item.maST || "Không rõ"}</b>
+                      <em>{item.count} lượt · {money(item.totalValue)}</em>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="adminx-analytics-card">
+              <h3>Lượt tra giá theo ngày</h3>
+              <div className="adminx-ranking-list">
+                {dashboardData.dailyLogs.length === 0 ? (
+                  <p>Chưa có dữ liệu.</p>
+                ) : (
+                  dashboardData.dailyLogs.map((item, index) => (
+                    <div key={`${item.day}-${index}`}>
+                      <span>{String(index + 1).padStart(2, "0")}</span>
+                      <b>{item.day}</b>
+                      <em>{item.count} lượt</em>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="adminx-analytics-card">
+              <h3>Loại thao tác</h3>
+              <div className="adminx-ranking-list">
+                {dashboardData.actionCounts.length === 0 ? (
+                  <p>Chưa có dữ liệu.</p>
+                ) : (
+                  dashboardData.actionCounts.map((item, index) => (
+                    <div key={`${item.action}-${index}`}>
+                      <span>{String(index + 1).padStart(2, "0")}</span>
+                      <b>{item.action}</b>
                       <em>{item.count} lượt</em>
                     </div>
                   ))
@@ -1061,51 +1307,6 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
                 )}
               </div>
             </div>
-          </div>
-        </section>
-      )}
-
-      {tab === "security" && (
-        <section className="adminx-panel">
-          <div className="adminx-panel-head adminx-panel-head-row">
-            <div>
-              <span className="adminx-eyebrow">Security</span>
-              <h2>Đổi PIN truy cập Admin</h2>
-              <p>PIN mới được lưu bằng dạng hash trong System_Settings.</p>
-            </div>
-            <button className="adminx-action-btn" type="button" onClick={changePin} disabled={busy === "pin"}>
-              {busy === "pin" ? "Đang đổi..." : "Đổi PIN"}
-            </button>
-          </div>
-
-          <div className="adminx-form-grid">
-            <label>
-              <span>PIN hiện tại</span>
-              <input
-                type="password"
-                value={oldPin}
-                onChange={(e) => setOldPin(e.target.value)}
-                placeholder="Nhập PIN hiện tại"
-              />
-            </label>
-            <label>
-              <span>PIN mới</span>
-              <input
-                type="password"
-                value={newPin}
-                onChange={(e) => setNewPin(e.target.value)}
-                placeholder="Tối thiểu 6 ký tự"
-              />
-            </label>
-            <label>
-              <span>Xác nhận PIN mới</span>
-              <input
-                type="password"
-                value={confirmPin}
-                onChange={(e) => setConfirmPin(e.target.value)}
-                placeholder="Nhập lại PIN mới"
-              />
-            </label>
           </div>
         </section>
       )}
@@ -1709,6 +1910,10 @@ const ADMINX_STYLE = `
   grid-template-columns: repeat(2, 1fr);
 }
 
+.adminx-form-wide {
+  grid-column: 1 / -1;
+}
+
 .adminx-form-grid label {
   display: grid;
   gap: 7px;
@@ -1735,9 +1940,63 @@ const ADMINX_STYLE = `
   justify-content: flex-end;
 }
 
+.adminx-system-sections {
+  display: grid;
+  gap: 12px;
+}
+
+.adminx-system-card {
+  padding: 14px;
+  border-radius: 22px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .045);
+}
+
+.adminx-system-card-head {
+  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.adminx-system-card-head > span {
+  width: 34px;
+  height: 34px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  background: #0f172a;
+  color: #ffd400;
+  font-size: 11px;
+  font-weight: 1000;
+}
+
+.adminx-system-card h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 17px;
+  line-height: 1.15;
+  font-weight: 1000;
+  letter-spacing: -.02em;
+}
+
+.adminx-system-card p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 800;
+}
+
 .adminx-lock-grid {
   margin-top: 14px;
   grid-template-columns: repeat(2, 1fr);
+}
+
+.adminx-lock-grid.compact {
+  grid-template-columns: 1fr;
 }
 
 .adminx-toggle-row {
@@ -1806,6 +2065,17 @@ const ADMINX_STYLE = `
 
 .adminx-dashboard-grid {
   grid-template-columns: 1fr 1fr;
+}
+
+.adminx-dashboard-metrics {
+  margin-bottom: 10px;
+}
+
+.adminx-dashboard-metrics .adminx-metric-card b {
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: 0;
+  word-break: break-word;
 }
 
 .adminx-analytics-card {
@@ -2281,27 +2551,40 @@ function StaffAdminAccessBox({
   onSave: (maNV: string, permission: string, modules: string) => Promise<void>;
 }) {
   const [permission, setPermission] = useState(item.permission || "");
-  const [modules, setModules] = useState<string[]>(
-    String(item.modulePermissions || "")
-      .split(",")
-      .map((v) => v.trim())
-      .filter(Boolean)
-  );
+  const [accessItems, setAccessItems] = useState<string[]>(parseAdminAccessItems(item.modulePermissions));
 
   useEffect(() => {
     setPermission(item.permission || "");
-    setModules(String(item.modulePermissions || "").split(",").map((v) => v.trim()).filter(Boolean));
+    setAccessItems(parseAdminAccessItems(item.modulePermissions));
   }, [item.permission, item.modulePermissions, item.maNV]);
 
   function setRole(next: "" | "mod" | "admin") {
     setPermission(next);
-    if (next !== "mod") setModules([]);
+    if (next !== "mod") setAccessItems([]);
   }
 
   function toggleModule(key: string) {
-    setModules((current) =>
-      current.includes(key) ? current.filter((item) => item !== key) : [...current, key]
-    );
+    setAccessItems((current) => {
+      if (!current.includes(key)) return [...current, key];
+      if (key === "tcdm") {
+        return current.filter((item) => item !== key && !item.startsWith(ADMIN_ACTION_PREFIX));
+      }
+      return current.filter((item) => item !== key);
+    });
+  }
+
+  function toggleAction(key: AdminActionKey) {
+    const token = `${ADMIN_ACTION_PREFIX}${key}`;
+
+    setAccessItems((current) => {
+      if (current.includes(token)) return current.filter((item) => item !== token);
+
+      const next = current.includes("tcdm")
+        ? [...current, token]
+        : ["tcdm", ...current, token];
+
+      return parseAdminAccessItems(next.join(","));
+    });
   }
 
   return (
@@ -2314,7 +2597,7 @@ function StaffAdminAccessBox({
         <button
           type="button"
           disabled={disabled}
-          onClick={() => onSave(item.maNV, permission, modules.join(","))}
+          onClick={() => onSave(item.maNV, permission, accessItems.join(","))}
         >
           {disabled ? "Đang lưu..." : "Lưu phân quyền"}
         </button>
@@ -2327,20 +2610,49 @@ function StaffAdminAccessBox({
       </div>
 
       {permission === "mod" && (
-        <div className="adminx-module-buttons">
-          {ADMIN_MODULE_OPTIONS.map((module) => (
-            <button
-              key={module.key}
-              type="button"
-              disabled={disabled}
-              className={modules.includes(module.key) ? "active" : ""}
-              onClick={() => toggleModule(module.key)}
-            >
-              <span>{module.label}</span>
-              <small>{module.key}</small>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="adminx-permission-section-title">
+            <span>Hạng mục truy cập</span>
+            <small>Cho phép Mod mở từng khu vực quản trị.</small>
+          </div>
+          <div className="adminx-module-buttons">
+            {ADMIN_MODULE_OPTIONS.map((module) => (
+              <button
+                key={module.key}
+                type="button"
+                disabled={disabled}
+                className={accessItems.includes(module.key) ? "active" : ""}
+                onClick={() => toggleModule(module.key)}
+              >
+                <span>{module.label}</span>
+                <small>{module.key}</small>
+              </button>
+            ))}
+          </div>
+
+          <div className="adminx-permission-section-title">
+            <span>Quyền thao tác trong TCDM</span>
+            <small>Nếu bỏ trống, Mod TCDM cũ vẫn dùng theo quyền module.</small>
+          </div>
+          <div className="adminx-module-buttons adminx-action-buttons">
+            {ADMIN_ACTION_OPTIONS.map((action) => {
+              const token = `${ADMIN_ACTION_PREFIX}${action.key}`;
+
+              return (
+                <button
+                  key={action.key}
+                  type="button"
+                  disabled={disabled}
+                  className={accessItems.includes(token) ? "active" : ""}
+                  onClick={() => toggleAction(action.key)}
+                >
+                  <span>{action.label}</span>
+                  <small>{action.desc}</small>
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
       {permission === "admin" && <em>Admin có toàn quyền, không cần chọn hạng mục.</em>}
       {permission === "" && <em>User thường không được truy cập trang quản trị.</em>}
@@ -2411,8 +2723,8 @@ const ADMIN_MODULES: Array<{
     key: "tools",
     no: "05",
     title: "Quản trị: Công cụ hỗ trợ",
-    desc: "Khu vực công cụ mở rộng, hiện giữ trạng thái đang cập nhật.",
-    badge: "Đang cập nhật",
+    desc: "Quản trị PMH, Pincode và hồ sơ thẩm định nhân viên gửi lên.",
+    badge: "PMH / thẩm định",
   },
 ];
 
@@ -2712,7 +3024,7 @@ function CmsEditor({
           <article>
             <h3>{title || "Chưa có tiêu đề"}</h3>
             <p>{summary || "Chưa có mô tả."}</p>
-            <div className="cms-preview-body" dangerouslySetInnerHTML={{ __html: body || "<p>Nội dung đang cập nhật.</p>" }} />
+            <div className="cms-preview-body" dangerouslySetInnerHTML={{ __html: sanitizeHtml(body || "<p>Nội dung đang cập nhật.</p>") }} />
           </article>
         </aside>
       </div>
@@ -2856,11 +3168,7 @@ export default function AdminConsole({
             />
           )
         ) : (
-          <div className="admin-cms-empty-tools">
-            <span>05</span>
-            <h3>Quản trị: Công cụ hỗ trợ</h3>
-            <p>Khu vực này đang giữ nguyên trạng thái đang cập nhật. Chưa thao tác gì ở giai đoạn này.</p>
-          </div>
+          <AdminToolsDashboard initialSettings={initialSettings} />
         )}
       </section>
 
@@ -3065,6 +3373,10 @@ const ADMIN_CMS_STYLE = `
 .adminx-role-pills button.active small, .adminx-module-buttons button.active small { color: rgba(255,255,255,.72); }
 .adminx-module-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .adminx-module-buttons button span { display: block; }
+.adminx-permission-section-title { margin: 12px 0 8px; display: grid; gap: 3px; }
+.adminx-permission-section-title span { color: #07111f; font-size: 12px; font-weight: 1000; }
+.adminx-permission-section-title small { color: #64748b; font-size: 10.5px; line-height: 1.35; font-weight: 850; }
+.adminx-action-buttons button { min-height: 76px; }
 .cms-rich-editor-vtdd { min-height: 380px; resize: vertical; font-family: Roboto, Arial, sans-serif; white-space: pre-wrap; }
 .cms-editor-note-vtdd { display: block; margin-top: 8px; color: #64748b; font-size: 11px; font-weight: 850; }
 @media (max-width: 760px) { .adminx-permission-head-v2 { grid-template-columns: 1fr; } .adminx-role-pills, .adminx-module-buttons { grid-template-columns: 1fr; } }

@@ -108,12 +108,12 @@ export default async function HomePage() {
     {
       number: "05",
       title: "Công Cụ Hỗ Trợ",
-      desc: "Khu vực mở rộng cho các công cụ vận hành ngành hàng.",
+      desc: "Cổng nghiệp vụ PMH, chiến giá và thẩm định hồ sơ hỗ trợ vận hành.",
       items: [
         {
-          title: "Công cụ hỗ trợ",
-          desc: "Khu vực công cụ nghiệp vụ đang được cập nhật.",
-          status: "Đang cập nhật",
+          title: "Cổng công cụ hỗ trợ siêu thị",
+          desc: "Click chọn để xem chi tiết công cụ hỗ trợ.",
+          href: "/cong-cu-ho-tro",
         },
       ],
     },

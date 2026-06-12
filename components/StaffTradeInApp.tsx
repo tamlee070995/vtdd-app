@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
+import { sanitizeHtml } from "@/lib/html-sanitize";
+import { getActiveSystemLock } from "@/lib/system-lock";
 
 type SheetRow = any[];
 
@@ -10,6 +13,24 @@ type StaffTradeInAppProps = {
   maST: string;
   staffName: string;
   forceSetup?: boolean;
+};
+
+type QuoteHistoryItem = {
+  time: string;
+  action: string;
+  maNV: string;
+  maST: string;
+  staffName: string;
+  mode: string;
+  spMoi: string;
+  spCu: string;
+  memory: string;
+  loai: string;
+  giaXac: number;
+  troGiaHang: number;
+  troGiaMWG: number;
+  tongTien: number;
+  khachCanBu: number;
 };
 
 
@@ -1320,13 +1341,170 @@ function getImportantNoticeHtml(message: string) {
   if (!raw) return "";
 
   const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
-  if (looksLikeHtml) return raw;
+  if (looksLikeHtml) return sanitizeHtml(raw);
 
   const lines = formatSystemMessageLines(raw);
   if (lines.length === 0) return "";
 
-  return lines.map((line) => `<p>${escapeSystemNoticeHtml(line)}</p>`).join("");
+  return sanitizeHtml(lines.map((line) => `<p>${escapeSystemNoticeHtml(line)}</p>`).join(""));
 }
+
+const QUOTE_TOOLS_CSS = `
+.vtdd-data-reload-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, .42);
+  backdrop-filter: blur(10px);
+}
+.vtdd-data-reload-card {
+  width: min(100%, 430px);
+  padding: 18px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .22);
+  display: grid;
+  gap: 10px;
+}
+.vtdd-data-reload-card span {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.vtdd-data-reload-card h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 1000;
+}
+.vtdd-data-reload-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 750;
+}
+.vtdd-data-reload-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+.vtdd-data-reload-actions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+.vtdd-data-reload-actions button:first-child {
+  background: #ffd400;
+  color: #111827;
+}
+.vtdd-data-reload-countdown {
+  margin-top: 2px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 900;
+  text-align: center;
+}
+.quote-history-card {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, .06);
+}
+.quote-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.quote-history-head b {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 1000;
+}
+.quote-history-head button,
+.quote-history-item button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 10px;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 950;
+  cursor: pointer;
+}
+.quote-history-list {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 2px;
+}
+.quote-history-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.quote-history-item b {
+  display: block;
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 1000;
+}
+.quote-history-item span {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 10.5px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+.quote-history-empty {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 800;
+}
+.result-btn-image,
+.result-btn-pdf {
+  background: #0f172a;
+  color: #fff;
+}
+@media (max-width: 760px) {
+  .vtdd-data-reload-actions,
+  .quote-history-item {
+    grid-template-columns: 1fr;
+  }
+}
+`;
 
 const TYPE_OPTIONS = [
   { label: "Loại 1", value: "1", index: 3 },
@@ -1762,6 +1940,13 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   const [showCustomerView, setShowCustomerView] = useState(false);
   const [quoteTime, setQuoteTime] = useState("");
   const [lookupLogTick, setLookupLogTick] = useState(0);
+  const [quoteHistory, setQuoteHistory] = useState<QuoteHistoryItem[]>([]);
+  const [quoteHistoryLoading, setQuoteHistoryLoading] = useState(false);
+  const [dataVersion, setDataVersion] = useState("");
+  const [newDataVersion, setNewDataVersion] = useState("");
+  const [showDataReload, setShowDataReload] = useState(false);
+  const [reloadCountdown, setReloadCountdown] = useState(5);
+  const [lockClockTick, setLockClockTick] = useState(() => Date.now());
 
   const [mustSetup, setMustSetup] = useState(forceSetup);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
@@ -1791,6 +1976,7 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
         setDataMoi(json.data.moi || []);
         setDataCu(json.data.cu || []);
         setDataTablet(json.data.tablet || []);
+        setDataVersion(String(json.dataVersion || json.data?.system?.DATA_VERSION || "1"));
         setSystemSettings(json.data.system || {});
         setNotifySettings({
           marquee: json.data.notify?.marquee || "",
@@ -1809,6 +1995,90 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
 
     load();
   }, []);
+
+  useEffect(() => {
+    loadQuoteHistory({ silent: true });
+  }, []);
+
+  useEffect(() => {
+    if (!dataVersion) return;
+
+    let stopped = false;
+
+    async function checkDataVersion() {
+      try {
+        const res = await fetch("/api/data/version", {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-store" },
+        });
+        const json = await res.json().catch(() => null);
+        const nextVersion = String(json?.dataVersion || "");
+
+        if (!stopped && nextVersion && nextVersion !== dataVersion) {
+          setNewDataVersion(nextVersion);
+          setShowDataReload(true);
+        }
+      } catch {
+        // Không làm phiền nhân viên nếu kiểm tra version lỗi tạm thời.
+      }
+    }
+
+    checkDataVersion();
+
+    const timer = window.setInterval(checkDataVersion, 5000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [dataVersion]);
+
+  useEffect(() => {
+    if (!showDataReload) return;
+
+    setReloadCountdown(5);
+
+    const timer = window.setInterval(() => {
+      setReloadCountdown((current) => {
+        if (current <= 1) {
+          window.clearInterval(timer);
+          window.location.reload();
+          return 0;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [showDataReload, newDataVersion]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setLockClockTick(Date.now());
+    }, 15000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  async function loadQuoteHistory(options?: { silent?: boolean }) {
+    try {
+      if (!options?.silent) setQuoteHistoryLoading(true);
+
+      const res = await fetch("/api/staff/quote-history?limit=20", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.success) {
+        setQuoteHistory(data.history || []);
+      }
+
+      setQuoteHistoryLoading(false);
+    } catch {
+      setQuoteHistoryLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (mustSetup) {
@@ -1906,7 +2176,8 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
     const canChooseOldProduct = mode === "buyonly" || (mode === "tradein" && !!spMoi);
     const canChooseType = !!selectedOldRow && !!spCu;
 
-    const systemLocked = settingEnabled(systemSettings, "SYSTEM_LOCK_ENABLED");
+    const activeSystemLock = getActiveSystemLock(systemSettings, new Date(lockClockTick));
+    const systemLocked = activeSystemLock.active;
     const staffPageLocked = settingEnabled(systemSettings, "STAFF_PAGE_LOCKED");
     const staffTradeinLocked = settingEnabled(systemSettings, "STAFF_TRADEIN_LOCKED");
     const staffBuyonlyLocked = settingEnabled(systemSettings, "STAFF_BUYONLY_LOCKED");
@@ -2116,6 +2387,266 @@ function resetForm() {
     );
   }
 
+  function escapeHtml(value: string) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function getQuoteSnapshot() {
+    return {
+      title: mode === "tradein" ? "BÁO GIÁ THU CŨ ĐỔI MỚI" : "BÁO GIÁ THU CŨ",
+      spMoi: mode === "tradein" ? spMoi || "Chưa chọn" : "Thu cũ không đổi mới",
+      spCu: spCu ? `${spCu}${memory ? " - " + memory : ""}` : "Chưa chọn",
+      loai: loai ? `Loại ${loai}` : "Chưa chọn",
+      staff: `${staffName || "Nhân viên"} - NV ${maNV} - ST ${maST}`,
+      time: quoteTime || getQuoteTime(),
+      rows: [
+        ["Giá máy cũ", formatMoney(priceInfo.giaXac)],
+        ["Hỗ trợ lên đời", mode === "tradein" ? formatMoney(priceInfo.troGiaHang) : "0 đ"],
+        ["Ưu đãi MWG", formatMoney(priceInfo.troGiaMWG)],
+        ...(mode === "tradein" && priceInfo.giaBanMoi > 0
+          ? [["Giá bán máy mới", formatMoney(priceInfo.giaBanMoi)]]
+          : []),
+        ["Tổng tiền khách nhận", formatMoney(priceInfo.tongTien)],
+        ...(mode === "tradein" && priceInfo.giaBanMoi > 0
+          ? [["Khách cần bù", formatMoney(priceInfo.khachCanBu)]]
+          : []),
+      ],
+    };
+  }
+
+  function drawWrappedText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    maxWidth: number,
+    lineHeight: number
+  ) {
+    const words = String(text || "").split(/\s+/);
+    let line = "";
+    let currentY = y;
+
+    words.forEach((word) => {
+      const testLine = line ? `${line} ${word}` : word;
+      if (ctx.measureText(testLine).width > maxWidth && line) {
+        ctx.fillText(line, x, currentY);
+        line = word;
+        currentY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    });
+
+    if (line) ctx.fillText(line, x, currentY);
+    return currentY + lineHeight;
+  }
+
+  function drawRoundRect(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+  ) {
+    const r = Math.min(radius, width / 2, height / 2);
+
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function renderQuoteCanvas() {
+    const snapshot = getQuoteSnapshot();
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 1500;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      throw new Error("Trình duyệt không hỗ trợ xuất ảnh.");
+    }
+
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffd400";
+    ctx.fillRect(0, 0, canvas.width, 18);
+
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "900 46px Arial";
+    ctx.fillText("Viễn Thông Di Động", 70, 95);
+    ctx.font = "800 24px Arial";
+    ctx.fillStyle = "#64748b";
+    ctx.fillText(snapshot.title, 70, 132);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.lineWidth = 2;
+    drawRoundRect(ctx, 60, 180, 1080, 1110, 34);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#111827";
+    ctx.font = "900 34px Arial";
+    ctx.fillText("TỔNG TIỀN KHÁCH NHẬN", 100, 250);
+    ctx.fillStyle = "#dc2626";
+    ctx.font = "900 78px Arial";
+    ctx.fillText(formatMoney(priceInfo.tongTien), 100, 345);
+
+    ctx.fillStyle = "#64748b";
+    ctx.font = "700 22px Arial";
+    ctx.fillText(`Cập nhật: ${snapshot.time}`, 100, 395);
+
+    let y = 470;
+    const metaRows = [
+      ["Máy mới", snapshot.spMoi],
+      ["Máy cũ", snapshot.spCu],
+      ["Loại máy", snapshot.loai],
+      ["Nhân viên", snapshot.staff],
+    ];
+
+    metaRows.forEach(([label, value]) => {
+      ctx.fillStyle = "#64748b";
+      ctx.font = "800 21px Arial";
+      ctx.fillText(label.toUpperCase(), 100, y);
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "900 27px Arial";
+      y = drawWrappedText(ctx, value, 100, y + 38, 980, 34) + 18;
+    });
+
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.beginPath();
+    ctx.moveTo(100, y + 10);
+    ctx.lineTo(1100, y + 10);
+    ctx.stroke();
+    y += 70;
+
+    snapshot.rows.forEach(([label, value], index) => {
+      const isTotal = index >= snapshot.rows.length - (priceInfo.khachCanBu > 0 ? 2 : 1);
+      ctx.fillStyle = isTotal ? "#0f172a" : "#334155";
+      ctx.font = isTotal ? "900 30px Arial" : "800 25px Arial";
+      ctx.fillText(label, 100, y);
+      ctx.textAlign = "right";
+      ctx.fillStyle = isTotal ? "#dc2626" : "#0f172a";
+      ctx.font = isTotal ? "900 34px Arial" : "900 27px Arial";
+      ctx.fillText(value, 1100, y);
+      ctx.textAlign = "left";
+      y += 62;
+    });
+
+    ctx.fillStyle = "#64748b";
+    ctx.font = "700 20px Arial";
+    drawWrappedText(
+      ctx,
+      "Lưu ý: Giá tham khảo tại thời điểm tra cứu. Kết quả cuối cùng phụ thuộc tình trạng máy thực tế khi kiểm tra tại siêu thị.",
+      100,
+      1210,
+      980,
+      28
+    );
+
+    return canvas;
+  }
+
+  async function downloadQuoteImage() {
+    if (!validateQuoteReady()) return;
+
+    try {
+      const canvas = renderQuoteCanvas();
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((item) => {
+          if (item) resolve(item);
+          else reject(new Error("Không tạo được ảnh báo giá."));
+        }, "image/png", 0.96);
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `bao-gia-${maNV}-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      await showSwal("success", "Đã tải ảnh báo giá", "Có thể gửi ảnh này qua Zalo hoặc ứng dụng chat.", 1600);
+    } catch (err: any) {
+      await showSwal("error", "Không xuất được ảnh", err?.message || "Vui lòng thử lại.", 0);
+    }
+  }
+
+  function printQuotePdf() {
+    if (!validateQuoteReady()) return;
+
+    const snapshot = getQuoteSnapshot();
+    const rows = snapshot.rows
+      .map(
+        ([label, value]) =>
+          `<div class="row"><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`
+      )
+      .join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(snapshot.title)}</title><style>
+      body{margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a}
+      main{width:760px;margin:24px auto;background:#fff;border:1px solid #e2e8f0;border-radius:22px;padding:32px}
+      h1{margin:0;color:#0f172a;font-size:30px} .brand{color:#64748b;font-weight:900;margin-bottom:18px}
+      .total{margin:18px 0 8px;color:#dc2626;font-size:48px;font-weight:1000}.time{color:#64748b;font-weight:800}
+      .meta{margin:24px 0;padding:18px;border-radius:16px;background:#f8fafc;display:grid;gap:12px}
+      .meta div,.row{display:flex;justify-content:space-between;gap:18px;border-bottom:1px solid #e2e8f0;padding-bottom:10px}
+      .row{font-size:18px}.row b{color:#0f172a}.note{margin-top:20px;color:#64748b;line-height:1.5;font-weight:700}
+      @media print{body{background:#fff}main{width:auto;margin:0;border:0;border-radius:0}}
+    </style></head><body><main>
+      <div class="brand">Viễn Thông Di Động</div>
+      <h1>${escapeHtml(snapshot.title)}</h1>
+      <div class="total">${escapeHtml(formatMoney(priceInfo.tongTien))}</div>
+      <div class="time">Cập nhật: ${escapeHtml(snapshot.time)}</div>
+      <section class="meta">
+        <div><span>Máy mới</span><b>${escapeHtml(snapshot.spMoi)}</b></div>
+        <div><span>Máy cũ</span><b>${escapeHtml(snapshot.spCu)}</b></div>
+        <div><span>Loại máy</span><b>${escapeHtml(snapshot.loai)}</b></div>
+        <div><span>Nhân viên</span><b>${escapeHtml(snapshot.staff)}</b></div>
+      </section>
+      <section>${rows}</section>
+      <p class="note">Lưu ý: Giá tham khảo tại thời điểm tra cứu. Kết quả cuối cùng phụ thuộc tình trạng máy thực tế khi kiểm tra tại siêu thị.</p>
+    </main><script>window.onload=function(){window.print();}</script></body></html>`;
+
+    const printWindow = window.open("", "_blank", "width=900,height=1100");
+    if (!printWindow) {
+      showSwal("warning", "Trình duyệt đang chặn popup", "Vui lòng cho phép popup để mở bản in PDF.", 0);
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
+  function applyHistoryItem(item: QuoteHistoryItem) {
+    const isBuyOnly = String(item.mode || "").toLowerCase().includes("không");
+    const nextMode = isBuyOnly ? "buyonly" : "tradein";
+    const newRow = dataMoi.find((row) => String(row[1] || "").trim() === item.spMoi);
+
+    setMode(nextMode);
+    setHang(nextMode === "tradein" ? String(newRow?.[0] || "") : "");
+    setSpMoi(nextMode === "tradein" ? item.spMoi || "" : "");
+    setGiaBanMoiInput("");
+    setSpCu(item.spCu || "");
+    setLoai(item.loai || "");
+    setQuoteTime(item.time || getQuoteTime());
+    setShowQuote(true);
+  }
+
       async function getClientIpHint() {
   try {
     const cached = window.sessionStorage.getItem("vtdd_client_ip_hint");
@@ -2192,6 +2723,8 @@ function resetForm() {
 
     if (!res.ok || !data?.success) {
       console.error("SEND_LOG_FAILED:", data?.message || res.statusText);
+    } else {
+      loadQuoteHistory({ silent: true });
     }
   } catch (err) {
     console.error("SEND_LOG_ERROR:", err);
@@ -2699,7 +3232,12 @@ function closeSystemPush() {
 }
 
 function renderSystemStyle() {
-  return <style>{SYSTEM_UI_CSS}</style>;
+  return (
+    <>
+      <style>{SYSTEM_UI_CSS}</style>
+      <style>{QUOTE_TOOLS_CSS}</style>
+    </>
+  );
 }
 
 function renderSystemNotices() {
@@ -2757,7 +3295,9 @@ function renderPushNotify() {
 }
 
 function renderSystemLock() {
-  const message = getSystemText(systemSettings, "SYSTEM_LOCK_MESSAGE") || "HỆ THỐNG ĐANG CẬP NHẬT KHẨN.";
+  const message = activeSystemLock.active
+    ? activeSystemLock.message
+    : getSystemText(systemSettings, "SYSTEM_LOCK_MESSAGE") || "HỆ THỐNG ĐANG CẬP NHẬT KHẨN.";
 
   return (
     <main className="vtdd-lock-page">
@@ -2765,9 +3305,10 @@ function renderSystemLock() {
       <section className="vtdd-lock-card">
         <div className="vtdd-lock-icon">!</div>
         <span>Tạm khóa truy cập</span>
-        <h1>Hệ thống đang cập nhật</h1>
+        <h1>{activeSystemLock.scheduled ? "Hệ thống đang bảo trì" : "Hệ thống đang cập nhật"}</h1>
         <p>{message}</p>
-        <a href="/">Quay về trang chủ</a>
+        {activeSystemLock.detail ? <p>{activeSystemLock.detail}</p> : null}
+        <Link href="/">Quay về trang chủ</Link>
       </section>
     </main>
   );
@@ -3122,6 +3663,43 @@ function renderSystemLock() {
             <button className="quote-btn quote-btn-customer" onClick={openCustomerView}>
              👁️ CHẾ ĐỘ CHO KHÁCH XEM
             </button>
+
+            <button className="result-btn result-btn-image" onClick={downloadQuoteImage}>
+              TẢI ẢNH
+            </button>
+
+            <button className="result-btn result-btn-pdf" onClick={printQuotePdf}>
+              IN PDF
+            </button>
+          </div>
+        </section>
+
+        <section className="quote-history-card">
+          <div className="quote-history-head">
+            <b>Lịch sử báo giá gần nhất</b>
+            <button type="button" onClick={() => loadQuoteHistory()} disabled={quoteHistoryLoading}>
+              {quoteHistoryLoading ? "Đang tải..." : "Tải lại"}
+            </button>
+          </div>
+
+          <div className="quote-history-list">
+            {quoteHistory.length === 0 ? (
+              <p className="quote-history-empty">Chưa có lịch sử báo giá cho tài khoản này.</p>
+            ) : (
+              quoteHistory.map((item, index) => (
+                <div className="quote-history-item" key={`${item.time}-${item.spCu}-${index}`}>
+                  <div>
+                    <b>{item.spCu || "Không rõ máy cũ"}{item.memory ? ` · ${item.memory}` : ""}</b>
+                    <span>
+                      {item.time} · {item.action} · {formatMoney(item.tongTien)}
+                    </span>
+                  </div>
+                  <button type="button" onClick={() => applyHistoryItem(item)}>
+                    Dùng lại
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </section>
           </aside>
@@ -3208,6 +3786,27 @@ function renderSystemLock() {
               <button onClick={copyQuote}>📋 COPY</button>
               <button className="zalo" onClick={shareQuote}>🔗 CHIA SẺ</button>
               <button className="exit" onClick={closeCustomerView}>🔓 THOÁT</button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {showDataReload && (
+        <section className="vtdd-data-reload-layer" role="dialog" aria-modal="true">
+          <div className="vtdd-data-reload-card">
+            <span>Hệ thống mới</span>
+            <h2>Dữ liệu vừa được cập nhật</h2>
+            <p>
+              Phiên bản hiện tại: {dataVersion || "1"} · Phiên bản mới: {newDataVersion || "mới"}.
+              Nhân viên bắt buộc reload để dùng cấu hình mới nhất.
+            </p>
+            <div className="vtdd-data-reload-countdown">
+              Tự reload sau {reloadCountdown}s nếu chưa thao tác.
+            </div>
+            <div className="vtdd-data-reload-actions">
+              <button type="button" onClick={() => window.location.reload()}>
+                Reload ngay
+              </button>
             </div>
           </div>
         </section>

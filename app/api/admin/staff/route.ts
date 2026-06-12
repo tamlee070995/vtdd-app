@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/admin-auth";
+import { adminHasAction, normalizeAdminAccess, requireAdminApi, type AdminActionKey } from "@/lib/admin-auth";
 import {
   adminResetStaffOtpCount,
   adminResetStaffSecurity,
@@ -36,17 +36,15 @@ async function isFullAdmin(admin: any) {
 }
 
 function normalizeModules(value: any) {
-  const allowed = new Set(["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "tools"]);
+  return normalizeAdminAccess(value);
+}
 
-  return String(value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item, index, arr) => allowed.has(item) && arr.indexOf(item) === index)
-    .join(",");
+function canRunAction(admin: any, action: AdminActionKey) {
+  return adminHasAction(admin, action, "tcdm");
 }
 
 export async function GET(req: NextRequest) {
-  const { response } = await requireAdminApi(req, { module: "tcdm" });
+  const { response } = await requireAdminApi(req, { module: "tcdm", action: "staff-manage" });
   if (response) return response;
 
   try {
@@ -117,33 +115,46 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "ACTIVE") {
+      if (!canRunAction(admin, "staff-manage")) {
+        return NextResponse.json({ success: false, message: "Không có quyền quản lý trạng thái nhân viên." }, { status: 403 });
+      }
+
       await updateStaffStatus(target.rowNumber, "Active");
       return NextResponse.json({ success: true, message: `Đã Active tài khoản NV ${target.maNV}.` });
     }
 
     if (action === "STANDBY") {
+      if (!canRunAction(admin, "staff-manage")) {
+        return NextResponse.json({ success: false, message: "Không có quyền quản lý trạng thái nhân viên." }, { status: 403 });
+      }
+
       await updateStaffStatus(target.rowNumber, "Standby");
       return NextResponse.json({ success: true, message: `Đã chuyển NV ${target.maNV} về Standby.` });
     }
 
     if (action === "RESET_SECURITY") {
-      if (!(await isFullAdmin(admin))) {
+      if (!(await isFullAdmin(admin)) && !canRunAction(admin, "staff-security")) {
         return NextResponse.json(
-          { success: false, message: "Chỉ Admin mới được reset bảo mật tài khoản." },
+          { success: false, message: "Không có quyền reset bảo mật tài khoản." },
           { status: 403 }
         );
       }
 
-      const passwordHash = (hashPassword as any)("123123", target.maNV);
+      const defaultPassword = process.env.DEFAULT_STAFF_PASSWORD || "123123";
+      const passwordHash = hashPassword(defaultPassword);
       await adminResetStaffSecurity(target.rowNumber, { passwordHash });
 
       return NextResponse.json({
         success: true,
-        message: `Đã reset bảo mật NV ${target.maNV}. Mật khẩu mặc định: 123123.`,
+        message: `Đã reset bảo mật NV ${target.maNV}. Mật khẩu mặc định: ${defaultPassword}.`,
       });
     }
 
     if (action === "RESET_OTP_COUNT") {
+      if (!canRunAction(admin, "staff-security")) {
+        return NextResponse.json({ success: false, message: "Không có quyền reset OTP nhân viên." }, { status: 403 });
+      }
+
       await adminResetStaffOtpCount(target.rowNumber);
       return NextResponse.json({ success: true, message: `Đã reset số lượt OTP của NV ${target.maNV}.` });
     }

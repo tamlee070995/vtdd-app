@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getHomeCmsItem } from "@/lib/home-cms-store";
+import { sanitizeHtml } from "@/lib/html-sanitize";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -8,12 +9,13 @@ export const dynamic = "force-dynamic";
 function bodyToHtml(value: string) {
   const raw = String(value || "").trim();
   if (!raw) return "<p>Nội dung đang cập nhật.</p>";
-  if (raw.includes("<") && raw.includes(">")) return raw;
-  return raw
+  if (raw.includes("<") && raw.includes(">")) return sanitizeHtml(raw);
+  const html = raw
     .split("\n")
     .filter((line) => line.trim())
     .map((line) => `<p>${line.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`)
     .join("");
+  return sanitizeHtml(html);
 }
 
 export default async function PublishedCmsPage({ params }: { params: Promise<{ slug: string }> }) {

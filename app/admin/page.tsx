@@ -26,14 +26,12 @@ export default async function AdminPage() {
             <span className="admin-cms-pro-logo"><img src="/mwg-logo.svg" alt="MWG" /></span>
             <div>
               <b>Viễn Thông Di Động</b>
-              <small>Enterprise CMS Console</small>
             </div>
           </div>
 
           <div className="admin-cms-pro-title">
-            <span>CMS QUẢN TRỊ NGÀNH HÀNG</span>
-            <h1>Trung tâm quản trị vận hành</h1>
-            <p>Điều phối tài khoản, trang tra giá TCDM và nội dung nghiệp vụ trên cổng ngành hàng.</p>
+            <h1>Quản trị vận hành</h1>
+            <p>Điều phối nội dung, nghiệp vụ, công cụ trên trang.</p>
           </div>
 
           <div className="admin-cms-pro-meta">

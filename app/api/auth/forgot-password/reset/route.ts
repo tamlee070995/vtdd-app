@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findStaffByMaNV, resetStaffPasswordByOtp } from "@/lib/staff-store";
-import { hashPassword, normalizeCode, normalizeText, verifyPassword } from "@/lib/staff-security";
+import { getPasswordRuleError, hashPassword, normalizeCode, normalizeText, verifyPassword } from "@/lib/staff-security";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +27,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (newPassword.length < 6) {
+    const passwordRuleError = getPasswordRuleError(newPassword);
+
+    if (passwordRuleError) {
       return NextResponse.json(
-        { success: false, message: "Mật khẩu mới phải có ít nhất 6 ký tự." },
+        { success: false, message: passwordRuleError },
         { status: 400 }
       );
     }

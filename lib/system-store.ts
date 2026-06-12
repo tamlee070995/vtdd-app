@@ -1,12 +1,11 @@
 import { google } from "googleapis";
 import { readSheetRange } from "@/lib/sheets";
+import { getQuoteLogs } from "@/lib/quote-log-store";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 const SETTINGS_SHEET = "System_Settings";
 const AUDIT_SHEET = "Admin_Audit";
-const LOG_SHEET = "Log_search";
-
 const SETTINGS_HEADERS = ["KEY", "VALUE", "TYPE", "UPDATED_AT", "UPDATED_BY"];
 const AUDIT_HEADERS = ["TIME", "ADMIN", "ACTION", "TARGET", "OLD_VALUE", "NEW_VALUE", "IP", "NOTE"];
 
@@ -20,6 +19,10 @@ export const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
 
   SYSTEM_LOCK_ENABLED: "0",
   SYSTEM_LOCK_MESSAGE: "HỆ THỐNG ĐANG CẬP NHẬT KHẨN.",
+  SYSTEM_LOCK_SCHEDULE_ENABLED: "0",
+  SYSTEM_LOCK_START_AT: "",
+  SYSTEM_LOCK_END_AT: "",
+  SYSTEM_LOCK_REASON: "Hệ thống tạm khóa theo lịch bảo trì đã cài đặt.",
 
   STAFF_PAGE_LOCKED: "0",
   CUSTOMER_PAGE_LOCKED: "0",
@@ -32,6 +35,12 @@ export const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
 
   DATA_VERSION: "1",
   ADMIN_PIN_HASH: "",
+
+  TOOL_PMH_ENABLED: "1",
+  TOOL_PMH_SCHEDULE_ENABLED: "0",
+  TOOL_PMH_START_AT: "",
+  TOOL_PMH_END_AT: "",
+  TOOL_PMH_LOCK_REASON: "Công cụ PMH/Pincode đang tạm đóng theo cài đặt Admin.",
 };
 
 let settingsWriteQueue: Promise<any> = Promise.resolve();
@@ -216,7 +225,8 @@ export async function getSystemSettings() {
 
 export async function getPublicSystemSettings() {
   const settings = await getSystemSettings();
-  const { ADMIN_PIN_HASH, ...publicSettings } = settings;
+  const publicSettings = { ...settings };
+  delete publicSettings.ADMIN_PIN_HASH;
 
   const from = clean(publicSettings.PRICE_EFFECTIVE_FROM);
   const to = clean(publicSettings.PRICE_EFFECTIVE_TO);
@@ -378,38 +388,63 @@ export type DashboardLogRow = {
 };
 
 export async function getAdminDashboardStats() {
-  let rows: any[][] = [];
-
-  try {
-    rows = await readSheetRange(`${LOG_SHEET}!A2:Q1001`);
-  } catch {
-    rows = [];
-  }
-
-  const cleanRows = rows.filter((row) => clean(row[0]) || clean(row[7]));
+  const cleanRows = await getQuoteLogs(1000);
 
   const recentLogs: DashboardLogRow[] = cleanRows.slice(0, 20).map((row) => ({
-    time: clean(row[0]),
-    action: clean(row[1]),
-    maNV: clean(row[2]),
-    maST: clean(row[3]),
-    staffName: clean(row[4]),
-    mode: clean(row[5]),
-    spMoi: clean(row[6]),
-    spCu: clean(row[7]),
-    memory: clean(row[8]),
-    loai: clean(row[9]),
-    tongTien: Number(row[13] || 0),
-    ip: clean(row[15]),
+    time: row.time,
+    action: row.action,
+    maNV: row.maNV,
+    maST: row.maST,
+    staffName: row.staffName,
+    mode: row.mode,
+    spMoi: row.spMoi,
+    spCu: row.spCu,
+    memory: row.memory,
+    loai: row.loai,
+    tongTien: row.tongTien,
+    ip: row.ip,
   }));
 
   const countMap = new Map<string, number>();
+  const staffMap = new Map<string, { maNV: string; staffName: string; count: number; totalValue: number }>();
+  const storeMap = new Map<string, { maST: string; count: number; totalValue: number }>();
+  const dayMap = new Map<string, number>();
+  const actionMap = new Map<string, number>();
+  let totalValue = 0;
 
   cleanRows.forEach((row) => {
-    const product = clean(row[7]);
+    const product = clean(row.spCu);
     if (!product) return;
 
     countMap.set(product, (countMap.get(product) || 0) + 1);
+
+    const staffKey = row.maNV || "unknown";
+    const currentStaff = staffMap.get(staffKey) || {
+      maNV: row.maNV || "Không rõ",
+      staffName: row.staffName || "",
+      count: 0,
+      totalValue: 0,
+    };
+    currentStaff.count += 1;
+    currentStaff.totalValue += row.tongTien;
+    staffMap.set(staffKey, currentStaff);
+
+    const storeKey = row.maST || "unknown";
+    const currentStore = storeMap.get(storeKey) || {
+      maST: row.maST || "Không rõ",
+      count: 0,
+      totalValue: 0,
+    };
+    currentStore.count += 1;
+    currentStore.totalValue += row.tongTien;
+    storeMap.set(storeKey, currentStore);
+
+    const dayKey = clean(row.time).slice(0, 10) || "Không rõ";
+    dayMap.set(dayKey, (dayMap.get(dayKey) || 0) + 1);
+
+    const action = clean(row.action) || "Không rõ";
+    actionMap.set(action, (actionMap.get(action) || 0) + 1);
+    totalValue += row.tongTien;
   });
 
   const topOldProducts = Array.from(countMap.entries())
@@ -417,10 +452,31 @@ export async function getAdminDashboardStats() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
+  const topStaff = Array.from(staffMap.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  const topStores = Array.from(storeMap.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  const dailyLogs = Array.from(dayMap.entries())
+    .map(([day, count]) => ({ day, count }))
+    .slice(0, 14);
+
+  const actionCounts = Array.from(actionMap.entries())
+    .map(([action, count]) => ({ action, count }))
+    .sort((a, b) => b.count - a.count);
+
   return {
     topOldProducts,
+    topStaff,
+    topStores,
+    dailyLogs,
+    actionCounts,
     recentLogs,
     totalLogs: cleanRows.length,
+    totalValue,
   };
 }
 

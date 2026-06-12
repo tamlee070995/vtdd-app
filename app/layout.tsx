@@ -1,14 +1,7 @@
 import type { Metadata } from "next";
-import { Roboto } from "next/font/google";
 import OnlineHeartbeat from "@/components/OnlineHeartbeat";
 import "./globals.css";
 import CmsImageLightbox from "@/components/CmsImageLightbox";
-
-const roboto = Roboto({
-  subsets: ["latin", "vietnamese"],
-  weight: ["400", "500", "700", "900"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: {
@@ -25,7 +18,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body className={roboto.className}suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <OnlineHeartbeat />
         {children}
         <CmsImageLightbox />
