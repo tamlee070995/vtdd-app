@@ -32,6 +32,11 @@ function clean(value: any) {
   return String(value ?? "").trim();
 }
 
+function isOn(value: unknown) {
+  const v = clean(value).toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { admin, response } = await requireAdminApi(req, { module: "tcdm" });
@@ -75,6 +80,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isReloadOnly) {
+      if (isOn(updates.STAFF_PAGE_LOCKED)) {
+        updates.STAFF_TRADEIN_LOCKED = "0";
+        updates.STAFF_BUYONLY_LOCKED = "0";
+      }
+
+      if (isOn(updates.CUSTOMER_PAGE_LOCKED)) {
+        updates.CUSTOMER_TRADEIN_LOCKED = "0";
+        updates.CUSTOMER_BUYONLY_LOCKED = "0";
+      }
+
       updates.DATA_VERSION = String(Date.now());
     }
 

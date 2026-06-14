@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { google } from "googleapis";
-import { findStaffByMaNV, getStaffRows } from "@/lib/staff-store";
+import { createStandbyAccount, findStaffByMaNV, getStaffRows } from "@/lib/staff-store";
 import {
   decryptText,
   encryptText,
@@ -13,9 +12,6 @@ import { sendNewStaffAccountMail } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
 
-const SHEET_NAME = "Data_Staff";
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
-
 function redirectRegister(
   req: NextRequest,
   type: "error" | "success",
@@ -25,40 +21,6 @@ function redirectRegister(
   url.searchParams.set(type, message);
 
   return NextResponse.redirect(url, { status: 303 });
-}
-
-function getSpreadsheetId() {
-  const spreadsheetId = process.env.SPREADSHEET_ID;
-
-  if (!spreadsheetId) {
-    throw new Error("Thiếu SPREADSHEET_ID trong biến môi trường.");
-  }
-
-  return spreadsheetId;
-}
-
-function getGoogleAuth() {
-  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-
-  if (!clientEmail || !privateKey) {
-    throw new Error("Thiếu GOOGLE_CLIENT_EMAIL hoặc GOOGLE_PRIVATE_KEY trong biến môi trường.");
-  }
-
-  return new google.auth.GoogleAuth({
-    credentials: {
-      client_email: clientEmail,
-      private_key: privateKey,
-    },
-    scopes: SCOPES,
-  });
-}
-
-async function getSheetsClient() {
-  return google.sheets({
-    version: "v4",
-    auth: getGoogleAuth(),
-  });
 }
 
 function checkPasswordRule(password: string) {
@@ -159,36 +121,7 @@ async function appendStandbyAccount(data: {
   answerHash: string;
   encryptedGmail: string;
 }) {
-  const sheets = await getSheetsClient();
-  const spreadsheetId = getSpreadsheetId();
-
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `${SHEET_NAME}!A:O`,
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: {
-      values: [
-        [
-          data.maNV, // A - MÃ NHÂN VIÊN
-          data.staffName, // B - TÊN NHÂN VIÊN
-          data.maST, // C - MÃ SIÊU THỊ
-          "", // D - TÊN SIÊU THỊ
-          "", // E - TÊN PHÒNG BAN
-          data.passwordHash, // F - MẬT KHẨU
-          data.encryptedQuestion, // G - CÂU HỎI BẢO MẬT
-          data.answerHash, // H - CÂU TRẢ LỜI BẢO MẬT
-          data.encryptedGmail, // I - GMAIL
-          "Standby", // J - TRẠNG THÁI
-          "", // K - RESET_OTP_HASH
-          "", // L - RESET_OTP_EXPIRES
-          "", // M - RESET_OTP_DAY
-          "", // N - RESET_OTP_COUNT
-          "1", // O - NEED_SETUP
-        ],
-      ],
-    },
-  });
+  await createStandbyAccount(data);
 }
 
 export async function POST(req: NextRequest) {

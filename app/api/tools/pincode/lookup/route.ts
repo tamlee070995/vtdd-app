@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { lookupPincodeStaff } from "@/lib/pincode-store";
+import { getCurrentPmhToolAvailability, pmhToolClosedJson } from "@/lib/pmh-tool-guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   try {
+    const availability = await getCurrentPmhToolAvailability();
+
+    if (!availability.enabled) {
+      return pmhToolClosedJson(availability, { valid: false });
+    }
+
     const maST = String(req.nextUrl.searchParams.get("maST") || "").trim();
     const maNV = String(req.nextUrl.searchParams.get("maNV") || "").trim();
 

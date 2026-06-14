@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { readSheetRange } from "@/lib/sheets";
+import { deleteRows, eq, insertRows, isSupabaseConfigured, selectAllRows, selectRows, updateRows } from "@/lib/supabase-rest";
 
 const SHEET_NAME = "Data_Staff";
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -113,7 +114,55 @@ function mapStaffRow(row: any[], index: number): StaffRow {
   };
 }
 
+function mapDbStaffRow(row: any, index: number): StaffRow {
+  const sourceRow = Number(clean(row.source_row));
+
+  return {
+    rowNumber: Number.isFinite(sourceRow) && sourceRow > 0 ? sourceRow : index + 2,
+    maNV: cleanCode(row.ma_nv),
+    staffName: clean(row.staff_name),
+    maST: cleanCode(row.ma_st),
+    storeName: clean(row.store_name),
+    department: clean(row.department),
+    password: clean(row.password_hash),
+    securityQuestion: clean(row.security_question),
+    securityAnswer: clean(row.security_answer),
+    gmail: clean(row.gmail),
+    status: clean(row.status),
+    resetOtpHash: clean(row.reset_otp_hash),
+    resetOtpExpires: clean(row.reset_otp_expires),
+    resetOtpDay: clean(row.reset_otp_day),
+    resetOtpCount: clean(row.reset_otp_count),
+    needSetup: clean(row.need_setup),
+    permission: normalizePermission(row.permission),
+    modulePermissions: clean(row.module_permissions),
+  };
+}
+
+async function updateDbStaffByRowNumber(rowNumber: number, patch: Record<string, unknown>) {
+  if (!isSupabaseConfigured()) return false;
+
+  try {
+    const rows = await updateRows<any>(
+      "staff",
+      { source_row: eq(String(rowNumber)) },
+      patch
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      throw new Error("Không tìm thấy nhân viên trong Supabase để cập nhật.");
+    }
+
+    return true;
+  } catch (err: any) {
+    console.warn("SUPABASE_STAFF_UPDATE_ERROR:", err?.message || err);
+    throw err;
+  }
+}
+
 export async function ensureStaffAdminHeaders() {
+  if (isSupabaseConfigured()) return;
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -141,6 +190,18 @@ export async function ensureStaffPermissionHeader() {
 }
 
 export async function getStaffRows(): Promise<StaffRow[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const rows = await selectAllRows<any>("staff", { order: "source_row.asc" });
+      return rows
+        .map(mapDbStaffRow)
+        .filter((row) => row.maNV || row.staffName);
+    } catch (err: any) {
+      console.warn("SUPABASE_STAFF_ROWS_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   const rows = await readSheetRange(`${SHEET_NAME}!A2:Q`);
   return rows.map((row: any[], index: number) => mapStaffRow(row, index));
 }
@@ -148,6 +209,19 @@ export async function getStaffRows(): Promise<StaffRow[]> {
 export async function findStaffByMaNV(maNV: string) {
   const target = cleanCode(maNV);
   if (!target) return null;
+
+  if (isSupabaseConfigured()) {
+    try {
+      const rows = await selectRows<any>("staff", {
+        filters: { ma_nv: eq(target) },
+        limit: 1,
+      });
+      return rows[0] ? mapDbStaffRow(rows[0], 0) : null;
+    } catch (err: any) {
+      console.warn("SUPABASE_FIND_STAFF_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
 
   const rows = await getStaffRows();
   return rows.find((r) => r.maNV === target) || null;
@@ -164,7 +238,7 @@ export async function getAdminStaffPage(params: {
   const q = clean(params.q).toLowerCase();
   const status = clean(params.status || "ALL");
 
-  const rows = await readSheetRange(`${SHEET_NAME}!A2:Q`);
+  const rows = await getStaffRows();
 
   let total = 0;
   let active = 0;
@@ -173,8 +247,7 @@ export async function getAdminStaffPage(params: {
 
   const filtered: AdminStaffPageItem[] = [];
 
-  rows.forEach((row: any[], index: number) => {
-    const item = mapStaffRow(row, index);
+  rows.forEach((item) => {
     if (!item.maNV && !item.staffName) return;
 
     total += 1;
@@ -253,6 +326,16 @@ export async function updateStaffSecurity(
     needSetup?: "0" | "1";
   }
 ) {
+  if (await updateDbStaffByRowNumber(rowNumber, {
+    password_hash: data.passwordHash,
+    security_question: data.encryptedQuestion,
+    security_answer: data.answerHash,
+    gmail: data.encryptedGmail,
+    ...(data.needSetup === "0" || data.needSetup === "1" ? { need_setup: data.needSetup } : {}),
+  })) {
+    return;
+  }
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -295,6 +378,41 @@ export async function createStandbyAccount(data: {
   answerHash: string;
   encryptedGmail: string;
 }) {
+  if (isSupabaseConfigured()) {
+    try {
+      await insertRows(
+        "staff",
+        [
+          {
+            ma_nv: cleanCode(data.maNV),
+            staff_name: clean(data.staffName),
+            ma_st: cleanCode(data.maST),
+            store_name: "",
+            department: "",
+            password_hash: data.passwordHash,
+            security_question: data.encryptedQuestion,
+            security_answer: data.answerHash,
+            gmail: data.encryptedGmail,
+            status: "Standby",
+            reset_otp_hash: "",
+            reset_otp_expires: "",
+            reset_otp_day: "",
+            reset_otp_count: "0",
+            need_setup: "1",
+            permission: "",
+            module_permissions: "",
+            source_row: String(Date.now()),
+          },
+        ],
+        { returning: "minimal" }
+      );
+      return;
+    } catch (err: any) {
+      console.warn("SUPABASE_CREATE_STAFF_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -333,6 +451,15 @@ export async function updateStaffResetOtp(
   rowNumber: number,
   data: { otpHash: string; expiresAt: string; day: string; count: number }
 ) {
+  if (await updateDbStaffByRowNumber(rowNumber, {
+    reset_otp_hash: data.otpHash,
+    reset_otp_expires: data.expiresAt,
+    reset_otp_day: data.day,
+    reset_otp_count: String(data.count),
+  })) {
+    return;
+  }
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -347,6 +474,14 @@ export async function updateStaffResetOtp(
 }
 
 export async function resetStaffPasswordByOtp(rowNumber: number, data: { passwordHash: string }) {
+  if (await updateDbStaffByRowNumber(rowNumber, {
+    password_hash: data.passwordHash,
+    reset_otp_hash: "",
+    reset_otp_expires: "",
+  })) {
+    return;
+  }
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -365,6 +500,10 @@ export async function resetStaffPasswordByOtp(rowNumber: number, data: { passwor
 }
 
 export async function updateStaffNeedSetup(rowNumber: number, needSetup: "0" | "1") {
+  if (await updateDbStaffByRowNumber(rowNumber, { need_setup: needSetup })) {
+    return;
+  }
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -379,6 +518,10 @@ export async function updateStaffNeedSetup(rowNumber: number, needSetup: "0" | "
 }
 
 export async function updateStaffStatus(rowNumber: number, status: "Active" | "Standby") {
+  if (await updateDbStaffByRowNumber(rowNumber, { status })) {
+    return;
+  }
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -392,8 +535,69 @@ export async function updateStaffStatus(rowNumber: number, status: "Active" | "S
   });
 }
 
+export async function deleteStaffAccount(rowNumber: number, maNV: string) {
+  const staffCode = cleanCode(maNV);
+
+  if (isSupabaseConfigured()) {
+    try {
+      const rows = await deleteRows<any>(
+        "staff",
+        { ma_nv: eq(staffCode) },
+        { returning: "representation" }
+      );
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        throw new Error("Không tìm thấy nhân viên trong Supabase để xóa.");
+      }
+
+      return;
+    } catch (err: any) {
+      console.warn("SUPABASE_STAFF_DELETE_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
+  const sheets = await getSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
+
+  return enqueueStaffWrite(async () => {
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: "sheets.properties(sheetId,title)",
+    });
+    const staffSheet = spreadsheet.data.sheets?.find((item) => item.properties?.title === SHEET_NAME);
+    const sheetId = staffSheet?.properties?.sheetId;
+
+    if (typeof sheetId !== "number") {
+      throw new Error(`Không tìm thấy sheet ${SHEET_NAME} để xóa nhân viên.`);
+    }
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId,
+                dimension: "ROWS",
+                startIndex: Math.max(1, rowNumber - 1),
+                endIndex: Math.max(2, rowNumber),
+              },
+            },
+          },
+        ],
+      },
+    });
+  });
+}
+
 export async function updateStaffPermission(rowNumber: number, permission: "admin" | "mod" | "") {
   await ensureStaffAdminHeaders();
+  if (await updateDbStaffByRowNumber(rowNumber, { permission: normalizePermission(permission) })) {
+    return;
+  }
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -435,10 +639,18 @@ export async function updateStaffAdminAccess(
   data: { permission: "admin" | "mod" | ""; modules?: string }
 ) {
   await ensureStaffAdminHeaders();
-  const sheets = await getSheetsClient();
-  const spreadsheetId = getSpreadsheetId();
   const permission = normalizePermission(data.permission);
   const modules = permission === "mod" ? normalizeModulePermissions(data.modules) : "";
+
+  if (await updateDbStaffByRowNumber(rowNumber, {
+    permission,
+    module_permissions: modules,
+  })) {
+    return;
+  }
+
+  const sheets = await getSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
 
   return enqueueStaffWrite(async () => {
     await sheets.spreadsheets.values.update({
@@ -451,6 +663,20 @@ export async function updateStaffAdminAccess(
 }
 
 export async function adminResetStaffSecurity(rowNumber: number, data: { passwordHash: string }) {
+  if (await updateDbStaffByRowNumber(rowNumber, {
+    password_hash: data.passwordHash,
+    security_question: "",
+    security_answer: "",
+    gmail: "",
+    reset_otp_hash: "",
+    reset_otp_expires: "",
+    reset_otp_day: "",
+    reset_otp_count: "0",
+    need_setup: "1",
+  })) {
+    return;
+  }
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -469,6 +695,10 @@ export async function adminResetStaffSecurity(rowNumber: number, data: { passwor
 }
 
 export async function adminResetStaffOtpCount(rowNumber: number) {
+  if (await updateDbStaffByRowNumber(rowNumber, { reset_otp_count: "0" })) {
+    return;
+  }
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 

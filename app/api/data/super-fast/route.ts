@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readSheetRange } from "@/lib/sheets";
 import { getPublicSystemSettings } from "@/lib/system-store";
+import { isSupabaseConfigured, selectAllRows } from "@/lib/supabase-rest";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -37,6 +38,32 @@ function clean(value: any) {
   return String(value ?? "").trim();
 }
 
+const NEW_HEADERS = [
+  "hang",
+  "tensanphamdoilen",
+  "tiletrogia",
+  "tiletrogiaApple",
+  "muctrogia",
+  "nganhhangmaydoilen",
+  "minmuctrogia",
+  "minmuctrogiaApple",
+];
+
+const OLD_HEADERS = [
+  "hang",
+  "tensanphamthuvao",
+  "bonho",
+  "LOAI 1",
+  "LOAI 2",
+  "LOAI 3",
+  "LOAI 4",
+  "LOAI 5",
+  "LOAI 5+",
+  "nganhhangmaythuvao",
+  "LOAI 1 MWG",
+  "LOAI 2 MWG",
+];
+
 function getDataVersion(settings: Record<string, string>) {
   return clean(settings.DATA_VERSION) || "1";
 }
@@ -71,6 +98,81 @@ async function loadPriceDataFromSheet(version: string): Promise<PriceDataCache> 
   };
 }
 
+function sourceRowSort(a: any, b: any) {
+  const aRow = Number(clean(a.source_row));
+  const bRow = Number(clean(b.source_row));
+  if (Number.isFinite(aRow) && Number.isFinite(bRow) && aRow !== bRow) return aRow - bRow;
+  return clean(a.product_name).localeCompare(clean(b.product_name), "vi", { numeric: true });
+}
+
+function mapNewProductRow(row: any) {
+  return [
+    clean(row.brand),
+    clean(row.product_name),
+    clean(row.subsidy_ratio),
+    clean(row.subsidy_ratio_apple),
+    clean(row.subsidy_amount),
+    clean(row.category),
+    clean(row.min_subsidy_amount),
+    clean(row.min_subsidy_amount_apple),
+  ];
+}
+
+function mapOldProductRow(row: any) {
+  return [
+    clean(row.brand),
+    clean(row.product_name),
+    clean(row.storage),
+    clean(row.price_type_1),
+    clean(row.price_type_2),
+    clean(row.price_type_3),
+    clean(row.price_type_4),
+    clean(row.price_type_5),
+    clean(row.price_type_5_plus),
+    clean(row.category),
+    clean(row.mwg_type_1),
+    clean(row.mwg_type_2),
+  ];
+}
+
+async function loadPriceDataFromDb(version: string): Promise<PriceDataCache> {
+  const [newRows, oldRows] = await Promise.all([
+    selectAllRows<any>("products_new", { order: "source_row.asc" }),
+    selectAllRows<any>("products_old", { order: "source_row.asc" }),
+  ]);
+
+  const phoneRows = oldRows
+    .filter((row) => clean(row.source_sheet) !== "Data_Cu_Tablet")
+    .sort(sourceRowSort);
+  const tabletRows = oldRows
+    .filter((row) => clean(row.source_sheet) === "Data_Cu_Tablet")
+    .sort(sourceRowSort);
+
+  return {
+    version,
+    loadedAt: nowVN(),
+    loadedAtMs: Date.now(),
+    data: {
+      moi: [NEW_HEADERS, ...newRows.sort(sourceRowSort).map(mapNewProductRow)],
+      cu: [OLD_HEADERS, ...phoneRows.map(mapOldProductRow)],
+      tablet: [OLD_HEADERS, ...tabletRows.map(mapOldProductRow)],
+    },
+  };
+}
+
+async function loadPriceData(version: string): Promise<PriceDataCache> {
+  if (isSupabaseConfigured()) {
+    try {
+      return await loadPriceDataFromDb(version);
+    } catch (err: any) {
+      console.warn("SUPABASE_PRICE_DATA_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
+  return loadPriceDataFromSheet(version);
+}
+
 async function getCachedPriceData(version: string) {
   if (priceDataCache && priceDataCache.version === version) {
     return {
@@ -90,7 +192,7 @@ async function getCachedPriceData(version: string) {
     }
   }
 
-  priceDataLoadingPromise = loadPriceDataFromSheet(version);
+  priceDataLoadingPromise = loadPriceData(version);
 
   try {
     const freshCache = await priceDataLoadingPromise;

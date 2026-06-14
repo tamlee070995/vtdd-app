@@ -2014,9 +2014,8 @@ export default function CustomerPage() {
   const customerPageLocked = settingEnabled(systemSettings, "CUSTOMER_PAGE_LOCKED");
   const customerTradeinLocked = settingEnabled(systemSettings, "CUSTOMER_TRADEIN_LOCKED");
   const customerBuyonlyLocked = settingEnabled(systemSettings, "CUSTOMER_BUYONLY_LOCKED");
-  const allCustomerTabsLocked = customerTradeinLocked && customerBuyonlyLocked;
   const currentCustomerTabLocked = mode === "tradein" ? customerTradeinLocked : customerBuyonlyLocked;
-  const customerAccessLocked = systemLocked || customerPageLocked || allCustomerTabsLocked;
+  const customerAccessLocked = systemLocked || customerPageLocked;
 
   const priceInfo = useMemo(() => {
     const type = TYPE_OPTIONS.find((x) => x.value === loai);

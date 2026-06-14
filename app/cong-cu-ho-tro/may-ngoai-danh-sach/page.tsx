@@ -1,8 +1,23 @@
 import PincodeRequestApp from "@/components/PincodeRequestApp";
+import PmhToolClosedPage from "@/components/PmhToolClosedPage";
+import { getPublicSystemSettings } from "@/lib/system-store";
+import { getPmhToolAvailability } from "@/lib/tool-settings";
 
 export const dynamic = "force-dynamic";
 
-export default function MayNgoaiDanhSachPage() {
+export default async function MayNgoaiDanhSachPage() {
+  const settings = await getPublicSystemSettings();
+  const availability = getPmhToolAvailability(settings);
+
+  if (!availability.enabled) {
+    return (
+      <PmhToolClosedPage
+        title="Máy ngoài danh sách"
+        reason={availability.reason}
+      />
+    );
+  }
+
   return (
     <PincodeRequestApp
       flow="NgoaiDS"

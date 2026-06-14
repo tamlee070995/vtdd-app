@@ -3,13 +3,15 @@ import { adminHasAction, normalizeAdminAccess, requireAdminApi, type AdminAction
 import {
   adminResetStaffOtpCount,
   adminResetStaffSecurity,
+  deleteStaffAccount,
   ensureStaffAdminHeaders,
   findStaffByMaNV,
   getAdminStaffPage,
   updateStaffAdminAccess,
   updateStaffStatus,
 } from "@/lib/staff-store";
-import { hashPassword, normalizeCode } from "@/lib/staff-security";
+import { decryptText, hashPassword, normalizeCode } from "@/lib/staff-security";
+import { sendStaffActivatedMail } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +43,40 @@ function normalizeModules(value: any) {
 
 function canRunAction(admin: any, action: AdminActionKey) {
   return adminHasAction(admin, action, "tcdm");
+}
+
+function denyModTouchingAdmin(admin: any, target: any) {
+  const actorPermission = normalizePermission(admin?.permission);
+  const targetPermission = normalizePermission(target?.permission);
+
+  if (actorPermission === "admin" || targetPermission !== "admin") return null;
+
+  return NextResponse.json(
+    { success: false, message: "Tài khoản Mod không được thao tác với tài khoản quyền Admin." },
+    { status: 403 }
+  );
+}
+
+function safeDecrypt(value: any) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  try {
+    return decryptText(raw) || raw;
+  } catch {
+    return raw;
+  }
+}
+
+function maskEmail(email: string) {
+  const [name, domain] = String(email || "").split("@");
+  if (!name || !domain) return email;
+  return `${name.slice(0, 2)}***@${domain}`;
+}
+
+function getLoginUrl(req: NextRequest) {
+  const baseUrl = String(process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin).replace(/\/+$/, "");
+  return `${baseUrl}/login`;
 }
 
 export async function GET(req: NextRequest) {
@@ -119,14 +155,52 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, message: "Không có quyền quản lý trạng thái nhân viên." }, { status: 403 });
       }
 
+      const guard = denyModTouchingAdmin(admin, target);
+      if (guard) return guard;
+
       await updateStaffStatus(target.rowNumber, "Active");
-      return NextResponse.json({ success: true, message: `Đã Active tài khoản NV ${target.maNV}.` });
+
+      const gmail = safeDecrypt(target.gmail).toLowerCase();
+
+      if (!gmail) {
+        return NextResponse.json({
+          success: true,
+          mailSent: false,
+          message: `Đã Active tài khoản NV ${target.maNV}, nhưng tài khoản chưa có Gmail để gửi thông báo.`,
+        });
+      }
+
+      try {
+        await sendStaffActivatedMail({
+          to: gmail,
+          staffName: target.staffName,
+          maNV: target.maNV,
+          loginUrl: getLoginUrl(req),
+        });
+
+        return NextResponse.json({
+          success: true,
+          mailSent: true,
+          message: `Đã Active tài khoản NV ${target.maNV} và gửi Gmail thông báo đến ${maskEmail(gmail)}.`,
+        });
+      } catch (mailErr: any) {
+        console.error("SEND_STAFF_ACTIVATED_MAIL_ERROR:", mailErr);
+
+        return NextResponse.json({
+          success: true,
+          mailSent: false,
+          message: `Đã Active tài khoản NV ${target.maNV}, nhưng chưa gửi được Gmail thông báo. Kiểm tra cấu hình Gmail SMTP.`,
+        });
+      }
     }
 
     if (action === "STANDBY") {
       if (!canRunAction(admin, "staff-manage")) {
         return NextResponse.json({ success: false, message: "Không có quyền quản lý trạng thái nhân viên." }, { status: 403 });
       }
+
+      const guard = denyModTouchingAdmin(admin, target);
+      if (guard) return guard;
 
       await updateStaffStatus(target.rowNumber, "Standby");
       return NextResponse.json({ success: true, message: `Đã chuyển NV ${target.maNV} về Standby.` });
@@ -139,6 +213,9 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
       }
+
+      const guard = denyModTouchingAdmin(admin, target);
+      if (guard) return guard;
 
       const defaultPassword = process.env.DEFAULT_STAFF_PASSWORD || "123123";
       const passwordHash = hashPassword(defaultPassword);
@@ -155,8 +232,30 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, message: "Không có quyền reset OTP nhân viên." }, { status: 403 });
       }
 
+      const guard = denyModTouchingAdmin(admin, target);
+      if (guard) return guard;
+
       await adminResetStaffOtpCount(target.rowNumber);
       return NextResponse.json({ success: true, message: `Đã reset số lượt OTP của NV ${target.maNV}.` });
+    }
+
+    if (action === "DELETE") {
+      if (!canRunAction(admin, "staff-manage")) {
+        return NextResponse.json({ success: false, message: "Không có quyền xóa nhân viên." }, { status: 403 });
+      }
+
+      const guard = denyModTouchingAdmin(admin, target);
+      if (guard) return guard;
+
+      if (normalizeCode(admin?.maNV || "") === target.maNV) {
+        return NextResponse.json(
+          { success: false, message: "Không thể xóa chính tài khoản đang đăng nhập." },
+          { status: 400 }
+        );
+      }
+
+      await deleteStaffAccount(target.rowNumber, target.maNV);
+      return NextResponse.json({ success: true, message: `Đã xóa tài khoản NV ${target.maNV}.` });
     }
 
     return NextResponse.json({ success: false, message: "Action không hợp lệ." }, { status: 400 });

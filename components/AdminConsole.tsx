@@ -160,22 +160,17 @@ const NOTIFY_SETTING_KEYS = [
   "PUSH_NOTIFY_VERSION",
 ];
 
-const SYSTEM_SETTING_KEYS = [
-  "PRICE_EFFECTIVE_FROM",
-  "PRICE_EFFECTIVE_TO",
-  "SYSTEM_LOCK_MESSAGE",
-  "SYSTEM_LOCK_ENABLED",
+const PRICE_SETTING_KEYS = ["PRICE_EFFECTIVE_FROM", "PRICE_EFFECTIVE_TO"];
+const RELOAD_SETTING_KEYS = ["DATA_VERSION"];
+const EMERGENCY_LOCK_SETTING_KEYS = ["SYSTEM_LOCK_MESSAGE", "SYSTEM_LOCK_ENABLED"];
+const SCHEDULE_LOCK_SETTING_KEYS = [
   "SYSTEM_LOCK_SCHEDULE_ENABLED",
   "SYSTEM_LOCK_START_AT",
   "SYSTEM_LOCK_END_AT",
   "SYSTEM_LOCK_REASON",
-  "STAFF_PAGE_LOCKED",
-  "STAFF_TRADEIN_LOCKED",
-  "STAFF_BUYONLY_LOCKED",
-  "CUSTOMER_PAGE_LOCKED",
-  "CUSTOMER_TRADEIN_LOCKED",
-  "CUSTOMER_BUYONLY_LOCKED",
 ];
+const STAFF_LOCK_SETTING_KEYS = ["STAFF_PAGE_LOCKED", "STAFF_TRADEIN_LOCKED", "STAFF_BUYONLY_LOCKED"];
+const CUSTOMER_LOCK_SETTING_KEYS = ["CUSTOMER_PAGE_LOCKED", "CUSTOMER_TRADEIN_LOCKED", "CUSTOMER_BUYONLY_LOCKED"];
 
 const PERMISSION_TREE = [
   {
@@ -357,6 +352,10 @@ function TcdmAdminConsole({
   const canWriteSettings = canUseAction("settings-write");
   const canReloadData = canUseAction("reload-data");
 
+  function isStaffAdminLocked(item: AdminStaff) {
+    return !isFullAdmin && item.permission === "admin";
+  }
+
   const lockCount = useMemo(() => {
     return [
       "SYSTEM_LOCK_ENABLED",
@@ -523,7 +522,7 @@ function TcdmAdminConsole({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, dashboardLoaded]);
 
-  async function runStaffAction(action: "ACTIVE" | "STANDBY" | "RESET_SECURITY" | "RESET_OTP_COUNT", maNV: string) {
+  async function runStaffAction(action: "ACTIVE" | "STANDBY" | "RESET_SECURITY" | "RESET_OTP_COUNT" | "DELETE", maNV: string) {
     try {
       setBusy(`${action}-${maNV}`);
 
@@ -561,9 +560,10 @@ function TcdmAdminConsole({
     }
   }
 
-  async function saveSettings(extra?: Record<string, string>, options?: { onlyKeys?: string[] }) {
+  async function saveSettings(extra?: Record<string, string>, options?: { onlyKeys?: string[]; busyKey?: string }) {
     try {
-      setBusy("settings");
+      const busyKey = options?.busyKey || "settings";
+      setBusy(busyKey);
 
       const payload = {
         ...settings,
@@ -599,19 +599,37 @@ function TcdmAdminConsole({
 
   async function reloadDataVersion() {
     const nextVersion = String(Date.now());
-    await saveSettings({ DATA_VERSION: nextVersion }, { onlyKeys: ["DATA_VERSION"] });
+    await saveSettings({ DATA_VERSION: nextVersion }, { onlyKeys: RELOAD_SETTING_KEYS, busyKey: "reload-data" });
   }
 
   async function saveNotifySettings(extra?: Record<string, string>) {
-    await saveSettings(extra, { onlyKeys: NOTIFY_SETTING_KEYS });
+    await saveSettings(extra, { onlyKeys: NOTIFY_SETTING_KEYS, busyKey: "notify-settings" });
   }
 
-  async function saveSystemSettings(extra?: Record<string, string>) {
-    await saveSettings(extra, { onlyKeys: SYSTEM_SETTING_KEYS });
+  async function saveSystemSection(keys: string[], busyKey: string, extra?: Record<string, string>) {
+    await saveSettings(extra, { onlyKeys: keys, busyKey });
   }
 
   function setSetting(key: string, value: string) {
     setSettings((current) => ({ ...current, [key]: value }));
+  }
+
+  function setLockSetting(key: string, value: boolean) {
+    setSettings((current) => {
+      const next = { ...current, [key]: toFlag(value) };
+
+      if (key === "STAFF_PAGE_LOCKED" && value) {
+        next.STAFF_TRADEIN_LOCKED = "0";
+        next.STAFF_BUYONLY_LOCKED = "0";
+      }
+
+      if (key === "CUSTOMER_PAGE_LOCKED" && value) {
+        next.CUSTOMER_TRADEIN_LOCKED = "0";
+        next.CUSTOMER_BUYONLY_LOCKED = "0";
+      }
+
+      return next;
+    });
   }
 
   function applyStaffSearch() {
@@ -619,15 +637,26 @@ function TcdmAdminConsole({
     setStaffQuery(staffSearchInput.trim());
   }
 
-  function ToggleRow({ settingKey, title, desc }: { settingKey: string; title: string; desc: string }) {
+  function ToggleRow({
+    settingKey,
+    title,
+    desc,
+    disabled = false,
+  }: {
+    settingKey: string;
+    title: string;
+    desc: string;
+    disabled?: boolean;
+  }) {
     const checked = isOn(settings[settingKey]);
 
     return (
-      <label className="adminx-toggle-row">
+      <label className={`adminx-toggle-row ${disabled ? "disabled" : ""}`}>
         <input
           type="checkbox"
           checked={checked}
-          onChange={(e) => setSetting(settingKey, toFlag(e.target.checked))}
+          disabled={disabled}
+          onChange={(e) => setLockSetting(settingKey, e.target.checked)}
         />
         <span className="adminx-switch" aria-hidden="true"></span>
         <div>
@@ -637,6 +666,9 @@ function TcdmAdminConsole({
       </label>
     );
   }
+
+  const staffPageLockedInForm = isOn(settings.STAFF_PAGE_LOCKED);
+  const customerPageLockedInForm = isOn(settings.CUSTOMER_PAGE_LOCKED);
 
   return (
     <section className="adminx-console">
@@ -845,6 +877,7 @@ function TcdmAdminConsole({
                         {item.gmail ? <span>{item.gmail}</span> : null}
                         {item.permission ? <span>QUYỀN: {item.permission.toUpperCase()}</span> : <span>QUYỀN: —</span>}
                         {item.permission === "mod" ? <span>PHẠM VI: {summarizeAdminAccess(item.modulePermissions)}</span> : null}
+                        {isStaffAdminLocked(item) ? <span>MOD KHÔNG THỂ THAO TÁC ADMIN</span> : null}
                       </div>
 
                     </div>
@@ -853,21 +886,21 @@ function TcdmAdminConsole({
                       <button
                         type="button"
                         className="primary"
-                        disabled={!canManageStaff || busy === `ACTIVE-${item.maNV}` || item.status === "Active"}
+                        disabled={!canManageStaff || isStaffAdminLocked(item) || busy === `ACTIVE-${item.maNV}` || item.status === "Active"}
                         onClick={() => runStaffAction("ACTIVE", item.maNV)}
                       >
                         Active
                       </button>
                       <button
                         type="button"
-                        disabled={!canManageStaff || busy === `STANDBY-${item.maNV}` || item.status === "Standby"}
+                        disabled={!canManageStaff || isStaffAdminLocked(item) || busy === `STANDBY-${item.maNV}` || item.status === "Standby"}
                         onClick={() => runStaffAction("STANDBY", item.maNV)}
                       >
                         Standby
                       </button>
                       <button
                         type="button"
-                        disabled={!canResetStaffSecurity || busy === `RESET_SECURITY-${item.maNV}`}
+                        disabled={!canResetStaffSecurity || isStaffAdminLocked(item) || busy === `RESET_SECURITY-${item.maNV}`}
                         onClick={() => {
                           const ok = window.confirm(
                             `Reset tài khoản ${item.maNV}: mật khẩu về 123123, xóa bảo mật/Gmail, NEED_SETUP=1 và OTP count=0?`
@@ -879,10 +912,23 @@ function TcdmAdminConsole({
                       </button>
                       <button
                         type="button"
-                        disabled={!canResetStaffSecurity || busy === `RESET_OTP_COUNT-${item.maNV}`}
+                        disabled={!canResetStaffSecurity || isStaffAdminLocked(item) || busy === `RESET_OTP_COUNT-${item.maNV}`}
                         onClick={() => runStaffAction("RESET_OTP_COUNT", item.maNV)}
                       >
                         Reset OTP
+                      </button>
+                      <button
+                        type="button"
+                        className="danger"
+                        disabled={!canManageStaff || isStaffAdminLocked(item) || busy === `DELETE-${item.maNV}`}
+                        onClick={() => {
+                          const ok = window.confirm(
+                            `Xóa tài khoản ${item.maNV} - ${item.staffName || "nhân viên này"}? Thao tác này không thể hoàn tác.`
+                          );
+                          if (ok) runStaffAction("DELETE", item.maNV);
+                        }}
+                      >
+                        Xóa nhân viên
                       </button>
                     </div>
                   </article>
@@ -1132,14 +1178,6 @@ function TcdmAdminConsole({
               <h2>Điều khiển hệ thống</h2>
               <p>Quản lý ngày áp dụng, khóa truy cập và reload dữ liệu bảng giá.</p>
             </div>
-            <div className={`adminx-button-stack ${canWriteSettings ? "" : "no-system-save"} ${canReloadData ? "" : "no-reload"}`}>
-              <button className="adminx-action-btn" type="button" onClick={() => saveSystemSettings()} disabled={!canWriteSettings || busy === "settings"}>
-                {busy === "settings" ? "Đang lưu..." : "Lưu hệ thống"}
-              </button>
-              <button className="adminx-action-btn secondary" type="button" onClick={reloadDataVersion} disabled={!canReloadData || busy === "settings"}>
-                Reload data
-              </button>
-            </div>
           </div>
 
           <div className={`adminx-system-sections ${canWriteSettings ? "" : "reload-only"}`}>
@@ -1169,6 +1207,16 @@ function TcdmAdminConsole({
                   />
                 </label>
               </div>
+              <div className="adminx-section-actions">
+                <button
+                  className="adminx-section-save"
+                  type="button"
+                  onClick={() => saveSystemSection(PRICE_SETTING_KEYS, "price-settings")}
+                  disabled={!canWriteSettings || busy === "price-settings"}
+                >
+                  {busy === "price-settings" ? "Đang lưu..." : "Lưu thời gian áp dụng"}
+                </button>
+              </div>
             </section>
 
             <section className="adminx-system-card adminx-reload-card">
@@ -1184,6 +1232,16 @@ function TcdmAdminConsole({
                   <span>Data version</span>
                   <input value={settings.DATA_VERSION || "1"} readOnly />
                 </label>
+              </div>
+              <div className="adminx-section-actions">
+                <button
+                  className="adminx-section-save"
+                  type="button"
+                  onClick={reloadDataVersion}
+                  disabled={!canReloadData || busy === "reload-data"}
+                >
+                  {busy === "reload-data" ? "Đang reload..." : "Reload data"}
+                </button>
               </div>
             </section>
 
@@ -1207,6 +1265,16 @@ function TcdmAdminConsole({
               </div>
               <div className="adminx-lock-grid compact">
                 <ToggleRow settingKey="SYSTEM_LOCK_ENABLED" title="Lock web khẩn cấp" desc="Hiển thị toàn màn hình cập nhật khẩn." />
+              </div>
+              <div className="adminx-section-actions">
+                <button
+                  className="adminx-section-save"
+                  type="button"
+                  onClick={() => saveSystemSection(EMERGENCY_LOCK_SETTING_KEYS, "emergency-lock")}
+                  disabled={!canWriteSettings || busy === "emergency-lock"}
+                >
+                  {busy === "emergency-lock" ? "Đang lưu..." : "Lưu lock khẩn cấp"}
+                </button>
               </div>
             </section>
 
@@ -1247,6 +1315,16 @@ function TcdmAdminConsole({
               <div className="adminx-lock-grid compact">
                 <ToggleRow settingKey="SYSTEM_LOCK_SCHEDULE_ENABLED" title="Khóa theo lịch" desc="Dùng khung giờ đã cài ở trên." />
               </div>
+              <div className="adminx-section-actions">
+                <button
+                  className="adminx-section-save"
+                  type="button"
+                  onClick={() => saveSystemSection(SCHEDULE_LOCK_SETTING_KEYS, "schedule-lock")}
+                  disabled={!canWriteSettings || busy === "schedule-lock"}
+                >
+                  {busy === "schedule-lock" ? "Đang lưu..." : "Lưu khóa theo lịch"}
+                </button>
+              </div>
             </section>
 
             <section className="adminx-system-card">
@@ -1259,8 +1337,32 @@ function TcdmAdminConsole({
               </div>
               <div className="adminx-lock-grid">
                 <ToggleRow settingKey="STAFF_PAGE_LOCKED" title="Khóa trang nhân viên" desc="Chặn truy cập cổng tra giá nhân viên." />
-                <ToggleRow settingKey="STAFF_TRADEIN_LOCKED" title="Khóa nhân viên - Thu cũ đổi mới" desc="Khóa tab Thu cũ đổi mới trên trang nhân viên." />
-                <ToggleRow settingKey="STAFF_BUYONLY_LOCKED" title="Khóa nhân viên - Chỉ thu cũ" desc="Khóa tab Chỉ thu cũ trên trang nhân viên." />
+                <ToggleRow
+                  settingKey="STAFF_TRADEIN_LOCKED"
+                  title="Khóa nhân viên - Thu cũ đổi mới"
+                  desc="Khóa tab Thu cũ đổi mới trên trang nhân viên."
+                  disabled={staffPageLockedInForm}
+                />
+                <ToggleRow
+                  settingKey="STAFF_BUYONLY_LOCKED"
+                  title="Khóa nhân viên - Chỉ thu cũ"
+                  desc="Khóa tab Chỉ thu cũ trên trang nhân viên."
+                  disabled={staffPageLockedInForm}
+                />
+              </div>
+              <div className="adminx-lock-help">
+                Khóa trang nhân viên sẽ làm mờ luồng Nhân viên ở trang chủ/trang chọn bảng giá và chặn truy cập hẳn.
+                Khóa từng tab con chỉ khóa đúng tab nghiệp vụ bên trong tool, nhân viên vẫn vào được trang tra giá.
+              </div>
+              <div className="adminx-section-actions">
+                <button
+                  className="adminx-section-save"
+                  type="button"
+                  onClick={() => saveSystemSection(STAFF_LOCK_SETTING_KEYS, "staff-locks")}
+                  disabled={!canWriteSettings || busy === "staff-locks"}
+                >
+                  {busy === "staff-locks" ? "Đang lưu..." : "Lưu khóa nhân viên"}
+                </button>
               </div>
             </section>
 
@@ -1274,8 +1376,32 @@ function TcdmAdminConsole({
               </div>
               <div className="adminx-lock-grid">
                 <ToggleRow settingKey="CUSTOMER_PAGE_LOCKED" title="Khóa trang khách hàng" desc="Chặn truy cập trang khách hàng cá nhân." />
-                <ToggleRow settingKey="CUSTOMER_TRADEIN_LOCKED" title="Khóa khách - Thu cũ đổi mới" desc="Khóa tab Thu cũ đổi mới trên trang khách hàng." />
-                <ToggleRow settingKey="CUSTOMER_BUYONLY_LOCKED" title="Khóa khách - Chỉ thu cũ" desc="Khóa tab Chỉ thu cũ trên trang khách hàng." />
+                <ToggleRow
+                  settingKey="CUSTOMER_TRADEIN_LOCKED"
+                  title="Khóa khách - Thu cũ đổi mới"
+                  desc="Khóa tab Thu cũ đổi mới trên trang khách hàng."
+                  disabled={customerPageLockedInForm}
+                />
+                <ToggleRow
+                  settingKey="CUSTOMER_BUYONLY_LOCKED"
+                  title="Khóa khách - Chỉ thu cũ"
+                  desc="Khóa tab Chỉ thu cũ trên trang khách hàng."
+                  disabled={customerPageLockedInForm}
+                />
+              </div>
+              <div className="adminx-lock-help">
+                Khóa trang khách hàng sẽ làm mờ luồng Khách hàng ở trang chủ/trang chọn bảng giá và chặn truy cập hẳn.
+                Khóa từng tab con chỉ khóa đúng chế độ tra giá bên trong trang khách hàng.
+              </div>
+              <div className="adminx-section-actions">
+                <button
+                  className="adminx-section-save"
+                  type="button"
+                  onClick={() => saveSystemSection(CUSTOMER_LOCK_SETTING_KEYS, "customer-locks")}
+                  disabled={!canWriteSettings || busy === "customer-locks"}
+                >
+                  {busy === "customer-locks" ? "Đang lưu..." : "Lưu khóa khách hàng"}
+                </button>
               </div>
             </section>
           </div>
@@ -1692,7 +1818,8 @@ const ADMINX_STYLE = `
 .adminx-inline-actions button,
 .adminx-filter-bar button,
 .adminx-pagination button,
-.adminx-staff-actions button {
+.adminx-staff-actions button,
+.adminx-section-save {
   min-height: 42px;
   padding: 0 14px;
   border: 0;
@@ -1719,10 +1846,17 @@ const ADMINX_STYLE = `
   color: #ffd400;
 }
 
+.adminx-staff-actions button.danger {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
 .adminx-action-btn:disabled,
 .adminx-filter-bar button:disabled,
 .adminx-pagination button:disabled,
-.adminx-staff-actions button:disabled {
+.adminx-staff-actions button:disabled,
+.adminx-section-save:disabled {
   opacity: .45;
   cursor: not-allowed;
 }
@@ -2059,6 +2193,16 @@ const ADMINX_STYLE = `
   justify-content: flex-end;
 }
 
+.adminx-section-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.adminx-section-save {
+  width: min(100%, 320px);
+}
+
 .adminx-system-sections {
   display: grid;
   gap: 12px;
@@ -2122,6 +2266,18 @@ const ADMINX_STYLE = `
   grid-template-columns: 1fr;
 }
 
+.adminx-lock-help {
+  margin-top: 10px;
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 850;
+}
+
 .adminx-toggle-row {
   padding: 13px;
   border-radius: 20px;
@@ -2132,6 +2288,11 @@ const ADMINX_STYLE = `
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   cursor: pointer;
+}
+
+.adminx-toggle-row.disabled {
+  opacity: .54;
+  cursor: not-allowed;
 }
 
 .adminx-toggle-row input {

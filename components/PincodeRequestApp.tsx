@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 type PincodeFlow = "ChienGia" | "NgoaiDS";
 type IdentifierType = "IMEI" | "Serial";
-type DeviceCategory = "" | "Điện thoại" | "Máy tính bảng";
+type DeviceCategory = "" | "Điện thoại" | "Tablet";
 
 type PincodeRequest = {
   requestId: string;
@@ -887,7 +887,7 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
         <Link href="/" className="pmh-brand" aria-label="Về trang chủ">
           <img src="/mwg-logo.svg" alt="MWG" />
           <span>
-            <b>ICT</b>
+            <b>Viễn Thông Di Động</b>
             <small>Công cụ hỗ trợ</small>
           </span>
         </Link>
@@ -1014,7 +1014,7 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
                   <select value={deviceCategory} onChange={(event) => setDeviceCategory(event.target.value as DeviceCategory)}>
                     <option value="">Chọn ngành hàng</option>
                     <option value="Điện thoại">Điện thoại</option>
-                    <option value="Máy tính bảng">Máy tính bảng</option>
+                    <option value="Tablet">Tablet</option>
                   </select>
                 </label>
 

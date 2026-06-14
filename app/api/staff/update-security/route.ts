@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
 
     let passwordHash = staff.password;
 
-    if (forceSetup || changePassword) {
+    if (changePassword) {
       if (!newPassword || !confirmPassword) {
         return NextResponse.json(
           { success: false, message: "Vui lòng nhập mật khẩu mới và xác nhận mật khẩu mới." },
@@ -177,9 +177,9 @@ export async function POST(req: NextRequest) {
 
     const res = NextResponse.json({
       success: true,
-      changedPassword: forceSetup || changePassword,
+      changedPassword: changePassword,
       message:
-        forceSetup || changePassword
+        changePassword
           ? "Đã cập nhật thông tin và đổi mật khẩu thành công. Lần đăng nhập sau hãy dùng mật khẩu mới."
           : "Đã cập nhật thông tin cá nhân thành công.",
     });

@@ -32,6 +32,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const gmailError = useMemo(() => {
     const value = gmail.trim().toLowerCase();
@@ -102,7 +103,12 @@ export default function RegisterPage() {
           </p>
         </section>
 
-        <form className="register-vtd-card" action="/api/auth/staff-register" method="POST">
+        <form
+          className="register-vtd-card"
+          action="/api/auth/staff-register"
+          method="POST"
+          onSubmit={() => setSubmitting(true)}
+        >
           {error && <div className="register-vtd-alert error">⚠️ {error}</div>}
 
           <div className="register-vtd-grid two">
@@ -137,7 +143,7 @@ export default function RegisterPage() {
                   spellCheck={false}
                   required
                 />
-                <button type="button" onClick={() => setShowPassword((v) => !v)}>
+                <button type="button" onClick={() => setShowPassword((v) => !v)} disabled={submitting}>
                   {showPassword ? "ẨN" : "HIỆN"}
                 </button>
               </div>
@@ -157,7 +163,7 @@ export default function RegisterPage() {
                   spellCheck={false}
                   required
                 />
-                <button type="button" onClick={() => setShowConfirmPassword((v) => !v)}>
+                <button type="button" onClick={() => setShowConfirmPassword((v) => !v)} disabled={submitting}>
                   {showConfirmPassword ? "ẨN" : "HIỆN"}
                 </button>
               </div>
@@ -216,20 +222,31 @@ export default function RegisterPage() {
               <span>Captcha</span>
               <div className="register-vtd-captcha-line">
                 <strong>{loadingCaptcha ? "Đang tải..." : captcha.question || "Bấm tải lại captcha"}</strong>
-                <button type="button" onClick={loadCaptcha}>Tải lại</button>
+                <button type="button" onClick={loadCaptcha} disabled={submitting}>Tải lại</button>
               </div>
               <input name="captchaAnswer" inputMode="numeric" placeholder="Nhập kết quả" required />
             </label>
           </div>
 
-          <button className="register-vtd-submit" type="submit" disabled={!!gmailError}>
-            Tạo tài khoản chờ duyệt
+          <button className="register-vtd-submit" type="submit" disabled={!!gmailError || submitting}>
+            {submitting ? "Đang gửi yêu cầu..." : "Tạo tài khoản chờ duyệt"}
           </button>
 
           <Link href="/login" className="register-vtd-back">
             Quay lại đăng nhập
           </Link>
         </form>
+
+        {submitting && !success && (
+          <div className="register-vtd-modal-backdrop" role="alertdialog" aria-modal="true" aria-live="assertive">
+            <div className="register-vtd-processing-modal">
+              <div className="register-vtd-processing-ring" aria-hidden="true"></div>
+              <div className="register-vtd-modal-kicker">ĐANG XỬ LÝ</div>
+              <h2>Đang gửi yêu cầu tạo tài khoản</h2>
+              <p>Vui lòng chờ trong giây lát, hệ thống đang kiểm tra thông tin và gửi thông báo cho Admin.</p>
+            </div>
+          </div>
+        )}
 
         {success && (
           <div className="register-vtd-modal-backdrop" role="dialog" aria-modal="true">
@@ -571,6 +588,45 @@ const styles = `
   animation: registerModalIn .18s ease-out;
 }
 
+.register-vtd-processing-modal {
+  width: min(100%, 430px);
+  padding: 28px;
+  border-radius: 28px;
+  background: radial-gradient(circle at 85% 12%, rgba(255, 212, 0, .22), transparent 34%), #ffffff;
+  border: 1px solid rgba(203, 213, 225, .95);
+  box-shadow: 0 34px 110px rgba(2, 6, 23, .32);
+  text-align: center;
+  animation: registerModalIn .18s ease-out;
+}
+
+.register-vtd-processing-ring {
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 16px;
+  border-radius: 999px;
+  border: 7px solid #e2e8f0;
+  border-top-color: #ffd400;
+  box-shadow: inset 0 0 0 6px #07111f;
+  animation: registerSpin .72s linear infinite;
+}
+
+.register-vtd-processing-modal h2 {
+  margin: 0;
+  color: #07111f;
+  font-size: 24px;
+  line-height: 1.12;
+  font-weight: 1000;
+  letter-spacing: -.035em;
+}
+
+.register-vtd-processing-modal p {
+  margin: 13px 0 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 800;
+}
+
 .register-vtd-modal-icon {
   width: 62px;
   height: 62px;
@@ -637,6 +693,12 @@ const styles = `
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes registerSpin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

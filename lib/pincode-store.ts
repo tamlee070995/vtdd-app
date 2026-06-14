@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { eq, insertRows, isSupabaseConfigured, selectAllRows, selectRows, updateRows } from "@/lib/supabase-rest";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 const DEFAULT_PINCODE_SPREADSHEET_ID = "1cmuS7ipRG3Dhh1uycqgWhCKwNRnwB42wDR2ckPNULFw";
@@ -402,8 +403,13 @@ function normalizeComparable(value: unknown) {
 function normalizeDeviceCategory(value: unknown) {
   const normalized = normalizeComparable(value);
   if (normalized === normalizeComparable("Điện thoại")) return "Điện thoại";
-  if (normalized === normalizeComparable("Máy tính bảng")) return "Máy tính bảng";
+  if (normalized === normalizeComparable("Máy tính bảng") || normalized === normalizeComparable("Tablet")) return "Tablet";
   return "";
+}
+
+function isAppleNewProduct(brand: unknown, modelName: unknown) {
+  const text = normalizeComparable(`${clean(brand)} ${clean(modelName)}`);
+  return text.includes("apple") || text.includes("iphone") || text.includes("ipad");
 }
 
 function isValidImei(value: string) {
@@ -534,6 +540,116 @@ function mapRequestRow(row: any[], index: number): PincodeRequest {
   };
 }
 
+function sourceRowNumber(value: unknown, fallback = 0) {
+  const n = Number(clean(value));
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function makeRequestId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function mapDbStaff(row: any): PincodeStaff {
+  return {
+    maNV: cleanCode(row.ma_nv),
+    staffName: clean(row.staff_name),
+    maST: cleanCode(row.ma_st),
+    storeName: clean(row.store_name),
+    status: clean(row.status),
+  };
+}
+
+function mapDbRequestRow(row: any, index = 0): PincodeRequest {
+  const requestId = clean(row.request_id) || clean(row.source_row);
+  const rowNumber = sourceRowNumber(row.source_row, index + 2);
+  const flow = normalizePincodeFlow(row.support_type);
+  const done = clean(row.completion_status);
+  const status = normalizeStatus(row.status, done);
+
+  return {
+    requestId,
+    rowNumber,
+    createdAt: clean(row.created_at_text),
+    flow,
+    flowLabel: getPincodeFlowLabel(flow),
+    maST: cleanCode(row.ma_st),
+    maNV: cleanCode(row.ma_nv),
+    staffName: "",
+    storeName: "",
+    imei: clean(row.imei),
+    modelCu: clean(row.old_model),
+    modelMoi: clean(row.new_model),
+    note: "",
+    status,
+    pinCode: clean(row.pincode),
+    menhGia: clean(row.menh_gia),
+    reason: clean(row.reject_reason),
+    admin: clean(row.admin_reviewer),
+    doneStatus: done,
+    updatedAt: "",
+    completedAt: done.toLowerCase() === "done" ? clean(row.created_at_text) : "",
+    imageUrls: [
+      row.image_link_1,
+      row.image_link_2,
+      row.image_link_3,
+      row.image_link_4,
+      row.image_link_5,
+      row.image_link_6,
+    ].map(clean).filter(Boolean),
+  };
+}
+
+function sortDbRequests(a: PincodeRequest, b: PincodeRequest) {
+  const aRow = sourceRowNumber(a.rowNumber);
+  const bRow = sourceRowNumber(b.rowNumber);
+  if (aRow !== bRow) return bRow - aRow;
+  return clean(b.createdAt).localeCompare(clean(a.createdAt), "vi", { numeric: true });
+}
+
+function dbRequestPatchFromInput(data: {
+  createdAt?: string;
+  maST?: string;
+  maNV?: string;
+  imei?: string;
+  imageUrls?: string[];
+  status?: string;
+  pincode?: string;
+  rejectReason?: string;
+  adminReviewer?: string;
+  completionStatus?: string;
+  menhGia?: string;
+  oldModel?: string;
+  newModel?: string;
+  supportType?: string;
+  sourceRow?: string;
+}) {
+  const imageUrls = data.imageUrls || [];
+  return {
+    ...(typeof data.createdAt !== "undefined" ? { created_at_text: clean(data.createdAt) } : {}),
+    ...(typeof data.maST !== "undefined" ? { ma_st: cleanCode(data.maST) } : {}),
+    ...(typeof data.maNV !== "undefined" ? { ma_nv: cleanCode(data.maNV) } : {}),
+    ...(typeof data.imei !== "undefined" ? { imei: clean(data.imei) } : {}),
+    ...(typeof data.imageUrls !== "undefined" ? {
+      image_link_1: clean(imageUrls[0]),
+      image_link_2: clean(imageUrls[1]),
+      image_link_3: clean(imageUrls[2]),
+      image_link_4: clean(imageUrls[3]),
+      image_link_5: clean(imageUrls[4]),
+      image_link_6: clean(imageUrls[5]),
+    } : {}),
+    ...(typeof data.status !== "undefined" ? { status: clean(data.status) } : {}),
+    ...(typeof data.pincode !== "undefined" ? { pincode: clean(data.pincode) } : {}),
+    ...(typeof data.rejectReason !== "undefined" ? { reject_reason: clean(data.rejectReason) } : {}),
+    ...(typeof data.adminReviewer !== "undefined" ? { admin_reviewer: clean(data.adminReviewer) } : {}),
+    ...(typeof data.completionStatus !== "undefined" ? { completion_status: clean(data.completionStatus) } : {}),
+    ...(typeof data.menhGia !== "undefined" ? { menh_gia: clean(data.menhGia) } : {}),
+    ...(typeof data.oldModel !== "undefined" ? { old_model: clean(data.oldModel) } : {}),
+    ...(typeof data.newModel !== "undefined" ? { new_model: clean(data.newModel) } : {}),
+    ...(typeof data.supportType !== "undefined" ? { support_type: normalizePincodeFlow(data.supportType) } : {}),
+    ...(typeof data.sourceRow !== "undefined" ? { source_row: clean(data.sourceRow) } : {}),
+  };
+}
+
 function isMainRequestRow(row: any[]) {
   if (!clean(row[0]) || !clean(row[1]) || !clean(row[2]) || !clean(row[3])) return false;
   if (!isValidStoredStatus(row[10])) return false;
@@ -560,6 +676,19 @@ export async function getPincodeStaffByMaNV(maNV: string) {
   const target = cleanCode(maNV);
   if (!target) return null;
 
+  if (isSupabaseConfigured()) {
+    try {
+      const rows = await selectRows<any>("staff", {
+        filters: { ma_nv: eq(target) },
+        limit: 1,
+      });
+      return rows[0] ? mapDbStaff(rows[0]) : null;
+    } catch (err: any) {
+      console.warn("SUPABASE_PINCODE_STAFF_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   const rows = await readValuesCached(`${STAFF_SHEET}!A2:Q`, STAFF_CACHE_TTL_MS);
 
   for (const row of rows) {
@@ -580,6 +709,54 @@ export async function getPincodeStaffByMaNV(maNV: string) {
 export async function lookupPincodeStaff(maST: string, maNV: string): Promise<PincodeStaffLookup> {
   const targetStore = cleanCode(maST);
   const targetStaff = cleanCode(maNV);
+
+  if (isSupabaseConfigured()) {
+    try {
+      const [staffRows, storeRows] = await Promise.all([
+        targetStaff
+          ? selectRows<any>("staff", { filters: { ma_nv: eq(targetStaff) }, limit: 1 })
+          : Promise.resolve([]),
+        targetStore
+          ? selectRows<any>("stores", { filters: { ma_st: eq(targetStore) }, limit: 1 })
+          : Promise.resolve([]),
+      ]);
+      const staff = staffRows[0] ? mapDbStaff(staffRows[0]) : null;
+      let store = storeRows[0]
+        ? { maST: cleanCode(storeRows[0].ma_st), storeName: clean(storeRows[0].store_name) }
+        : null;
+
+      if (!store && targetStore && staff?.maST === targetStore) {
+        store = { maST: staff.maST, storeName: staff.storeName };
+      }
+
+      let message = "";
+
+      if (targetStore && !store) {
+        message = "Mã siêu thị không tồn tại hoặc chưa có nhân viên trong hệ thống.";
+      } else if (targetStaff && !staff) {
+        message = "Mã nhân viên không tồn tại trong hệ thống.";
+      } else if (staff?.status && staff.status.toLowerCase() !== "active") {
+        message = "Tài khoản nhân viên chưa Active.";
+      } else if (targetStore && staff && staff.maST !== targetStore) {
+        message = `Mã nhân viên ${staff.maNV} thuộc siêu thị ${staff.maST}, không khớp mã ${targetStore}.`;
+      }
+
+      return {
+        valid: Boolean(!message && (!targetStore || store) && (!targetStaff || staff)),
+        message,
+        staff,
+        store,
+        query: {
+          maST: targetStore,
+          maNV: targetStaff,
+        },
+      };
+    } catch (err: any) {
+      console.warn("SUPABASE_PINCODE_LOOKUP_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   const rows = await readValuesCached(`${STAFF_SHEET}!A2:Q`, STAFF_CACHE_TTL_MS);
   const staffRows = rows.map((row) => ({
     maNV: cleanCode(row[0]),
@@ -622,6 +799,28 @@ export async function getPincodeNewModelsByCategory(category: string) {
   const normalizedCategory = normalizeDeviceCategory(category);
   if (!normalizedCategory) return [];
 
+  if (isSupabaseConfigured()) {
+    try {
+      const rows = await selectAllRows<any>("products_new", { order: "source_row.asc" });
+      const models = new Map<string, string>();
+
+      rows.forEach((row) => {
+        const modelName = clean(row.product_name);
+        const rowCategory = normalizeDeviceCategory(row.category);
+        if (!modelName || rowCategory !== normalizedCategory) return;
+        if (isAppleNewProduct(row.brand, modelName)) return;
+
+        const key = normalizeComparable(modelName);
+        if (!models.has(key)) models.set(key, modelName);
+      });
+
+      return Array.from(models.values()).sort((a, b) => a.localeCompare(b, "vi", { numeric: true }));
+    } catch (err: any) {
+      console.warn("SUPABASE_PINCODE_NEW_MODELS_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   const rows = await readValuesCached(`${NEW_MODEL_SHEET}!B5:F`, MODEL_CACHE_TTL_MS);
   const models = new Map<string, string>();
 
@@ -629,6 +828,7 @@ export async function getPincodeNewModelsByCategory(category: string) {
     const modelName = clean(row[0]);
     const rowCategory = normalizeDeviceCategory(row[4]);
     if (!modelName || rowCategory !== normalizedCategory) return;
+    if (isAppleNewProduct("", modelName)) return;
 
     const key = normalizeComparable(modelName);
     if (!models.has(key)) models.set(key, modelName);
@@ -638,6 +838,26 @@ export async function getPincodeNewModelsByCategory(category: string) {
 }
 
 export async function getPincodeOldModels() {
+  if (isSupabaseConfigured()) {
+    try {
+      const rows = await selectAllRows<any>("products_old", { order: "source_row.asc" });
+      const models = new Map<string, string>();
+
+      rows.forEach((row) => {
+        const modelName = clean(row.product_name);
+        if (!modelName) return;
+
+        const key = normalizeComparable(modelName);
+        if (!models.has(key)) models.set(key, modelName);
+      });
+
+      return Array.from(models.values()).sort((a, b) => a.localeCompare(b, "vi", { numeric: true }));
+    } catch (err: any) {
+      console.warn("SUPABASE_PINCODE_OLD_MODELS_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   const [phoneRows, tabletRows] = await Promise.all([
     readValuesCached(`${OLD_MODEL_PHONE_SHEET}!B5:B`, MODEL_CACHE_TTL_MS).catch(() => []),
     readValuesCached(`${OLD_MODEL_TABLET_SHEET}!B5:B`, MODEL_CACHE_TTL_MS).catch(() => []),
@@ -672,6 +892,20 @@ async function isValidNewModelForCategory(category: string, modelName: string) {
 }
 
 export async function getPincodeRequests(limit = 300) {
+  if (isSupabaseConfigured()) {
+    try {
+      const rows = await selectAllRows<any>("pincode_requests");
+      return rows
+        .map(mapDbRequestRow)
+        .filter((row) => row.createdAt && row.maST && row.maNV && row.imei)
+        .sort(sortDbRequests)
+        .slice(0, Math.max(1, Math.min(1000, limit)));
+    } catch (err: any) {
+      console.warn("SUPABASE_PINCODE_REQUESTS_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   await ensurePincodeSheets();
   const rows = await readValuesCached(`${REQUEST_SHEET}!A2:S`, REQUEST_CACHE_TTL_MS);
 
@@ -683,6 +917,29 @@ export async function getPincodeRequests(limit = 300) {
 }
 
 export async function getPincodeRequestById(requestId: string) {
+  const id = clean(requestId);
+
+  if (isSupabaseConfigured()) {
+    try {
+      let rows = await selectRows<any>("pincode_requests", {
+        filters: { request_id: eq(id) },
+        limit: 1,
+      });
+
+      if (rows.length === 0 && id) {
+        rows = await selectRows<any>("pincode_requests", {
+          filters: { source_row: eq(id) },
+          limit: 1,
+        });
+      }
+
+      return rows[0] ? mapDbRequestRow(rows[0], 0) : null;
+    } catch (err: any) {
+      console.warn("SUPABASE_PINCODE_REQUEST_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   const rowNumber = Number(clean(requestId));
   if (!Number.isFinite(rowNumber) || rowNumber < 2) return null;
   return getRow(rowNumber);
@@ -716,6 +973,30 @@ export async function findPincodeFollowUpRequest(data: {
 }
 
 export async function getPmhStats(flow?: PincodeFlow) {
+  if (isSupabaseConfigured()) {
+    try {
+      const rows = await selectAllRows<any>("pmh_codes", { order: "source_row.asc" });
+      const stats = new Map<string, number>();
+
+      rows.forEach((row) => {
+        const pin = clean(row.pincode);
+        const status = clean(row.status);
+        const menhGia = clean(row.menh_gia) || "Mặc định";
+
+        if (!pin || status === "Used") return;
+        if (flow && !isPmhMenhGiaMatchFlow(menhGia, flow)) return;
+        stats.set(menhGia, (stats.get(menhGia) || 0) + 1);
+      });
+
+      return Array.from(stats.entries())
+        .map(([menhGia, count]) => ({ menhGia, count }))
+        .sort((a, b) => comparePmhMenhGia(a.menhGia, b.menhGia));
+    } catch (err: any) {
+      console.warn("SUPABASE_PMH_STATS_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   await ensurePincodeSheets();
   const rows = await readValuesCached(`${PMH_SHEET}!A2:C`, PMH_STATS_CACHE_TTL_MS);
   const stats = new Map<string, number>();
@@ -790,7 +1071,9 @@ export async function createPincodeRequest(data: {
   imageUrls?: string[];
   userAgent?: string;
 }) {
-  await ensurePincodeSheets();
+  if (!isSupabaseConfigured()) {
+    await ensurePincodeSheets();
+  }
 
   const flow = normalizePincodeFlow(data.flow);
   const staff = await getPincodeStaffByMaNV(data.maNV);
@@ -840,6 +1123,96 @@ export async function createPincodeRequest(data: {
 
   const timestamp = nowVN();
   const duplicate = await findActiveDuplicate(imei, flow);
+
+  if (isSupabaseConfigured()) {
+    try {
+      return await enqueuePincodeWrite(async () => {
+        if (duplicate) {
+          if (duplicate.status === "Rejected_Soft") {
+            await updateRows(
+              "pincode_requests",
+              { request_id: eq(duplicate.requestId) },
+              dbRequestPatchFromInput({
+                maST: staff.maST || inputStore,
+                maNV: staff.maNV,
+                imei,
+                imageUrls,
+                status: "Pending",
+                pincode: "",
+                rejectReason: "",
+                adminReviewer: "",
+                completionStatus: "",
+                menhGia: "",
+                oldModel: modelCu,
+                newModel: modelMoi,
+                supportType: flow,
+              }),
+              { returning: "minimal" }
+            );
+
+            const request = await getPincodeRequestById(duplicate.requestId);
+
+            return {
+              success: true,
+              recovered: false,
+              request,
+              message: "Đã cập nhật lại hồ sơ và chuyển về trạng thái chờ duyệt.",
+            };
+          }
+
+          return {
+            success: true,
+            recovered: true,
+            request: duplicate,
+            message: duplicate.status === "Pending"
+              ? "Thiết bị này đang có hồ sơ chờ duyệt."
+              : "Thiết bị này đã có hồ sơ được xử lý trước đó.",
+          };
+        }
+
+        const requestId = makeRequestId();
+        await insertRows(
+          "pincode_requests",
+          [
+            {
+              request_id: requestId,
+              ...dbRequestPatchFromInput({
+                createdAt: timestamp,
+                maST: staff.maST || inputStore,
+                maNV: staff.maNV,
+                imei,
+                imageUrls,
+                status: "Pending",
+                pincode: "",
+                rejectReason: "",
+                adminReviewer: "",
+                completionStatus: "",
+                menhGia: "",
+                oldModel: modelCu,
+                newModel: modelMoi,
+                supportType: flow,
+                sourceRow: String(Date.now()),
+              }),
+            },
+          ],
+          { returning: "minimal" }
+        );
+
+        const request = await getPincodeRequestById(requestId);
+
+        return {
+          success: true,
+          recovered: false,
+          request,
+          message: "Đã gửi hồ sơ thẩm định PMH.",
+        };
+      });
+    } catch (err: any) {
+      console.warn("SUPABASE_CREATE_PINCODE_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
 
@@ -935,6 +1308,73 @@ export async function createPincodeRequest(data: {
 }
 
 export async function importPincodes(list: Array<{ pin: string; menhGia: string }>) {
+  if (isSupabaseConfigured()) {
+    try {
+      return await enqueuePincodeWrite(async () => {
+        const rows = await selectAllRows<any>("pmh_codes");
+        const existing = new Set(rows.map((row) => clean(row.pincode)).filter(Boolean));
+        const current = new Set<string>();
+        const duplicates: string[] = [];
+        const invalid: string[] = [];
+        const appendRows: Array<Record<string, string>> = [];
+
+        list.forEach((item) => {
+          const pin = clean(item.pin);
+          const menhGia = clean(item.menhGia);
+
+          if (!pin) return;
+          if (!getPmhSuffixFromMenhGia(menhGia)) {
+            invalid.push(`${pin} | ${menhGia || "Trống mệnh giá"}`);
+            return;
+          }
+          if (existing.has(pin) || current.has(pin)) {
+            duplicates.push(pin);
+            return;
+          }
+
+          current.add(pin);
+          appendRows.push({
+            pincode: pin,
+            status: "",
+            menh_gia: menhGia,
+            request_id: "",
+            used_at: "",
+            used_by: "",
+            source_row: String(Date.now() + appendRows.length),
+          });
+        });
+
+        if (invalid.length > 0) {
+          return {
+            success: false,
+            message: "Mệnh giá PMH phải có hậu tố All hoặc TCDM. Ví dụ: 300K All / 300K TCDM.",
+            invalid,
+          };
+        }
+
+        if (duplicates.length > 0) {
+          return {
+            success: false,
+            message: "Có Pincode bị trùng, quá trình nạp đã hủy.",
+            duplicates,
+          };
+        }
+
+        if (appendRows.length > 0) {
+          await insertRows("pmh_codes", appendRows, { returning: "minimal" });
+        }
+
+        return {
+          success: true,
+          imported: appendRows.length,
+        };
+      });
+    } catch (err: any) {
+      console.warn("SUPABASE_IMPORT_PINCODES_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   await ensurePincodeSheets();
 
   return enqueuePincodeWrite(async () => {
@@ -1005,6 +1445,90 @@ export async function approvePincodeRequest(data: {
   admin: string;
   menhGia?: string;
 }) {
+  if (isSupabaseConfigured()) {
+    try {
+      return await enqueuePincodeWrite(async () => {
+        const request = await getPincodeRequestById(data.requestId);
+        if (!request) throw new Error("Không tìm thấy hồ sơ cần duyệt.");
+        if (request.status !== "Pending") throw new Error(`Hồ sơ đã được xử lý với trạng thái ${request.status}.`);
+
+        const selectedMenhGia = clean(data.menhGia);
+        if (selectedMenhGia && !isPmhMenhGiaMatchFlow(selectedMenhGia, request.flow)) {
+          throw new Error(`Mệnh giá "${selectedMenhGia}" không thuộc luồng ${request.flowLabel}.`);
+        }
+
+        const pmhRows = await selectAllRows<any>("pmh_codes");
+        const candidates = pmhRows
+          .map((row) => ({
+            pin: clean(row.pincode),
+            status: clean(row.status),
+            menhGia: clean(row.menh_gia),
+            sourceRow: sourceRowNumber(row.source_row),
+            value: getPmhMenhGiaValue(row.menh_gia),
+          }))
+          .filter((row) => {
+            if (!row.pin || row.status === "Used") return false;
+            if (!isPmhMenhGiaMatchFlow(row.menhGia, request.flow)) return false;
+            if (selectedMenhGia && row.menhGia !== selectedMenhGia) return false;
+            return true;
+          })
+          .sort((a, b) => {
+            if (!selectedMenhGia && a.value !== b.value) return a.value - b.value;
+            return a.sourceRow - b.sourceRow;
+          });
+
+        const selectedPin = candidates[0];
+        if (!selectedPin) {
+          throw new Error(
+            selectedMenhGia
+              ? `Hết PMH "${selectedMenhGia}".`
+              : `Hết PMH thuộc luồng ${request.flowLabel}. Cần mã có hậu tố ${getPmhFlowSuffix(request.flow)}.`
+          );
+        }
+
+        const usedAt = nowVN();
+        const claimed = await updateRows<any>(
+          "pmh_codes",
+          { pincode: eq(selectedPin.pin) },
+          {
+            status: "Used",
+            request_id: request.requestId,
+            used_at: usedAt,
+            used_by: clean(data.admin),
+          }
+        );
+
+        if (!Array.isArray(claimed) || claimed.length === 0) {
+          throw new Error("Không giữ được mã PMH, vui lòng thử lại.");
+        }
+
+        await updateRows(
+          "pincode_requests",
+          { request_id: eq(request.requestId) },
+          dbRequestPatchFromInput({
+            status: "Approve",
+            pincode: selectedPin.pin,
+            rejectReason: "",
+            adminReviewer: clean(data.admin),
+            completionStatus: "",
+            menhGia: selectedPin.menhGia,
+          }),
+          { returning: "minimal" }
+        );
+
+        return {
+          success: true,
+          pinCode: selectedPin.pin,
+          menhGia: selectedPin.menhGia,
+          message: `Đã duyệt và cấp PMH ${selectedPin.menhGia}.`,
+        };
+      });
+    } catch (err: any) {
+      console.warn("SUPABASE_APPROVE_PINCODE_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   await ensurePincodeSheets();
 
   return enqueuePincodeWrite(async () => {
@@ -1099,6 +1623,44 @@ export async function rejectPincodeRequest(data: {
   soft?: boolean;
   imageSlots?: string[];
 }) {
+  if (isSupabaseConfigured()) {
+    return enqueuePincodeWrite(async () => {
+      const request = await getPincodeRequestById(data.requestId);
+      if (!request) throw new Error("Không tìm thấy hồ sơ cần từ chối.");
+      if (request.status !== "Pending") throw new Error(`Hồ sơ đã được xử lý với trạng thái ${request.status}.`);
+
+      const status: PincodeStatus = data.soft ? "Rejected_Soft" : "Rejected_Hard";
+      const slots = Array.from(
+        new Set(
+          (data.imageSlots || [])
+            .map((item) => clean(item))
+            .filter((item) => /^[1-6]$/.test(item))
+        )
+      ).sort((a, b) => Number(a) - Number(b));
+      const reasonText = clean(data.reason) || "Admin từ chối hồ sơ.";
+      const storedReason = data.soft && slots.length > 0
+        ? `[CHUP_LAI_ANH:${slots.join(",")}]\n${reasonText}`
+        : reasonText;
+
+      await updateRows(
+        "pincode_requests",
+        { request_id: eq(request.requestId) },
+        dbRequestPatchFromInput({
+          status,
+          pincode: "",
+          rejectReason: storedReason,
+          adminReviewer: clean(data.admin),
+        }),
+        { returning: "minimal" }
+      );
+
+      return {
+        success: true,
+        message: data.soft ? "Đã yêu cầu nhân viên cập nhật lại hồ sơ." : "Đã từ chối cấp PMH.",
+      };
+    });
+  }
+
   await ensurePincodeSheets();
 
   return enqueuePincodeWrite(async () => {
@@ -1146,6 +1708,39 @@ export async function updatePincodeRequestImages(data: {
   requestId: string;
   imageUrls: string[];
 }) {
+  if (isSupabaseConfigured()) {
+    return enqueuePincodeWrite(async () => {
+      const request = await getPincodeRequestById(data.requestId);
+      if (!request) throw new Error("Không tìm thấy hồ sơ cần cập nhật ảnh.");
+      if (request.status !== "Rejected_Soft") throw new Error("Hồ sơ không ở trạng thái yêu cầu chụp lại.");
+
+      const imageUrls = Array.from({ length: 6 }, (_, index) => clean(data.imageUrls[index]));
+      const requiredFileCount = request.flow === "ChienGia" ? 5 : 6;
+      if (imageUrls.slice(0, requiredFileCount).some((url) => !url)) {
+        throw new Error(`Vui lòng bổ sung đủ ${requiredFileCount} file hồ sơ.`);
+      }
+
+      await updateRows(
+        "pincode_requests",
+        { request_id: eq(request.requestId) },
+        dbRequestPatchFromInput({
+          imageUrls,
+          status: "Pending",
+          pincode: "",
+          rejectReason: "",
+          adminReviewer: "",
+        }),
+        { returning: "minimal" }
+      );
+
+      return {
+        success: true,
+        request: await getPincodeRequestById(data.requestId),
+        message: "Đã cập nhật ảnh và chuyển hồ sơ về trạng thái chờ duyệt.",
+      };
+    });
+  }
+
   await ensurePincodeSheets();
 
   return enqueuePincodeWrite(async () => {
@@ -1185,6 +1780,22 @@ export async function updatePincodeRequestImages(data: {
 }
 
 export async function markPincodeCompleted(requestId: string) {
+  if (isSupabaseConfigured()) {
+    return enqueuePincodeWrite(async () => {
+      const request = await getPincodeRequestById(requestId);
+      if (!request) throw new Error("Không tìm thấy hồ sơ.");
+
+      await updateRows(
+        "pincode_requests",
+        { request_id: eq(request.requestId) },
+        { completion_status: "Done" },
+        { returning: "minimal" }
+      );
+
+      return { success: true };
+    });
+  }
+
   await ensurePincodeSheets();
 
   return enqueuePincodeWrite(async () => {
@@ -1213,6 +1824,22 @@ export async function markPincodeCompleted(requestId: string) {
 }
 
 export async function markPincodeSkipped(requestId: string) {
+  if (isSupabaseConfigured()) {
+    return enqueuePincodeWrite(async () => {
+      const request = await getPincodeRequestById(requestId);
+      if (!request) throw new Error("Không tìm thấy hồ sơ.");
+
+      await updateRows(
+        "pincode_requests",
+        { request_id: eq(request.requestId) },
+        { completion_status: "X" },
+        { returning: "minimal" }
+      );
+
+      return { success: true };
+    });
+  }
+
   await ensurePincodeSheets();
 
   return enqueuePincodeWrite(async () => {

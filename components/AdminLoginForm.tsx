@@ -79,7 +79,15 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
     <main className="admin-login-premium-page admin-login-no-flash-page">
       <section className="admin-login-premium-shell">
         <aside className="admin-login-premium-hero">
-          <div className="admin-login-logo-mark">VT</div>
+          <div className="admin-login-hero-brand">
+            <div className="admin-login-logo-mark">
+              <img src="/mwg-logo.svg" alt="MWG" />
+            </div>
+            <div>
+              <strong>Viễn Thông Di Động</strong>
+              <small>ENTERPRISE ACCESS</small>
+            </div>
+          </div>
 
           <div className="admin-login-hero-content">
             <span>ENTERPRISE ACCESS</span>

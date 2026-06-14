@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPincodeNewModelsByCategory, getPincodeOldModels } from "@/lib/pincode-store";
+import { getCurrentPmhToolAvailability, pmhToolClosedJson } from "@/lib/pmh-tool-guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,6 +17,12 @@ function formatQuotaMessage(err: any, fallback: string) {
 
 export async function GET(req: NextRequest) {
   try {
+    const availability = await getCurrentPmhToolAvailability();
+
+    if (!availability.enabled) {
+      return pmhToolClosedJson(availability, { models: [] });
+    }
+
     const type = String(req.nextUrl.searchParams.get("type") || "").trim();
     if (type === "old") {
       const models = await getPincodeOldModels();

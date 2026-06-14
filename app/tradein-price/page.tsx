@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import styles from "./page.module.css";
+import { getPublicSystemSettings } from "@/lib/system-store";
+import { settingEnabled } from "@/lib/system-lock";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +18,15 @@ type EntryItem = {
   desc: string;
   href: string;
   tone: "internal" | "public" | "print";
+  locked?: boolean;
+  lockText?: string;
 };
 
-const ENTRY_ITEMS: EntryItem[] = [
+function getEntryItems(settings: Record<string, string>): EntryItem[] {
+  const staffPageLocked = settingEnabled(settings, "STAFF_PAGE_LOCKED");
+  const customerPageLocked = settingEnabled(settings, "CUSTOMER_PAGE_LOCKED");
+
+  return [
   {
     index: "01",
     badge: "INTERNAL",
@@ -26,6 +34,8 @@ const ENTRY_ITEMS: EntryItem[] = [
     desc: "Đăng nhập nội bộ để tra bảng giá, trợ giá và xuất báo giá nhanh.",
     href: "/login",
     tone: "internal",
+    locked: staffPageLocked,
+    lockText: "Trang nhân viên đang tạm khóa theo cài đặt Admin.",
   },
   {
     index: "02",
@@ -34,6 +44,8 @@ const ENTRY_ITEMS: EntryItem[] = [
     desc: "Trang tra cứu công khai, đơn giản và dễ hiểu cho khách hàng.",
     href: "/khach-hang",
     tone: "public",
+    locked: customerPageLocked,
+    lockText: "Trang khách hàng đang tạm khóa theo cài đặt Admin.",
   },
   {
     index: "03",
@@ -43,13 +55,17 @@ const ENTRY_ITEMS: EntryItem[] = [
     href: "/tradein-price/sticker-tcdm",
     tone: "print",
   },
-];
+  ];
+}
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export default function TradeInPriceEntryPage() {
+export default async function TradeInPriceEntryPage() {
+  const settings = await getPublicSystemSettings();
+  const items = getEntryItems(settings);
+
   return (
     <main className={styles.tradeEntryPage}>
       <section className={styles.tradeEntryShell}>
@@ -95,23 +111,40 @@ export default function TradeInPriceEntryPage() {
         </section>
 
         <section className={styles.tradeEntryCards} aria-label="Chọn luồng bảng giá thu cũ đổi mới">
-          {ENTRY_ITEMS.map((item) => (
-            <Link
-              href={item.href}
-              key={item.index}
-              className={cx(styles.tradeEntryCard, styles[`tone_${item.tone}`])}
-            >
+          {items.map((item) => {
+            const content = (
+              <>
               <span className={styles.tradeEntryCardNumber}>{item.index}</span>
 
               <span className={styles.tradeEntryCardBody}>
-                <em>{item.badge}</em>
+                <em>{item.locked ? "TẠM KHÓA" : item.badge}</em>
                 <strong>{item.title}</strong>
                 <small>{item.desc}</small>
+                {item.locked && item.lockText ? <small className={styles.tradeEntryLockText}>{item.lockText}</small> : null}
               </span>
 
               <span className={styles.tradeEntryArrow}>›</span>
-            </Link>
-          ))}
+              </>
+            );
+
+            return item.locked ? (
+              <div
+                key={item.index}
+                className={cx(styles.tradeEntryCard, styles[`tone_${item.tone}`], styles.tradeEntryCardLocked)}
+                aria-disabled="true"
+              >
+                {content}
+              </div>
+            ) : (
+              <Link
+                href={item.href}
+                key={item.index}
+                className={cx(styles.tradeEntryCard, styles[`tone_${item.tone}`])}
+              >
+                {content}
+              </Link>
+            );
+          })}
         </section>
 
         <footer className={styles.tradeEntryFooter}>

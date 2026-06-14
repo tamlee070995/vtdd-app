@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import AdminDataSyncPanel from "@/components/AdminDataSyncPanel";
 import PincodeAdminTool from "@/components/PincodeAdminTool";
 import { getPmhToolAvailability } from "@/lib/tool-settings";
 
-type ToolKey = "pmh" | "coming-price" | "coming-audit";
+type ToolKey = "pmh" | "coming-price" | "support-report";
 
 type AdminToolsDashboardProps = {
   initialSettings: Record<string, string>;
@@ -35,23 +36,14 @@ const TOOLS: Array<{
     configurable: false,
   },
   {
-    key: "coming-audit",
+    key: "support-report",
     no: "03",
     title: "Báo cáo hỗ trợ",
-    desc: "Khung dashboard dự phòng cho log, xuất file hoặc báo cáo sau này.",
-    status: "Chưa mở",
-    configurable: false,
+    desc: "Đồng bộ dữ liệu, xuất log và tạo file backup.",
+    status: "Đã mở",
+    configurable: true,
   },
 ];
-
-function isOn(value: string) {
-  const v = String(value || "").trim().toLowerCase();
-  return v === "1" || v === "true" || v === "yes" || v === "on";
-}
-
-function toFlag(value: boolean) {
-  return value ? "1" : "0";
-}
 
 function toDatetimeLocalInput(value: any) {
   const raw = String(value || "").trim().replace(/^'/, "");
@@ -79,6 +71,7 @@ function toDatetimeLocalInput(value: any) {
 
 export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashboardProps) {
   const [openTool, setOpenTool] = useState<ToolKey | "">("pmh");
+  const [showPmhConfig, setShowPmhConfig] = useState(false);
   const [settings, setSettings] = useState<Record<string, string>>({
     TOOL_PMH_ENABLED: "1",
     TOOL_PMH_SCHEDULE_ENABLED: "0",
@@ -133,27 +126,66 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
     setOpenTool((current) => (current === key ? "" : key));
   }
 
-  async function togglePmhEnabled(checked: boolean) {
-    const value = toFlag(checked);
-    setSetting("TOOL_PMH_ENABLED", value);
-    await saveToolSettings({ TOOL_PMH_ENABLED: value }, "pmh-enabled");
-  }
-
-  async function togglePmhSchedule(checked: boolean) {
-    const value = toFlag(checked);
-    setSetting("TOOL_PMH_SCHEDULE_ENABLED", value);
-    await saveToolSettings({ TOOL_PMH_SCHEDULE_ENABLED: value }, "pmh-schedule");
-  }
-
   async function savePmhSchedule() {
+    if (!String(settings.TOOL_PMH_START_AT || "").trim() && !String(settings.TOOL_PMH_END_AT || "").trim()) {
+      showToast("Vui lòng cài ít nhất giờ bắt đầu hoặc giờ kết thúc chạy.");
+      return;
+    }
+
     await saveToolSettings(
       {
-        TOOL_PMH_SCHEDULE_ENABLED: settings.TOOL_PMH_SCHEDULE_ENABLED || "0",
+        TOOL_PMH_ENABLED: "1",
+        TOOL_PMH_SCHEDULE_ENABLED: "1",
         TOOL_PMH_START_AT: settings.TOOL_PMH_START_AT || "",
         TOOL_PMH_END_AT: settings.TOOL_PMH_END_AT || "",
         TOOL_PMH_LOCK_REASON: settings.TOOL_PMH_LOCK_REASON || "",
       },
       "pmh-schedule-save"
+    );
+  }
+
+  function renderPmhConfig() {
+    return (
+      <section className={`pmh-tool-config ${pmhAvailability.enabled ? "" : "off"}`}>
+        <div>
+          <span>Trạng thái công cụ</span>
+          <h4>{pmhAvailability.enabled ? "PMH/Pincode đang bật" : "PMH/Pincode đang tắt"}</h4>
+          <p>
+            {pmhAvailability.enabled
+              ? "Nhân viên có thể mở công cụ ngoài cổng hỗ trợ và gửi hồ sơ."
+              : pmhAvailability.reason || "Công cụ đang tạm đóng."}
+          </p>
+        </div>
+        <div className="pmh-tool-config-grid">
+          <label>
+            <span>Giờ bắt đầu chạy</span>
+            <input
+              type="datetime-local"
+              value={toDatetimeLocalInput(settings.TOOL_PMH_START_AT)}
+              onChange={(event) => setSetting("TOOL_PMH_START_AT", event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Giờ kết thúc chạy</span>
+            <input
+              type="datetime-local"
+              value={toDatetimeLocalInput(settings.TOOL_PMH_END_AT)}
+              onChange={(event) => setSetting("TOOL_PMH_END_AT", event.target.value)}
+            />
+          </label>
+          <label className="wide">
+            <span>Nội dung hiển thị ngoài thời gian chạy</span>
+            <textarea
+              value={settings.TOOL_PMH_LOCK_REASON || ""}
+              onChange={(event) => setSetting("TOOL_PMH_LOCK_REASON", event.target.value)}
+              placeholder="VD: Công cụ PMH/Pincode chưa đến thời gian chạy."
+            />
+          </label>
+          <button type="button" onClick={savePmhSchedule} disabled={saving === "pmh-schedule-save"}>
+            {saving === "pmh-schedule-save" ? "Đang lưu..." : "Lưu lịch tool"}
+          </button>
+        </div>
+      </section>
     );
   }
 
@@ -174,13 +206,12 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
           const active = openTool === tool.key;
           const isPmh = tool.key === "pmh";
           const toolEnabled = isPmh ? pmhAvailability.enabled : false;
-          const manuallyOn = isPmh ? pmhAvailability.manualEnabled : false;
           const scheduleActive = isPmh ? pmhAvailability.scheduled : false;
 
           return (
             <article
               key={tool.key}
-              className={`tools-v5-card ${active ? "active" : ""} ${tool.configurable ? "" : "disabled"} ${!toolEnabled && isPmh ? "off" : ""}`}
+              className={`tools-v5-card ${active ? "active" : ""} ${tool.configurable ? "" : "disabled"} ${!toolEnabled && isPmh ? "off" : ""} ${showPmhConfig && isPmh ? "with-config" : ""}`}
             >
               <button
                 type="button"
@@ -195,36 +226,35 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
                 </span>
               </button>
 
-              {isPmh ? (
-                <label className="tool-switch" title="Bật/tắt công cụ PMH ngoài cổng hỗ trợ">
-                  <input
-                    type="checkbox"
-                    checked={manuallyOn}
-                    disabled={saving === "pmh-enabled"}
-                    onChange={(event) => togglePmhEnabled(event.target.checked)}
-                  />
-                  <span aria-hidden="true" />
-                </label>
-              ) : (
-                <strong>{tool.status}</strong>
-              )}
+              <strong>{isPmh ? "Theo lịch chạy" : tool.status}</strong>
 
               <div className="tools-v5-status">
-                {isPmh ? (
-                  scheduleActive ? "Đang tắt theo lịch" : toolEnabled ? "Đang bật" : "Đang tắt"
-                ) : (
-                  tool.status
-                )}
+                {isPmh
+                  ? scheduleActive
+                    ? "Ngoài giờ chạy"
+                    : toolEnabled
+                      ? "Đang trong giờ chạy"
+                      : "Chưa cài giờ chạy"
+                  : tool.status}
               </div>
 
-              <button
-                type="button"
-                className="tools-v5-collapse"
-                onClick={() => toggleTool(tool.key, tool.configurable)}
-                disabled={!tool.configurable}
-              >
-                {tool.configurable ? (active ? "Thu gọn" : "Mở") : "Chưa mở"}
-              </button>
+              <div className="tools-v5-card-actions">
+                {isPmh ? (
+                  <button type="button" className="tools-v5-settings-btn" onClick={() => setShowPmhConfig((current) => !current)}>
+                    Cài đặt
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="tools-v5-collapse"
+                  onClick={() => toggleTool(tool.key, tool.configurable)}
+                  disabled={!tool.configurable}
+                >
+                  {tool.configurable ? (active ? "Thu gọn" : "Mở") : "Chưa mở"}
+                </button>
+              </div>
+
+              {isPmh && showPmhConfig ? renderPmhConfig() : null}
             </article>
           );
         })}
@@ -232,58 +262,11 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
 
       {openTool === "pmh" ? (
         <div className="tools-v5-panel">
-          <section className={`pmh-tool-config ${pmhAvailability.enabled ? "" : "off"}`}>
-            <div>
-              <span>Trạng thái công cụ</span>
-              <h4>{pmhAvailability.enabled ? "PMH/Pincode đang bật" : "PMH/Pincode đang tắt"}</h4>
-              <p>
-                {pmhAvailability.enabled
-                  ? "Nhân viên có thể mở công cụ ngoài cổng hỗ trợ và gửi hồ sơ."
-                  : pmhAvailability.reason || "Công cụ đang tạm đóng."}
-              </p>
-            </div>
-            <div className="pmh-tool-config-grid">
-              <label className="pmh-schedule-switch">
-                <input
-                  type="checkbox"
-                  checked={isOn(settings.TOOL_PMH_SCHEDULE_ENABLED)}
-                  disabled={saving === "pmh-schedule"}
-                  onChange={(event) => togglePmhSchedule(event.target.checked)}
-                />
-                <span />
-                <b>Tắt theo lịch</b>
-              </label>
-              <label>
-                <span>Giờ bắt đầu tắt</span>
-                <input
-                  type="datetime-local"
-                  value={toDatetimeLocalInput(settings.TOOL_PMH_START_AT)}
-                  onChange={(event) => setSetting("TOOL_PMH_START_AT", event.target.value)}
-                />
-              </label>
-              <label>
-                <span>Giờ kết thúc tắt</span>
-                <input
-                  type="datetime-local"
-                  value={toDatetimeLocalInput(settings.TOOL_PMH_END_AT)}
-                  onChange={(event) => setSetting("TOOL_PMH_END_AT", event.target.value)}
-                />
-              </label>
-              <label className="wide">
-                <span>Nội dung hiển thị khi tắt tool</span>
-                <textarea
-                  value={settings.TOOL_PMH_LOCK_REASON || ""}
-                  onChange={(event) => setSetting("TOOL_PMH_LOCK_REASON", event.target.value)}
-                  placeholder="VD: Công cụ PMH/Pincode tạm đóng để cập nhật chương trình."
-                />
-              </label>
-              <button type="button" onClick={savePmhSchedule} disabled={saving === "pmh-schedule-save"}>
-                {saving === "pmh-schedule-save" ? "Đang lưu..." : "Lưu lịch tool"}
-              </button>
-            </div>
-          </section>
-
           <PincodeAdminTool />
+        </div>
+      ) : openTool === "support-report" ? (
+        <div className="tools-v5-panel">
+          <AdminDataSyncPanel />
         </div>
       ) : (
         <div className="tools-v5-empty">
@@ -333,6 +316,7 @@ const STYLE = `
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+  align-items: start;
 }
 .tools-v5-card {
   min-height: 124px;
@@ -346,6 +330,9 @@ const STYLE = `
   background: #fff;
   color: #07111f;
   box-shadow: 0 14px 34px rgba(15,23,42,.055);
+}
+.tools-v5-card.with-config {
+  grid-column: 1 / -1;
 }
 .tools-v5-card.active {
   border-color: #07111f;
@@ -402,55 +389,21 @@ const STYLE = `
   line-height: 1.35;
   font-weight: 850;
 }
-.tool-switch {
-  width: 64px;
-  height: 34px;
-  align-self: start;
-  position: relative;
-  cursor: pointer;
-}
-.tool-switch input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.tool-switch span {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: #cbd5e1;
-  box-shadow: inset 0 0 0 1px rgba(15,23,42,.08);
-}
-.tool-switch span::after {
-  content: "";
-  position: absolute;
-  width: 26px;
-  height: 26px;
-  left: 4px;
-  top: 4px;
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 6px 14px rgba(15,23,42,.2);
-  transition: transform .18s ease;
-}
-.tool-switch input:checked + span {
-  background: #ffd400;
-}
-.tool-switch input:checked + span::after {
-  transform: translateX(30px);
-  background: #07111f;
-}
 .tools-v5-card > strong,
 .tools-v5-status,
-.tools-v5-collapse {
+.tools-v5-collapse,
+.tools-v5-settings-btn {
   width: fit-content;
-  padding: 8px 11px;
+  min-height: 34px;
+  padding: 0 11px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 1000;
 }
 .tools-v5-status {
   grid-column: 1;
+  display: inline-flex;
+  align-items: center;
   background: #eef2f7;
   color: #07111f;
 }
@@ -458,12 +411,25 @@ const STYLE = `
   background: #fee2e2;
   color: #991b1b;
 }
-.tools-v5-collapse {
+.tools-v5-card-actions {
   grid-column: 2;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+.tools-v5-collapse,
+.tools-v5-settings-btn {
   border: 0;
+  cursor: pointer;
+}
+.tools-v5-collapse {
   background: #07111f;
   color: #ffd400;
-  cursor: pointer;
+}
+.tools-v5-settings-btn {
+  background: #ffd400;
+  color: #07111f;
 }
 .tools-v5-collapse:disabled {
   cursor: not-allowed;
@@ -476,10 +442,11 @@ const STYLE = `
   gap: 12px;
 }
 .pmh-tool-config {
-  padding: 16px;
-  border-radius: 22px;
+  grid-column: 1 / -1;
+  padding: 14px;
+  border-radius: 18px;
   display: grid;
-  grid-template-columns: minmax(220px, .7fr) minmax(0, 1fr);
+  grid-template-columns: minmax(220px, .55fr) minmax(0, 1fr);
   gap: 14px;
   background: #fff;
   border: 1px solid #dbe5ef;
@@ -500,7 +467,7 @@ const STYLE = `
 .pmh-tool-config h4 {
   margin: 7px 0 0;
   color: #07111f;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
   font-weight: 1000;
 }
@@ -539,59 +506,9 @@ const STYLE = `
   padding: 0 11px;
 }
 .pmh-tool-config textarea {
-  min-height: 76px;
+  min-height: 70px;
   padding: 11px;
   resize: vertical;
-}
-.pmh-schedule-switch {
-  grid-column: 1 / -1;
-  min-height: 44px;
-  padding: 9px 11px;
-  border-radius: 16px;
-  display: grid !important;
-  grid-template-columns: auto auto 1fr;
-  align-items: center;
-  gap: 10px;
-  background: #f8fafc;
-  border: 1px solid #dbe5ef;
-  cursor: pointer;
-}
-.pmh-schedule-switch input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.pmh-schedule-switch span {
-  width: 48px;
-  height: 28px;
-  border-radius: 999px;
-  display: block;
-  background: #cbd5e1;
-  position: relative;
-}
-.pmh-schedule-switch span::after {
-  content: "";
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  left: 3px;
-  top: 3px;
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 5px 12px rgba(15,23,42,.18);
-  transition: transform .18s ease;
-}
-.pmh-schedule-switch input:checked + span {
-  background: #ffd400;
-}
-.pmh-schedule-switch input:checked + span::after {
-  transform: translateX(20px);
-  background: #07111f;
-}
-.pmh-schedule-switch b {
-  color: #07111f;
-  font-size: 13px;
-  font-weight: 1000;
 }
 .pmh-tool-config-grid button {
   grid-column: 1 / -1;
@@ -651,6 +568,13 @@ const STYLE = `
   }
   .tools-v5-card {
     grid-template-columns: 1fr auto;
+  }
+  .tools-v5-card.with-config {
+    grid-column: auto;
+  }
+  .tools-v5-card-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
   }
 }
 `;

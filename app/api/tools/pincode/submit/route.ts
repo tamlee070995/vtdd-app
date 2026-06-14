@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadDataUrlToCloudinary } from "@/lib/cloudinary-upload";
 import { createPincodeRequest, normalizePincodeFlow, updatePincodeRequestImages } from "@/lib/pincode-store";
-import { getSystemSettings } from "@/lib/system-store";
-import { getPmhToolAvailability } from "@/lib/tool-settings";
+import { getCurrentPmhToolAvailability, pmhToolClosedJson } from "@/lib/pmh-tool-guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,17 +22,10 @@ function formatSubmitError(err: any) {
 
 export async function POST(req: NextRequest) {
   try {
-    const settings = await getSystemSettings();
-    const availability = getPmhToolAvailability(settings);
+    const availability = await getCurrentPmhToolAvailability();
 
     if (!availability.enabled) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: availability.reason || "Công cụ PMH/Pincode đang tạm đóng.",
-        },
-        { status: 423 }
-      );
+      return pmhToolClosedJson(availability);
     }
 
     const body = await req.json().catch(() => null);

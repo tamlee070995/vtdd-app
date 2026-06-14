@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { createSignedSessionToken, verifySignedSessionToken } from "@/lib/auth-session";
-import { decryptText, isDefaultPasswordStored } from "@/lib/staff-security";
+import { decryptText } from "@/lib/staff-security";
 import { findStaffByMaNV, type StaffRow } from "@/lib/staff-store";
 
 export const STAFF_SESSION_COOKIE = "vtdd_staff_session";
@@ -50,14 +50,10 @@ function safeDecrypt(value: string) {
 export function shouldForceStaffSetup(staff: StaffRow, gmail: string, securityQuestion: string) {
   const needSetupFlag = String(staff.needSetup || "").trim().toLowerCase();
   const needSetupByFlag = needSetupFlag === "1" || needSetupFlag === "true" || needSetupFlag === "yes";
-  const needSetupByOldDefaultPassword = isDefaultPasswordStored(staff.password);
-  const needSetupByOldPlainPassword = !String(staff.password || "").startsWith("pwd:v1:");
   const needSetupByMissingSecurity = !gmail || !securityQuestion || !staff.securityAnswer;
 
   return (
     needSetupByFlag ||
-    needSetupByOldDefaultPassword ||
-    needSetupByOldPlainPassword ||
     needSetupByMissingSecurity
   );
 }

@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { readSheetRange } from "@/lib/sheets";
 import { getQuoteLogs } from "@/lib/quote-log-store";
+import { insertRows, isSupabaseConfigured, selectAllRows } from "@/lib/supabase-rest";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
@@ -105,6 +106,14 @@ function clean(value: any) {
   return String(value ?? "").trim();
 }
 
+function settingType(key: string) {
+  return key.includes("LOCK") ||
+    key.includes("ENABLED") ||
+    key.endsWith("_LOCKED")
+    ? "BOOLEAN"
+    : "TEXT";
+}
+
 function boolValue(value: string) {
   const v = clean(value).toLowerCase();
   return v === "1" || v === "true" || v === "yes" || v === "on";
@@ -199,6 +208,26 @@ export async function ensureSheet(sheetName: string, headers: string[]) {
 }
 
 export async function getSystemSettings() {
+  if (isSupabaseConfigured()) {
+    try {
+      const rows = await selectAllRows<{
+        key: string;
+        value: string;
+      }>("system_settings", { order: "key.asc" });
+      const settings: Record<string, string> = { ...DEFAULT_SYSTEM_SETTINGS };
+
+      rows.forEach((row) => {
+        const key = clean(row.key);
+        if (key) settings[key] = clean(row.value);
+      });
+
+      return settings;
+    } catch (err: any) {
+      console.warn("SUPABASE_SETTINGS_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   await ensureSheet(SETTINGS_SHEET, SETTINGS_HEADERS);
 
   let rows: any[][] = [];
@@ -255,6 +284,32 @@ export async function updateSystemSettings(
   updates: Record<string, string>,
   updatedBy: string
 ) {
+  if (isSupabaseConfigured()) {
+    try {
+      const timestamp = nowVN();
+      const rows = Object.entries(updates)
+        .map(([rawKey, rawValue]) => {
+          const key = clean(rawKey);
+          if (!key) return null;
+
+          return {
+            key,
+            value: clean(rawValue),
+            type: settingType(key),
+            updated_at_text: timestamp,
+            updated_by: updatedBy || "Admin",
+          };
+        })
+        .filter(Boolean) as Array<Record<string, string>>;
+
+      await insertRows("system_settings", rows, { onConflict: "key", returning: "minimal" });
+      return;
+    } catch (err: any) {
+      console.warn("SUPABASE_UPDATE_SETTINGS_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   await ensureSheet(SETTINGS_SHEET, SETTINGS_HEADERS);
 
   const sheets = await getSheetsClient();
@@ -291,12 +346,7 @@ export async function updateSystemSettings(
       const value = clean(rawValue);
       const rowNumber = existingRowByKey.get(key);
 
-      const type =
-        key.includes("LOCK") ||
-        key.includes("ENABLED") ||
-        key.endsWith("_LOCKED")
-          ? "BOOLEAN"
-          : "TEXT";
+      const type = settingType(key);
 
       const values = [[key, value, type, timestamp, updatedBy || "Admin"]];
 
@@ -343,6 +393,31 @@ export async function appendAdminAudit(data: {
   ip?: string;
   note?: string;
 }) {
+  if (isSupabaseConfigured()) {
+    try {
+      await insertRows(
+        "admin_audit",
+        [
+          {
+            time_text: nowVN(),
+            admin: clean(data.admin || "Admin"),
+            action: clean(data.action),
+            target: clean(data.target),
+            old_value: clean(data.oldValue),
+            new_value: clean(data.newValue),
+            ip: clean(data.ip),
+            note: clean(data.note),
+          },
+        ],
+        { returning: "minimal" }
+      );
+      return;
+    } catch (err: any) {
+      console.warn("SUPABASE_AUDIT_ERROR:", err?.message || err);
+      throw err;
+    }
+  }
+
   await ensureSheet(AUDIT_SHEET, AUDIT_HEADERS);
 
   const sheets = await getSheetsClient();

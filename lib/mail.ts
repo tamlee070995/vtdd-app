@@ -1,15 +1,26 @@
 import nodemailer from "nodemailer";
 
 function getMailer() {
-  const user = process.env.GMAIL_SMTP_USER;
-  const pass = process.env.GMAIL_SMTP_APP_PASSWORD;
+  const host = String(process.env.MAIL_HOST || "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "");
+  const port = Number(process.env.MAIL_PORT || 465);
+  const secure =
+    String(process.env.MAIL_SECURE ?? (port === 465 ? "true" : "false"))
+      .trim()
+      .toLowerCase() !== "false";
+  const user = process.env.MAIL_USER;
+  const pass = process.env.MAIL_PASS;
 
-  if (!user || !pass) {
-    throw new Error("Thiếu GMAIL_SMTP_USER hoặc GMAIL_SMTP_APP_PASSWORD trong .env.local");
+  if (!host || !user || !pass) {
+    throw new Error("Thiếu MAIL_HOST, MAIL_USER hoặc MAIL_PASS trong .env.local");
   }
 
   return nodemailer.createTransport({
-    service: "gmail",
+    host,
+    port,
+    secure,
     auth: {
       user,
       pass,
@@ -18,7 +29,7 @@ function getMailer() {
 }
 
 function getMailFrom() {
-  return process.env.MAIL_FROM || process.env.GMAIL_SMTP_USER || "";
+  return process.env.MAIL_FROM || `Viễn Thông Di Động <${process.env.MAIL_USER || ""}>`;
 }
 
 export async function sendResetOtpMail(params: {
@@ -60,6 +71,10 @@ export async function sendNewStaffAccountMail(params: {
 }) {
   const transporter = getMailer();
   const to = params.to || process.env.ADMIN_NOTIFY_EMAIL || "tamlee070995@gmail.com";
+
+  if (!to) {
+    throw new Error("Thiếu email nhận thông báo tài khoản mới.");
+  }
 
   await transporter.sendMail({
     from: getMailFrom(),

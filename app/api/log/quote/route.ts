@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { appendQuoteLog } from "@/lib/quote-log-store";
 import { insertSheetRowAt2Queued } from "@/lib/sheets-write";
 import { getCurrentStaffFromRequest } from "@/lib/staff-auth";
 
@@ -86,25 +87,49 @@ export async function POST(req: NextRequest) {
       second: "2-digit",
     });
 
-    await insertSheetRowAt2Queued(SHEET_NAME, HEADERS, [
-      now,
-      getActionLabel(clean(body.action)),
-      currentStaff.maNV,
-      currentStaff.maST,
-      currentStaff.staffName,
-      body.mode === "tradein" ? "Thu cũ đổi mới" : "Thu cũ không đổi mới",
-      clean(body.spMoi),
-      clean(body.spCu),
-      clean(body.memory),
-      clean(body.loai),
-      money(body.giaXac),
-      money(body.troGiaHang),
-      money(body.troGiaMWG),
-      money(body.tongTien),
-      money(body.khachCanBu),
-      getClientIp(req, body),
-      req.headers.get("user-agent") || "",
-    ]);
+    const logRow = {
+      time: now,
+      action: getActionLabel(clean(body.action)),
+      maNV: currentStaff.maNV,
+      maST: currentStaff.maST,
+      staffName: currentStaff.staffName,
+      mode: body.mode === "tradein" ? "Thu cũ đổi mới" : "Thu cũ không đổi mới",
+      spMoi: clean(body.spMoi),
+      spCu: clean(body.spCu),
+      memory: clean(body.memory),
+      loai: clean(body.loai),
+      giaXac: money(body.giaXac),
+      troGiaHang: money(body.troGiaHang),
+      troGiaMWG: money(body.troGiaMWG),
+      tongTien: money(body.tongTien),
+      khachCanBu: money(body.khachCanBu),
+      ip: getClientIp(req, body),
+      userAgent: req.headers.get("user-agent") || "",
+    };
+
+    const wroteDb = await appendQuoteLog(logRow);
+
+    if (!wroteDb) {
+      await insertSheetRowAt2Queued(SHEET_NAME, HEADERS, [
+        now,
+        logRow.action,
+        logRow.maNV,
+        logRow.maST,
+        logRow.staffName,
+        logRow.mode,
+        logRow.spMoi,
+        logRow.spCu,
+        logRow.memory,
+        logRow.loai,
+        logRow.giaXac,
+        logRow.troGiaHang,
+        logRow.troGiaMWG,
+        logRow.tongTien,
+        logRow.khachCanBu,
+        logRow.ip,
+        logRow.userAgent,
+      ]);
+    }
 
     return NextResponse.json({
       success: true,

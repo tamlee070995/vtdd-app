@@ -227,6 +227,11 @@
   color: #020617;
 }
 
+.toolItemMuted {
+  opacity: .56;
+  filter: grayscale(.25);
+}
+
 .toolItemDisabled {
   background: rgba(248, 250, 252, .75);
   color: #94a3b8;
@@ -252,6 +257,18 @@
   font-size: 12px;
   line-height: 1.35;
   font-weight: 780;
+}
+
+.lockText {
+  width: fit-content;
+  margin-top: 2px;
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #c2410c !important;
+  font-size: 10.5px !important;
+  font-weight: 1000 !important;
 }
 
 .toolItem i {

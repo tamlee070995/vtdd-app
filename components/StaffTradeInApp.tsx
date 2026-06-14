@@ -1983,7 +1983,7 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   const [showProfilePanel, setShowProfilePanel] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [profileCurrentPassword, setProfileCurrentPassword] = useState("");
-  const [profileChangePassword, setProfileChangePassword] = useState(forceSetup);
+  const [profileChangePassword, setProfileChangePassword] = useState(false);
   const [profileNewPassword, setProfileNewPassword] = useState("");
   const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
   const [profileQuestion, setProfileQuestion] = useState("");
@@ -2114,7 +2114,7 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   useEffect(() => {
     if (mustSetup) {
       setShowProfilePanel(true);
-      setProfileChangePassword(true);
+      setProfileChangePassword(false);
     }
   }, [mustSetup]);
 
@@ -2212,9 +2212,8 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
     const staffPageLocked = settingEnabled(systemSettings, "STAFF_PAGE_LOCKED");
     const staffTradeinLocked = settingEnabled(systemSettings, "STAFF_TRADEIN_LOCKED");
     const staffBuyonlyLocked = settingEnabled(systemSettings, "STAFF_BUYONLY_LOCKED");
-    const allStaffTabsLocked = staffTradeinLocked && staffBuyonlyLocked;
     const currentStaffTabLocked = mode === "tradein" ? staffTradeinLocked : staffBuyonlyLocked;
-    const staffAccessLocked = systemLocked || staffPageLocked || allStaffTabsLocked;
+    const staffAccessLocked = systemLocked || staffPageLocked;
 
   const subsidyMeta = useMemo(() => {
     if (mode !== "tradein" || !selectedNewRow) {
@@ -2959,7 +2958,7 @@ async function submitProfileUpdate() {
     return;
   }
 
-  if (profileChangePassword || mustSetup) {
+  if (profileChangePassword) {
     if (!profileNewPassword || !profileConfirmPassword) {
       showSwal("warning", "Thiếu mật khẩu mới", "Vui lòng nhập mật khẩu mới và xác nhận mật khẩu mới.", 0);
       return;
@@ -2981,9 +2980,9 @@ async function submitProfileUpdate() {
       },
       body: JSON.stringify({
         currentPassword: profileCurrentPassword,
-        changePassword: profileChangePassword || mustSetup,
-        newPassword: (profileChangePassword || mustSetup) ? profileNewPassword : "",
-        confirmPassword: (profileChangePassword || mustSetup) ? profileConfirmPassword : "",
+        changePassword: profileChangePassword,
+        newPassword: profileChangePassword ? profileNewPassword : "",
+        confirmPassword: profileChangePassword ? profileConfirmPassword : "",
         question: finalQuestion,
         answer: profileAnswer,
         gmail: profileGmail,
@@ -3025,11 +3024,9 @@ function renderProfilePanel(modeView: "modal" | "setup") {
       ? profileCustomQuestion || "Câu hỏi bảo mật riêng"
       : profileQuestion || "Chưa chọn câu hỏi";
 
-  const passwordModeText = isSetup
-    ? "Bắt buộc đổi mật khẩu lần đầu"
-    : profileChangePassword
-      ? "Đang bật đổi mật khẩu"
-      : "Đang giữ mật khẩu cũ";
+  const passwordModeText = profileChangePassword
+    ? "Đang bật đổi mật khẩu"
+    : "Đang giữ mật khẩu hiện tại";
 
   return (
     <section
@@ -3057,7 +3054,7 @@ function renderProfilePanel(modeView: "modal" | "setup") {
             <h2>{isSetup ? "Thiết lập lần đầu" : "Cập nhật thông tin"}</h2>
             <p>
               {isSetup
-                ? "Đổi mật khẩu mặc định và thêm thông tin khôi phục trước khi sử dụng hệ thống."
+                ? "Xác thực mật khẩu hiện tại và thêm thông tin khôi phục trước khi sử dụng hệ thống."
                 : "Xác thực mật khẩu hiện tại, sau đó cập nhật mật khẩu, Gmail hoặc câu hỏi bảo mật."}
             </p>
           </div>
@@ -3078,7 +3075,7 @@ function renderProfilePanel(modeView: "modal" | "setup") {
                 <span>Nhập mật khẩu hiện tại.</span>
               </div>
             </div>
-            <div className={isSetup || profileChangePassword ? "done" : ""}>
+            <div className={profileChangePassword ? "done" : ""}>
               <i>02</i>
               <div>
                 <b>Mật khẩu</b>
@@ -3132,7 +3129,7 @@ function renderProfilePanel(modeView: "modal" | "setup") {
                 value={profileCurrentPassword}
                 onChange={setProfileCurrentPassword}
                 autoComplete="current-password"
-                placeholder={isSetup ? "Nhập mật khẩu mặc định 123123" : "Nhập mật khẩu hiện tại"}
+                placeholder={isSetup ? "Nhập mật khẩu của bạn" : "Nhập mật khẩu hiện tại"}
               />
             </div>
           </section>
@@ -3141,22 +3138,28 @@ function renderProfilePanel(modeView: "modal" | "setup") {
             <label className="profile-v5-switch">
               <input
                 type="checkbox"
-                checked={isSetup || profileChangePassword}
-                disabled={isSetup}
-                onChange={(e) => setProfileChangePassword(e.target.checked)}
+                checked={profileChangePassword}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setProfileChangePassword(checked);
+                  if (!checked) {
+                    setProfileNewPassword("");
+                    setProfileConfirmPassword("");
+                  }
+                }}
               />
               <span></span>
               <div>
                 <b>Đổi mật khẩu đăng nhập</b>
                 <em>
                   {isSetup
-                    ? "Bắt buộc tạo mật khẩu mới cho tài khoản."
+                    ? "Mặc định tắt, bật nếu cần tạo mật khẩu mới."
                     : "Bật nếu muốn thay đổi mật khẩu đăng nhập hiện tại."}
                 </em>
               </div>
             </label>
 
-            {(isSetup || profileChangePassword) && (
+            {profileChangePassword && (
               <div className="profile-v5-two-cols profile-v5-password-grid">
                 <div className="profile-v5-field">
                   <label>Mật khẩu mới</label>

@@ -11,6 +11,7 @@ export type ToolAvailability = {
 };
 
 const DEFAULT_PMH_REASON = "Công cụ PMH/Pincode đang tạm đóng theo cài đặt Admin.";
+const DEFAULT_PMH_WINDOW_REASON = "Công cụ PMH/Pincode chưa đến thời gian chạy.";
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -57,15 +58,18 @@ export function getPmhToolAvailability(
   settings: SystemSettingsRecord,
   now: Date = new Date()
 ): ToolAvailability {
-  const manualEnabled = settingEnabled(settings, "TOOL_PMH_ENABLED");
+  const legacyManualEnabled = settingEnabled(settings, "TOOL_PMH_ENABLED");
   const scheduleEnabled = settingEnabled(settings, "TOOL_PMH_SCHEDULE_ENABLED");
   const startAt = getSystemText(settings, "TOOL_PMH_START_AT");
   const endAt = getSystemText(settings, "TOOL_PMH_END_AT");
   const reason = getSystemText(settings, "TOOL_PMH_LOCK_REASON") || DEFAULT_PMH_REASON;
+  const hasWindowInput = Boolean(clean(startAt) || clean(endAt));
+  const scheduleApplies = scheduleEnabled || hasWindowInput;
 
-  let scheduled = false;
+  let activeInWindow = true;
+  let hasValidWindow = false;
 
-  if (scheduleEnabled && (startAt || endAt)) {
+  if (scheduleApplies && hasWindowInput) {
     const start = parseLocalDateTime(startAt);
     const end = parseLocalDateTime(endAt);
     const startOk = !startAt || Boolean(start);
@@ -74,16 +78,20 @@ export function getPmhToolAvailability(
     if (startOk && endOk) {
       const afterStart = !start || now.getTime() >= start.getTime();
       const beforeEnd = !end || now.getTime() <= end.getTime();
-      scheduled = afterStart && beforeEnd;
+      hasValidWindow = true;
+      activeInWindow = afterStart && beforeEnd;
     }
   }
 
+  const enabled = scheduleApplies ? activeInWindow : legacyManualEnabled;
+  const scheduled = scheduleApplies && hasValidWindow && !activeInWindow;
+
   return {
     key: "pmh",
-    enabled: manualEnabled && !scheduled,
-    manualEnabled,
+    enabled,
+    manualEnabled: true,
     scheduled,
-    reason: !manualEnabled || scheduled ? reason : "",
+    reason: enabled ? "" : reason || DEFAULT_PMH_WINDOW_REASON,
     startAt,
     endAt,
   };

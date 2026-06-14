@@ -39,7 +39,7 @@ export default function SupportToolsPortal({ pmhAvailability }: SupportToolsPort
             <img src="/mwg-logo.svg" alt="MWG" />
           </span>
           <span>
-            <strong>ICT</strong>
+            <strong>Viễn Thông Di Động</strong>
             <small>Viễn Thông Di Động</small>
           </span>
         </Link>
@@ -61,12 +61,7 @@ export default function SupportToolsPortal({ pmhAvailability }: SupportToolsPort
             <button type="button" className="support-collapse-button" onClick={() => setOpen((current) => !current)}>
               {open ? "Thu gọn" : "Mở rộng"}
             </button>
-          ) : (
-            <div className="support-closed-chip">
-              <i />
-              Công cụ đang tạm đóng
-            </div>
-          )}
+          ) : null}
         </div>
 
         {!enabled ? <div className="support-lock-reason">{pmhAvailability.reason}</div> : null}
@@ -267,26 +262,6 @@ const STYLE = `
   font-size: 12px;
   font-weight: 1000;
   cursor: pointer;
-}
-.support-closed-chip {
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  color: #9a3412;
-  font-size: 12px;
-  font-weight: 1000;
-}
-.support-closed-chip i {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 0 0 7px rgba(234,88,12,.12);
 }
 .support-status {
   width: fit-content;
