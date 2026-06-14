@@ -37,13 +37,15 @@ function safePublicId(name: string) {
 
 export async function uploadDataUrlToCloudinary(dataUrl: string, options?: { folder?: string; name?: string }) {
   const data = String(dataUrl || "");
+  const isImage = data.startsWith("data:image/");
+  const isAudio = data.startsWith("data:audio/");
 
-  if (!data.startsWith("data:image/")) {
-    throw new Error("Chỉ hỗ trợ upload ảnh dạng PNG/JPG/WEBP.");
+  if (!isImage && !isAudio) {
+    throw new Error("Chỉ hỗ trợ upload ảnh hoặc file ghi âm.");
   }
 
-  if (data.length > 8_000_000) {
-    throw new Error("Ảnh quá lớn. Vui lòng nén hoặc chọn ảnh nhỏ hơn.");
+  if (data.length > (isAudio ? 25_000_000 : 8_000_000)) {
+    throw new Error(isAudio ? "File ghi âm quá lớn. Vui lòng chọn file nhỏ hơn." : "Ảnh quá lớn. Vui lòng nén hoặc chọn ảnh nhỏ hơn.");
   }
 
   const { cloudName, apiKey, apiSecret, folder } = getCloudinaryEnv();
@@ -67,7 +69,8 @@ export async function uploadDataUrlToCloudinary(dataUrl: string, options?: { fol
   uploadForm.append("folder", targetFolder);
   uploadForm.append("public_id", publicId);
 
-  const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+  const resourceType = isAudio ? "auto" : "image";
+  const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
     method: "POST",
     body: uploadForm,
   });

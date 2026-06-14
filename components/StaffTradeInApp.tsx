@@ -707,6 +707,9 @@ const SYSTEM_UI_CSS = `
 .vtdd-system-banner-featured.system-notice-v3 {
   padding: 12px 13px !important;
   border-radius: 22px !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
   border: 1.5px solid rgba(239, 68, 68, .58) !important;
   background:
     radial-gradient(circle at 100% 0%, rgba(239, 68, 68, .12), transparent 34%),
@@ -762,10 +765,9 @@ const SYSTEM_UI_CSS = `
 .system-notice-v3-list {
   display: grid;
   gap: 4px;
-  max-height: clamp(118px, 18vh, 190px);
-  overflow-y: auto;
-  padding-right: 3px;
-  overscroll-behavior: contain;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .system-notice-v3-list p {
@@ -805,7 +807,7 @@ const SYSTEM_UI_CSS = `
   }
 
   .system-notice-v3-list {
-    max-height: 154px;
+    max-height: none;
   }
 
   .system-notice-v3-list p {
@@ -1130,15 +1132,36 @@ const SYSTEM_UI_CSS = `
    VTDD FIX - Important notice rich HTML from TinyMCE
 ========================================================= */
 .system-notice-v3-rich {
-  max-height: 190px;
-  overflow: auto;
-  padding-right: 4px;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .system-notice-v3-rich :where(p, div, span, strong, b, em, i, u, li, a) {
   max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.system-notice-v3-rich span {
+  display: inline !important;
+  margin: 0 !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  font-weight: inherit;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.system-notice-v3-rich span:not([style]) {
+  color: inherit !important;
+}
+
+.system-notice-v3-rich :where(strong, b) {
+  display: inline !important;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .system-notice-v3-rich p {
@@ -1150,6 +1173,14 @@ const SYSTEM_UI_CSS = `
   line-height: 1.45;
   font-weight: inherit;
   white-space: normal;
+}
+
+.system-notice-v3-rich :where(strong, b) {
+  font-weight: 1000;
+}
+
+.system-notice-v3-rich :where(div, span) {
+  line-height: 1.45;
 }
 
 .system-notice-v3-rich p:last-child {

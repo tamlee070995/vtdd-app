@@ -9,6 +9,16 @@ import {
 
 export const dynamic = "force-dynamic";
 
+function formatQuotaMessage(err: any, fallback: string) {
+  const rawMessage = String(err?.message || "");
+  const isQuotaError = /quota|read requests|sheets\.googleapis\.com/i.test(rawMessage);
+
+  return {
+    message: isQuotaError ? "Google Sheets đang quá tải lượt đọc. Vui lòng chờ khoảng 1 phút rồi thử lại." : rawMessage || fallback,
+    status: isQuotaError ? 429 : 500,
+  };
+}
+
 export async function GET(req: NextRequest) {
   const { response } = await requireAdminApi(req, { module: "tools" });
   if (response) return response;
@@ -21,9 +31,10 @@ export async function GET(req: NextRequest) {
       dashboard,
     });
   } catch (err: any) {
+    const error = formatQuotaMessage(err, "Không tải được dữ liệu PMH.");
     return NextResponse.json(
-      { success: false, message: err?.message || "Không tải được dữ liệu PMH." },
-      { status: 500 }
+      { success: false, message: error.message },
+      { status: error.status }
     );
   }
 }
@@ -59,6 +70,7 @@ export async function POST(req: NextRequest) {
         admin: adminName,
         reason: body?.reason || "",
         soft: action === "REQUEST_UPDATE",
+        imageSlots: Array.isArray(body?.imageSlots) ? body.imageSlots : [],
       });
 
       return NextResponse.json(result);
@@ -66,9 +78,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: false, message: "Action không hợp lệ." }, { status: 400 });
   } catch (err: any) {
+    const error = formatQuotaMessage(err, "Không xử lý được yêu cầu PMH.");
     return NextResponse.json(
-      { success: false, message: err?.message || "Không xử lý được yêu cầu PMH." },
-      { status: 500 }
+      { success: false, message: error.message },
+      { status: error.status }
     );
   }
 }

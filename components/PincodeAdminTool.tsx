@@ -124,6 +124,18 @@ export default function PincodeAdminTool() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    function onReviewDone(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== "PINCODE_REVIEW_DONE") return;
+      loadDashboard({ silent: true });
+    }
+
+    window.addEventListener("message", onReviewDone);
+    return () => window.removeEventListener("message", onReviewDone);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function postAction(body: any) {
     const res = await fetch("/api/admin/tools/pincode", {
       method: "POST",
@@ -162,50 +174,16 @@ export default function PincodeAdminTool() {
     }
   }
 
-  async function approve(item: PincodeRequest) {
-    try {
-      const options = item.flow === "ChienGia" ? dashboard.pmh.chienGia : dashboard.pmh.ngoaiDs;
-      const hint = options.map((stat) => `${stat.menhGia} (${stat.count})`).join("\n");
-      const menhGia = window.prompt(
-        `Nhập mệnh giá cần cấp cho ${item.flowLabel}. Để trống = lấy mã đầu tiên đúng luồng.\n\nKho còn:\n${hint || "Chưa có PMH đúng luồng."}`,
-        ""
-      );
+  function openReview(item: PincodeRequest) {
+    const url = `/admin/tools/pincode/${encodeURIComponent(item.requestId)}`;
+    const popup = window.open(url, `pmh-review-${item.requestId}`, "popup=yes,width=1180,height=840");
 
-      if (menhGia === null) return;
-
-      setBusy(item.requestId);
-      const data = await postAction({ action: "APPROVE", requestId: item.requestId, menhGia });
-      setBusy("");
-      showToast(data.message || "Đã duyệt PMH.");
-      await loadDashboard({ silent: true });
-    } catch (err: any) {
-      setBusy("");
-      showToast(err?.message || "Không duyệt được hồ sơ.");
+    if (popup) {
+      popup.focus();
+      return;
     }
-  }
 
-  async function reject(item: PincodeRequest, soft: boolean) {
-    try {
-      const reason = window.prompt(
-        soft ? "Nhập lý do yêu cầu nhân viên cập nhật lại hồ sơ:" : "Nhập lý do từ chối cấp PMH:",
-        item.reason || ""
-      );
-
-      if (reason === null) return;
-
-      setBusy(item.requestId);
-      const data = await postAction({
-        action: soft ? "REQUEST_UPDATE" : "REJECT",
-        requestId: item.requestId,
-        reason,
-      });
-      setBusy("");
-      showToast(data.message || "Đã cập nhật hồ sơ.");
-      await loadDashboard({ silent: true });
-    } catch (err: any) {
-      setBusy("");
-      showToast(err?.message || "Không từ chối được hồ sơ.");
-    }
+    window.open(url, "_blank");
   }
 
   return (
@@ -285,45 +263,12 @@ export default function PincodeAdminTool() {
                 </div>
                 <h5>{item.imei || "Chưa có IMEI/SN"}</h5>
                 <p>NV {item.maNV} · {item.staffName || "Chưa rõ tên"} · ST {item.maST || "—"} · {item.createdAt}</p>
-                <div className="pmh-info-grid">
-                  <div><span>Máy cũ</span><b>{item.modelCu || "—"}</b></div>
-                  <div><span>Máy mới</span><b>{item.modelMoi || "—"}</b></div>
-                  <div><span>PMH</span><b>{item.menhGia || "Chưa cấp"}</b></div>
-                  <div><span>Admin</span><b>{item.admin || "—"}</b></div>
-                </div>
-                {item.note || item.reason ? <p className="pmh-note">{item.reason || item.note}</p> : null}
-                <div className="pmh-images">
-                  {item.imageUrls.length === 0 ? (
-                    <em>Chưa có ảnh</em>
-                  ) : (
-                    item.imageUrls.map((url, index) => (
-                      <a href={url} target="_blank" rel="noreferrer" key={`${item.requestId}-${index}`}>
-                        <img src={url} alt={`Ảnh ${index + 1}`} />
-                      </a>
-                    ))
-                  )}
-                </div>
               </div>
 
               <div className="pmh-actions">
-                {item.status === "Pending" ? (
-                  <>
-                    <button type="button" className="approve" disabled={busy === item.requestId} onClick={() => approve(item)}>
-                      Duyệt & cấp PMH
-                    </button>
-                    <button type="button" disabled={busy === item.requestId} onClick={() => reject(item, true)}>
-                      Yêu cầu cập nhật
-                    </button>
-                    <button type="button" className="reject" disabled={busy === item.requestId} onClick={() => reject(item, false)}>
-                      Từ chối
-                    </button>
-                  </>
-                ) : (
-                  <div className="pmh-final">
-                    <span>{item.pinCode ? `PMH: ${item.pinCode}` : statusText(item.status)}</span>
-                    <small>{item.updatedAt || item.completedAt || ""}</small>
-                  </div>
-                )}
+                <button type="button" className="approve review" onClick={() => openReview(item)}>
+                  Kiểm duyệt yêu cầu
+                </button>
               </div>
             </article>
           ))
@@ -391,6 +336,7 @@ const STYLE = `
 .pmh-actions { display: grid; gap: 8px; align-content: center; }
 .pmh-actions button { width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; }
 .pmh-actions button.approve { background: #07111f; border-color: #07111f; color: #ffd400; }
+.pmh-actions button.review { min-height: 54px; }
 .pmh-actions button.reject { background: #fee2e2; border-color: #fecaca; color: #991b1b; }
 .pmh-final { padding: 12px; border-radius: 16px; background: #f8fafc; border: 1px solid #e2e8f0; display: grid; gap: 6px; }
 .pmh-final span { color: #07111f; font-size: 13px; font-weight: 1000; word-break: break-word; }

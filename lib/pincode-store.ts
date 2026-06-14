@@ -7,37 +7,50 @@ const STAFF_SHEET = "Data_Staff";
 const PMH_SHEET = "PMH";
 const REQUEST_SHEET = "Data_PincodeAudit";
 const LEGACY_REQUEST_SHEET = "Data_Pincode";
+const NEW_MODEL_SHEET = "Data_Moi";
+const OLD_MODEL_PHONE_SHEET = "Data_Cu";
+const OLD_MODEL_TABLET_SHEET = "Data_Cu_Tablet";
 
 const PMH_HEADERS = ["PINCODE", "STATUS", "MENH_GIA"];
 const REQUEST_HEADERS = [
   "TIME",
-  "MA_ST",
-  "MA_NV",
+  "Mã ST",
+  "Mã NV",
   "IMEI",
-  "IMAGE_1",
-  "IMAGE_2",
-  "IMAGE_3",
-  "IMAGE_4",
-  "IMAGE_5",
-  "IMAGE_6",
-  "STATUS",
-  "PINCODE",
-  "REASON",
-  "ADMIN",
-  "DONE",
-  "MENH_GIA",
-  "MODEL_CU",
-  "MODEL_MOI",
-  "FLOW",
-  "NOTE",
-  "STAFF_NAME",
-  "STORE_NAME",
-  "UPDATED_AT",
-  "USER_AGENT",
+  "Link ảnh 1",
+  "Link ảnh 2",
+  "Link ảnh 3",
+  "Link ảnh 4",
+  "Link ảnh 5",
+  "Link ảnh 6",
+  "Trạng thái",
+  "Pincode",
+  "Nội dung từ chối",
+  "Admin duyệt",
+  "Hoàn tất/Copy",
+  "Mệnh giá",
+  "Model cũ",
+  "Model mới",
+  "Loại hỗ trợ",
 ];
 
 let pincodeWriteQueue: Promise<any> = Promise.resolve();
 let legacySheetCleanupAttempted = false;
+let pincodeSheetsEnsuredAt = 0;
+
+const PINCODE_SHEETS_ENSURE_TTL_MS = 10 * 60 * 1000;
+const STAFF_CACHE_TTL_MS = 5 * 60 * 1000;
+const MODEL_CACHE_TTL_MS = 10 * 60 * 1000;
+const REQUEST_CACHE_TTL_MS = 5 * 1000;
+const PMH_STATS_CACHE_TTL_MS = 20 * 1000;
+
+type ReadCacheEntry = {
+  expiresAt: number;
+  values?: any[][];
+  promise?: Promise<any[][]>;
+};
+
+const readCache = new Map<string, ReadCacheEntry>();
 
 function enqueuePincodeWrite<T>(job: () => Promise<T>) {
   const nextJob = pincodeWriteQueue.then(job, job);
@@ -157,10 +170,36 @@ async function ensureSheet(sheetName: string, headers: string[]) {
 }
 
 async function ensureRequestSheet() {
-  await ensureSheet(REQUEST_SHEET, REQUEST_HEADERS);
+  let sheetId = await ensureSheet(REQUEST_SHEET, REQUEST_HEADERS);
 
   const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" });
+  const requestSheet = meta.data.sheets?.find((sheet) => sheet.properties?.title === REQUEST_SHEET);
+  const columnCount = requestSheet?.properties?.gridProperties?.columnCount || REQUEST_HEADERS.length;
+  sheetId = typeof requestSheet?.properties?.sheetId === "number" ? requestSheet.properties.sheetId : sheetId;
+
+  if (sheetId !== null && columnCount < REQUEST_HEADERS.length) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            updateSheetProperties: {
+              properties: {
+                sheetId,
+                gridProperties: {
+                  columnCount: REQUEST_HEADERS.length,
+                },
+              },
+              fields: "gridProperties.columnCount",
+            },
+          },
+        ],
+      },
+    });
+  }
+
   const endCol = getColumnLetter(REQUEST_HEADERS.length);
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -169,8 +208,8 @@ async function ensureRequestSheet() {
   const current = res.data.values?.[0] || [];
   const isMainRequestHeader =
     clean(current[0]).toUpperCase() === "TIME" &&
-    clean(current[10]).toUpperCase() === "STATUS" &&
-    clean(current[18]).toUpperCase() === "FLOW";
+    clean(current[10]).toUpperCase() === clean(REQUEST_HEADERS[10]).toUpperCase() &&
+    clean(current[18]).toUpperCase() === clean(REQUEST_HEADERS[18]).toUpperCase();
 
   if (!isMainRequestHeader) {
     await sheets.spreadsheets.values.update({
@@ -180,12 +219,35 @@ async function ensureRequestSheet() {
       requestBody: { values: [REQUEST_HEADERS] },
     });
   }
+
+  if (sheetId !== null && columnCount > REQUEST_HEADERS.length) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId,
+                dimension: "COLUMNS",
+                startIndex: REQUEST_HEADERS.length,
+                endIndex: columnCount,
+              },
+            },
+          },
+        ],
+      },
+    });
+  }
 }
 
 async function ensurePincodeSheets() {
+  if (Date.now() - pincodeSheetsEnsuredAt < PINCODE_SHEETS_ENSURE_TTL_MS) return;
+
   await ensureSheet(PMH_SHEET, PMH_HEADERS);
   await ensureRequestSheet();
   await deleteLegacyRequestSheet();
+  pincodeSheetsEnsuredAt = Date.now();
 }
 
 async function deleteLegacyRequestSheet() {
@@ -222,6 +284,56 @@ async function readValues(range: string) {
   return res.data.values || [];
 }
 
+function cloneRows(rows: any[][]) {
+  return rows.map((row) => [...row]);
+}
+
+async function readValuesCached(range: string, ttlMs: number) {
+  const cacheKey = `${getSpreadsheetId()}|${range}`;
+  const now = Date.now();
+  const cached = readCache.get(cacheKey);
+
+  if (cached?.values && cached.expiresAt > now) {
+    return cloneRows(cached.values);
+  }
+
+  if (cached?.promise) {
+    return cloneRows(await cached.promise);
+  }
+
+  const promise = readValues(range)
+    .then((rows) => {
+      readCache.set(cacheKey, {
+        expiresAt: Date.now() + ttlMs,
+        values: cloneRows(rows),
+      });
+      return rows;
+    })
+    .catch((err) => {
+      readCache.delete(cacheKey);
+      throw err;
+    });
+
+  readCache.set(cacheKey, {
+    expiresAt: now + Math.min(ttlMs, 1000),
+    promise,
+  });
+
+  return cloneRows(await promise);
+}
+
+function invalidateReadCache(sheetName?: string) {
+  if (!sheetName) {
+    readCache.clear();
+    return;
+  }
+
+  const sheetPrefix = `${sheetName}!`;
+  Array.from(readCache.keys()).forEach((key) => {
+    if (key.includes(sheetPrefix)) readCache.delete(key);
+  });
+}
+
 export type PincodeFlow = "ChienGia" | "NgoaiDS";
 export type PincodeStatus = "Pending" | "Approved" | "Rejected_Soft" | "Rejected_Hard" | "Completed";
 
@@ -244,6 +356,7 @@ export type PincodeRequest = {
   menhGia: string;
   reason: string;
   admin: string;
+  doneStatus: string;
   updatedAt: string;
   completedAt: string;
   imageUrls: string[];
@@ -257,6 +370,20 @@ export type PincodeStaff = {
   status: string;
 };
 
+export type PincodeStaffLookup = {
+  valid: boolean;
+  message: string;
+  staff: PincodeStaff | null;
+  store: {
+    maST: string;
+    storeName: string;
+  } | null;
+  query: {
+    maST: string;
+    maNV: string;
+  };
+};
+
 export type PmhStat = {
   menhGia: string;
   count: number;
@@ -264,6 +391,59 @@ export type PmhStat = {
 
 export function normalizePincodeFlow(value: unknown): PincodeFlow {
   return clean(value) === "ChienGia" ? "ChienGia" : "NgoaiDS";
+}
+
+function normalizeComparable(value: unknown) {
+  return clean(value)
+    .normalize("NFC")
+    .toLocaleLowerCase("vi-VN");
+}
+
+function normalizeDeviceCategory(value: unknown) {
+  const normalized = normalizeComparable(value);
+  if (normalized === normalizeComparable("Điện thoại")) return "Điện thoại";
+  if (normalized === normalizeComparable("Máy tính bảng")) return "Máy tính bảng";
+  return "";
+}
+
+function isValidImei(value: string) {
+  const digits = clean(value).replace(/\D/g, "");
+  if (!/^\d{15}$/.test(digits)) return false;
+
+  let sum = 0;
+  for (let index = 0; index < digits.length; index += 1) {
+    let digit = Number(digits[digits.length - 1 - index]);
+    if (index % 2 === 1) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+  }
+
+  return sum % 10 === 0;
+}
+
+function isValidSerialNumber(value: string) {
+  return /^[A-Z0-9]{11}$/.test(clean(value).toUpperCase());
+}
+
+function normalizeIdentifier(value: unknown, type?: unknown) {
+  const requestedType = clean(type).toLowerCase();
+  const raw = clean(value).toUpperCase();
+
+  if (requestedType === "serial" || raw.startsWith("SN:")) {
+    const serial = raw.replace(/^SN:\s*/, "");
+    if (!isValidSerialNumber(serial)) {
+      throw new Error("Lỗi cú pháp Serial Number, nhập lại");
+    }
+    return `SN:${serial}`;
+  }
+
+  const imei = raw.replace(/\D/g, "");
+  if (!isValidImei(imei)) {
+    throw new Error("Lỗi cú pháp IMEI, nhập lại");
+  }
+  return imei;
 }
 
 export function getPincodeFlowLabel(flow: unknown) {
@@ -286,11 +466,27 @@ function isPmhMenhGiaMatchFlow(menhGia: unknown, flow: unknown) {
   return getPmhSuffixFromMenhGia(menhGia) === getPmhFlowSuffix(flow);
 }
 
+function getPmhMenhGiaValue(menhGia: unknown) {
+  const raw = clean(menhGia).toUpperCase();
+  const match = raw.match(/(\d[\d.,]*)/);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+
+  const numberText = match[1].replace(/[.,]/g, "");
+  const value = Number(numberText);
+  return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
+}
+
+function comparePmhMenhGia(a: unknown, b: unknown) {
+  const diff = getPmhMenhGiaValue(a) - getPmhMenhGiaValue(b);
+  if (diff !== 0) return diff;
+  return clean(a).localeCompare(clean(b), "vi", { numeric: true });
+}
+
 function normalizeStatus(value: unknown, done?: unknown): PincodeStatus {
   if (clean(done).toLowerCase() === "done") return "Completed";
 
   const status = clean(value);
-  if (status === "Approved") return "Approved";
+  if (status === "Approved" || status === "Approve") return "Approved";
   if (status === "Rejected_Soft") return "Rejected_Soft";
   if (status === "Rejected_Hard") return "Rejected_Hard";
   if (status === "Completed") return "Completed";
@@ -299,7 +495,7 @@ function normalizeStatus(value: unknown, done?: unknown): PincodeStatus {
 
 function isValidStoredStatus(value: unknown) {
   const status = clean(value);
-  return status === "Pending" || status === "Approved" || status === "Rejected_Soft" || status === "Rejected_Hard";
+  return status === "Pending" || status === "Approved" || status === "Approve" || status === "Rejected_Soft" || status === "Rejected_Hard";
 }
 
 function normalizeImageList(row: any[]) {
@@ -320,19 +516,20 @@ function mapRequestRow(row: any[], index: number): PincodeRequest {
     flowLabel: getPincodeFlowLabel(flow),
     maST: cleanCode(row[1]),
     maNV: cleanCode(row[2]),
-    staffName: clean(row[20]),
-    storeName: clean(row[21]),
+    staffName: "",
+    storeName: "",
     imei: clean(row[3]),
     modelCu: clean(row[16]),
     modelMoi: clean(row[17]),
-    note: clean(row[19]),
+    note: "",
     status,
     pinCode: clean(row[11]),
     menhGia: clean(row[15]),
     reason: clean(row[12]),
     admin: clean(row[13]),
-    updatedAt: clean(row[22]),
-    completedAt: done.toLowerCase() === "done" ? clean(row[22]) || clean(row[0]) : "",
+    doneStatus: done,
+    updatedAt: "",
+    completedAt: done.toLowerCase() === "done" ? clean(row[0]) : "",
     imageUrls: normalizeImageList(row),
   };
 }
@@ -353,7 +550,7 @@ function parseUpdatedRowNumber(range?: string | null) {
 async function getRow(rowNumber: number) {
   if (!rowNumber || rowNumber < 2) return null;
   await ensurePincodeSheets();
-  const rows = await readValues(`${REQUEST_SHEET}!A${rowNumber}:X${rowNumber}`);
+  const rows = await readValues(`${REQUEST_SHEET}!A${rowNumber}:S${rowNumber}`);
   const row = rows[0] || [];
   if (!isMainRequestRow(row)) return null;
   return mapRequestRow(row, rowNumber - 2);
@@ -363,7 +560,7 @@ export async function getPincodeStaffByMaNV(maNV: string) {
   const target = cleanCode(maNV);
   if (!target) return null;
 
-  const rows = await readValues(`${STAFF_SHEET}!A2:Q`);
+  const rows = await readValuesCached(`${STAFF_SHEET}!A2:Q`, STAFF_CACHE_TTL_MS);
 
   for (const row of rows) {
     if (cleanCode(row[0]) !== target) continue;
@@ -380,9 +577,103 @@ export async function getPincodeStaffByMaNV(maNV: string) {
   return null;
 }
 
+export async function lookupPincodeStaff(maST: string, maNV: string): Promise<PincodeStaffLookup> {
+  const targetStore = cleanCode(maST);
+  const targetStaff = cleanCode(maNV);
+  const rows = await readValuesCached(`${STAFF_SHEET}!A2:Q`, STAFF_CACHE_TTL_MS);
+  const staffRows = rows.map((row) => ({
+    maNV: cleanCode(row[0]),
+    staffName: clean(row[1]),
+    maST: cleanCode(row[2]),
+    storeName: clean(row[3]),
+    status: clean(row[9]),
+  }));
+  const staff = targetStaff ? staffRows.find((row) => row.maNV === targetStaff) || null : null;
+  const storeRow = targetStore ? staffRows.find((row) => row.maST === targetStore) || null : null;
+  const store = storeRow ? { maST: storeRow.maST, storeName: storeRow.storeName } : null;
+
+  let message = "";
+
+  if (targetStore && !store) {
+    message = "Mã siêu thị không tồn tại hoặc chưa có nhân viên trong hệ thống.";
+  } else if (targetStaff && !staff) {
+    message = "Mã nhân viên không tồn tại trong hệ thống.";
+  } else if (staff?.status && staff.status.toLowerCase() !== "active") {
+    message = "Tài khoản nhân viên chưa Active.";
+  } else if (targetStore && staff && staff.maST !== targetStore) {
+    message = `Mã nhân viên ${staff.maNV} thuộc siêu thị ${staff.maST}, không khớp mã ${targetStore}.`;
+  }
+
+  const valid = Boolean(!message && (!targetStore || store) && (!targetStaff || staff));
+
+  return {
+    valid,
+    message,
+    staff,
+    store,
+    query: {
+      maST: targetStore,
+      maNV: targetStaff,
+    },
+  };
+}
+
+export async function getPincodeNewModelsByCategory(category: string) {
+  const normalizedCategory = normalizeDeviceCategory(category);
+  if (!normalizedCategory) return [];
+
+  const rows = await readValuesCached(`${NEW_MODEL_SHEET}!B5:F`, MODEL_CACHE_TTL_MS);
+  const models = new Map<string, string>();
+
+  rows.forEach((row) => {
+    const modelName = clean(row[0]);
+    const rowCategory = normalizeDeviceCategory(row[4]);
+    if (!modelName || rowCategory !== normalizedCategory) return;
+
+    const key = normalizeComparable(modelName);
+    if (!models.has(key)) models.set(key, modelName);
+  });
+
+  return Array.from(models.values()).sort((a, b) => a.localeCompare(b, "vi", { numeric: true }));
+}
+
+export async function getPincodeOldModels() {
+  const [phoneRows, tabletRows] = await Promise.all([
+    readValuesCached(`${OLD_MODEL_PHONE_SHEET}!B5:B`, MODEL_CACHE_TTL_MS).catch(() => []),
+    readValuesCached(`${OLD_MODEL_TABLET_SHEET}!B5:B`, MODEL_CACHE_TTL_MS).catch(() => []),
+  ]);
+  const models = new Map<string, string>();
+
+  [...phoneRows, ...tabletRows].forEach((row) => {
+    const modelName = clean(row[0]);
+    if (!modelName) return;
+
+    const key = normalizeComparable(modelName);
+    if (!models.has(key)) models.set(key, modelName);
+  });
+
+  return Array.from(models.values()).sort((a, b) => a.localeCompare(b, "vi", { numeric: true }));
+}
+
+async function isValidOldModel(modelName: string) {
+  const selectedModel = normalizeComparable(modelName);
+  if (!selectedModel) return false;
+
+  const models = await getPincodeOldModels();
+  return models.some((item) => normalizeComparable(item) === selectedModel);
+}
+
+async function isValidNewModelForCategory(category: string, modelName: string) {
+  const selectedModel = normalizeComparable(modelName);
+  if (!selectedModel) return false;
+
+  const models = await getPincodeNewModelsByCategory(category);
+  return models.some((item) => normalizeComparable(item) === selectedModel);
+}
+
 export async function getPincodeRequests(limit = 300) {
   await ensurePincodeSheets();
-  const rows = await readValues(`${REQUEST_SHEET}!A2:X`);
+  const rows = await readValuesCached(`${REQUEST_SHEET}!A2:S`, REQUEST_CACHE_TTL_MS);
 
   return rows
     .filter(isMainRequestRow)
@@ -397,9 +688,36 @@ export async function getPincodeRequestById(requestId: string) {
   return getRow(rowNumber);
 }
 
+export async function findPincodeFollowUpRequest(data: {
+  maST: string;
+  maNV: string;
+  flow?: PincodeFlow;
+}) {
+  const targetStore = cleanCode(data.maST);
+  const targetStaff = cleanCode(data.maNV);
+  const targetFlow = data.flow ? normalizePincodeFlow(data.flow) : "";
+
+  if (!targetStore || !targetStaff) return null;
+
+  const requests = await getPincodeRequests(1000);
+
+  return (
+    requests.find((item) => {
+      if (item.maST !== targetStore || item.maNV !== targetStaff) return false;
+      if (targetFlow && item.flow !== targetFlow) return false;
+
+      const doneStatus = item.doneStatus.toLowerCase();
+      if (item.status === "Pending") return true;
+      if (item.status === "Approved" && item.pinCode && doneStatus !== "done" && doneStatus !== "x") return true;
+
+      return false;
+    }) || null
+  );
+}
+
 export async function getPmhStats(flow?: PincodeFlow) {
   await ensurePincodeSheets();
-  const rows = await readValues(`${PMH_SHEET}!A2:C`);
+  const rows = await readValuesCached(`${PMH_SHEET}!A2:C`, PMH_STATS_CACHE_TTL_MS);
   const stats = new Map<string, number>();
 
   rows.forEach((row) => {
@@ -414,7 +732,7 @@ export async function getPmhStats(flow?: PincodeFlow) {
 
   return Array.from(stats.entries())
     .map(([menhGia, count]) => ({ menhGia, count }))
-    .sort((a, b) => a.menhGia.localeCompare(b.menhGia, "vi", { numeric: true }));
+    .sort((a, b) => comparePmhMenhGia(a.menhGia, b.menhGia));
 }
 
 export async function getPincodeAdminDashboard() {
@@ -463,8 +781,11 @@ export async function createPincodeRequest(data: {
   maST: string;
   maNV: string;
   imei: string;
+  identifierType?: string;
   modelCu: string;
+  oldRamRom?: string;
   modelMoi: string;
+  deviceCategory?: string;
   note?: string;
   imageUrls?: string[];
   userAgent?: string;
@@ -487,12 +808,36 @@ export async function createPincodeRequest(data: {
     throw new Error(`Mã siêu thị không khớp Data_Staff. NV ${staff.maNV} thuộc ST ${staff.maST}.`);
   }
 
-  const imei = clean(data.imei).toUpperCase();
-  if (!imei || imei.length < 6) {
-    throw new Error("Vui lòng nhập IMEI/SN hợp lệ.");
+  const imei = normalizeIdentifier(data.imei, data.identifierType);
+  const modelCuInput = clean(data.modelCu);
+  const modelCu = flow === "ChienGia"
+    ? modelCuInput
+    : [modelCuInput, clean(data.oldRamRom)].filter(Boolean).join(" | RAM/ROM: ");
+  const modelMoi = clean(data.modelMoi);
+  const deviceCategory = normalizeDeviceCategory(data.deviceCategory);
+
+  if (flow === "ChienGia") {
+    if (!modelCuInput || !(await isValidOldModel(modelCuInput))) {
+      throw new Error("Vui lòng chọn máy cũ trong danh sách Data_Cu / Data_Cu_Tablet.");
+    }
+  } else if (!modelCuInput || !clean(data.oldRamRom)) {
+    throw new Error("Vui lòng nhập model máy cũ và chọn RAM/ROM.");
+  }
+
+  if (!deviceCategory) {
+    throw new Error("Vui lòng chọn ngành hàng máy cũ.");
+  }
+
+  if (!modelMoi || !(await isValidNewModelForCategory(deviceCategory, modelMoi))) {
+    throw new Error("Máy mới không nằm trong danh sách Data_Moi theo ngành hàng đã chọn.");
   }
 
   const imageUrls = Array.from({ length: 6 }, (_, index) => clean(data.imageUrls?.[index]));
+  const requiredFileCount = flow === "ChienGia" ? 5 : 6;
+  if (imageUrls.slice(0, requiredFileCount).some((url) => !url)) {
+    throw new Error(`Vui lòng tải đủ ${requiredFileCount} file hồ sơ theo đúng từng ô yêu cầu.`);
+  }
+
   const timestamp = nowVN();
   const duplicate = await findActiveDuplicate(imei, flow);
   const sheets = await getSheetsClient();
@@ -503,7 +848,7 @@ export async function createPincodeRequest(data: {
       return enqueuePincodeWrite(async () => {
         await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: `${REQUEST_SHEET}!B${duplicate.rowNumber}:X${duplicate.rowNumber}`,
+          range: `${REQUEST_SHEET}!B${duplicate.rowNumber}:S${duplicate.rowNumber}`,
           valueInputOption: "USER_ENTERED",
           requestBody: {
             values: [
@@ -518,18 +863,14 @@ export async function createPincodeRequest(data: {
                 "",
                 "",
                 "",
-                clean(data.modelCu),
-                clean(data.modelMoi),
+                modelCu,
+                modelMoi,
                 flow,
-                clean(data.note),
-                staff.staffName,
-                staff.storeName,
-                timestamp,
-                clean(data.userAgent),
               ],
             ],
           },
         });
+        invalidateReadCache(REQUEST_SHEET);
 
         const request = await getPincodeRequestById(duplicate.requestId);
 
@@ -555,7 +896,7 @@ export async function createPincodeRequest(data: {
   return enqueuePincodeWrite(async () => {
     const appendRes = await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${REQUEST_SHEET}!A:X`,
+      range: `${REQUEST_SHEET}!A:S`,
       valueInputOption: "USER_ENTERED",
       insertDataOption: "INSERT_ROWS",
       requestBody: {
@@ -572,18 +913,14 @@ export async function createPincodeRequest(data: {
             "",
             "",
             "",
-            clean(data.modelCu),
-            clean(data.modelMoi),
+            modelCu,
+            modelMoi,
             flow,
-            clean(data.note),
-            staff.staffName,
-            staff.storeName,
-            timestamp,
-            clean(data.userAgent),
           ],
         ],
       },
     });
+    invalidateReadCache(REQUEST_SHEET);
 
     const rowNumber = parseUpdatedRowNumber(appendRes.data.updates?.updatedRange);
     const request = rowNumber ? await getPincodeRequestById(String(rowNumber)) : null;
@@ -653,6 +990,7 @@ export async function importPincodes(list: Array<{ pin: string; menhGia: string 
         insertDataOption: "INSERT_ROWS",
         requestBody: { values: appendRows },
       });
+      invalidateReadCache(PMH_SHEET);
     }
 
     return {
@@ -684,6 +1022,8 @@ export async function approvePincodeRequest(data: {
       throw new Error(`Mệnh giá "${selectedMenhGia}" không thuộc luồng ${request.flowLabel}.`);
     }
 
+    const candidates: Array<{ pin: string; rowNumber: number; menhGia: string; value: number }> = [];
+
     for (let i = 0; i < pmhRows.length; i += 1) {
       const pin = clean(pmhRows[i][0]);
       const status = clean(pmhRows[i][1]);
@@ -693,10 +1033,24 @@ export async function approvePincodeRequest(data: {
       if (!isPmhMenhGiaMatchFlow(menhGia, request.flow)) continue;
       if (selectedMenhGia && menhGia !== selectedMenhGia) continue;
 
-      pinCode = pin;
-      pinRowNumber = i + 2;
-      actualMenhGia = menhGia;
-      break;
+      candidates.push({
+        pin,
+        rowNumber: i + 2,
+        menhGia,
+        value: getPmhMenhGiaValue(menhGia),
+      });
+    }
+
+    candidates.sort((a, b) => {
+      if (!selectedMenhGia && a.value !== b.value) return a.value - b.value;
+      return a.rowNumber - b.rowNumber;
+    });
+
+    const selectedPin = candidates[0];
+    if (selectedPin) {
+      pinCode = selectedPin.pin;
+      pinRowNumber = selectedPin.rowNumber;
+      actualMenhGia = selectedPin.menhGia;
     }
 
     if (!pinCode || pinRowNumber < 2) {
@@ -709,7 +1063,6 @@ export async function approvePincodeRequest(data: {
 
     const sheets = await getSheetsClient();
     const spreadsheetId = getSpreadsheetId();
-    const timestamp = nowVN();
 
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId,
@@ -722,15 +1075,13 @@ export async function approvePincodeRequest(data: {
           },
           {
             range: `${REQUEST_SHEET}!K${request.rowNumber}:P${request.rowNumber}`,
-            values: [["Approved", pinCode, "", clean(data.admin), "", actualMenhGia]],
-          },
-          {
-            range: `${REQUEST_SHEET}!W${request.rowNumber}:W${request.rowNumber}`,
-            values: [[timestamp]],
+            values: [["Approve", pinCode, "", clean(data.admin), "", actualMenhGia]],
           },
         ],
       },
     });
+    invalidateReadCache(PMH_SHEET);
+    invalidateReadCache(REQUEST_SHEET);
 
     return {
       success: true,
@@ -746,6 +1097,7 @@ export async function rejectPincodeRequest(data: {
   admin: string;
   reason: string;
   soft?: boolean;
+  imageSlots?: string[];
 }) {
   await ensurePincodeSheets();
 
@@ -755,7 +1107,17 @@ export async function rejectPincodeRequest(data: {
     if (request.status !== "Pending") throw new Error(`Hồ sơ đã được xử lý với trạng thái ${request.status}.`);
 
     const status: PincodeStatus = data.soft ? "Rejected_Soft" : "Rejected_Hard";
-    const timestamp = nowVN();
+    const slots = Array.from(
+      new Set(
+        (data.imageSlots || [])
+          .map((item) => clean(item))
+          .filter((item) => /^[1-6]$/.test(item))
+      )
+    ).sort((a, b) => Number(a) - Number(b));
+    const reasonText = clean(data.reason) || "Admin từ chối hồ sơ.";
+    const storedReason = data.soft && slots.length > 0
+      ? `[CHUP_LAI_ANH:${slots.join(",")}]\n${reasonText}`
+      : reasonText;
     const sheets = await getSheetsClient();
     const spreadsheetId = getSpreadsheetId();
 
@@ -766,19 +1128,58 @@ export async function rejectPincodeRequest(data: {
         data: [
           {
             range: `${REQUEST_SHEET}!K${request.rowNumber}:N${request.rowNumber}`,
-            values: [[status, "", clean(data.reason) || "Admin từ chối hồ sơ.", clean(data.admin)]],
-          },
-          {
-            range: `${REQUEST_SHEET}!W${request.rowNumber}:W${request.rowNumber}`,
-            values: [[timestamp]],
+            values: [[status, "", storedReason, clean(data.admin)]],
           },
         ],
       },
     });
+    invalidateReadCache(REQUEST_SHEET);
 
     return {
       success: true,
       message: data.soft ? "Đã yêu cầu nhân viên cập nhật lại hồ sơ." : "Đã từ chối cấp PMH.",
+    };
+  });
+}
+
+export async function updatePincodeRequestImages(data: {
+  requestId: string;
+  imageUrls: string[];
+}) {
+  await ensurePincodeSheets();
+
+  return enqueuePincodeWrite(async () => {
+    const request = await getPincodeRequestById(data.requestId);
+    if (!request) throw new Error("Không tìm thấy hồ sơ cần cập nhật ảnh.");
+    if (request.status !== "Rejected_Soft") throw new Error("Hồ sơ không ở trạng thái yêu cầu chụp lại.");
+
+    const imageUrls = Array.from({ length: 6 }, (_, index) => clean(data.imageUrls[index]));
+    const requiredFileCount = request.flow === "ChienGia" ? 5 : 6;
+    if (imageUrls.slice(0, requiredFileCount).some((url) => !url)) {
+      throw new Error(`Vui lòng bổ sung đủ ${requiredFileCount} file hồ sơ.`);
+    }
+
+    const sheets = await getSheetsClient();
+    const spreadsheetId = getSpreadsheetId();
+
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: "USER_ENTERED",
+        data: [
+          {
+            range: `${REQUEST_SHEET}!E${request.rowNumber}:N${request.rowNumber}`,
+            values: [[...imageUrls, "Pending", "", "", ""]],
+          },
+        ],
+      },
+    });
+    invalidateReadCache(REQUEST_SHEET);
+
+    return {
+      success: true,
+      request: await getPincodeRequestById(data.requestId),
+      message: "Đã cập nhật ảnh và chuyển hồ sơ về trạng thái chờ duyệt.",
     };
   });
 }
@@ -790,7 +1191,6 @@ export async function markPincodeCompleted(requestId: string) {
     const request = await getPincodeRequestById(requestId);
     if (!request) throw new Error("Không tìm thấy hồ sơ.");
 
-    const timestamp = nowVN();
     const sheets = await getSheetsClient();
     const spreadsheetId = getSpreadsheetId();
 
@@ -803,13 +1203,38 @@ export async function markPincodeCompleted(requestId: string) {
             range: `${REQUEST_SHEET}!O${request.rowNumber}:O${request.rowNumber}`,
             values: [["Done"]],
           },
+        ],
+      },
+    });
+    invalidateReadCache(REQUEST_SHEET);
+
+    return { success: true };
+  });
+}
+
+export async function markPincodeSkipped(requestId: string) {
+  await ensurePincodeSheets();
+
+  return enqueuePincodeWrite(async () => {
+    const request = await getPincodeRequestById(requestId);
+    if (!request) throw new Error("Không tìm thấy hồ sơ.");
+
+    const sheets = await getSheetsClient();
+    const spreadsheetId = getSpreadsheetId();
+
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: "USER_ENTERED",
+        data: [
           {
-            range: `${REQUEST_SHEET}!W${request.rowNumber}:W${request.rowNumber}`,
-            values: [[timestamp]],
+            range: `${REQUEST_SHEET}!O${request.rowNumber}:O${request.rowNumber}`,
+            values: [["X"]],
           },
         ],
       },
     });
+    invalidateReadCache(REQUEST_SHEET);
 
     return { success: true };
   });

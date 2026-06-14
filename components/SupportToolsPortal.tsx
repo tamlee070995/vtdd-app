@@ -26,7 +26,7 @@ type SupportToolsPortalProps = {
 };
 
 export default function SupportToolsPortal({ pmhAvailability }: SupportToolsPortalProps) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const enabled = pmhAvailability.enabled;
 
   return (
@@ -54,23 +54,24 @@ export default function SupportToolsPortal({ pmhAvailability }: SupportToolsPort
       <section className={`support-module ${open ? "open" : "collapsed"} ${enabled ? "" : "tool-off"}`}>
         <div className="support-module-head">
           <div className="support-title-block">
-            <h1>Công Cụ Hỗ Trợ Event TCDM</h1>
-            <p>Cổng nghiệp vụ PMH, chiến giá và hỗ trợ sản phẩm TCDM ngoài danh sách.</p>
+            <h1>Event Thu Cũ Đổi Mới</h1>
           </div>
 
-          <button type="button" className="support-collapse-button" onClick={() => setOpen((current) => !current)}>
-            {open ? "Thu gọn" : "Mở rộng"}
-          </button>
-        </div>
-
-        <div className={`support-status ${enabled ? "ready" : "locked"}`}>
-          <i />
-          <span>{enabled ? "Hệ thống đang sẵn sàng nhận yêu cầu" : "Công cụ đang tạm đóng"}</span>
+          {enabled ? (
+            <button type="button" className="support-collapse-button" onClick={() => setOpen((current) => !current)}>
+              {open ? "Thu gọn" : "Mở rộng"}
+            </button>
+          ) : (
+            <div className="support-closed-chip">
+              <i />
+              Công cụ đang tạm đóng
+            </div>
+          )}
         </div>
 
         {!enabled ? <div className="support-lock-reason">{pmhAvailability.reason}</div> : null}
 
-        {open ? (
+        {enabled && open ? (
           <div className="support-tools-grid" aria-label="Công cụ PMH">
             {ROUTES.map((item) => {
               const content = (
@@ -212,7 +213,7 @@ const STYLE = `
 }
 .support-module-head {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 14px;
   align-items: start;
 }
@@ -266,6 +267,26 @@ const STYLE = `
   font-size: 12px;
   font-weight: 1000;
   cursor: pointer;
+}
+.support-closed-chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 1000;
+}
+.support-closed-chip i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 7px rgba(234,88,12,.12);
 }
 .support-status {
   width: fit-content;

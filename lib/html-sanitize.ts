@@ -43,6 +43,28 @@ const URI_ATTRS = new Set(["href", "src"]);
 const GLOBAL_ATTRS = new Set(["class", "title", "aria-label"]);
 const TABLE_ATTRS = new Set(["colspan", "rowspan"]);
 const MEDIA_ATTRS = new Set(["alt", "height", "loading", "width"]);
+const SAFE_STYLE_ATTRS = new Set([
+  "background",
+  "background-color",
+  "border-color",
+  "color",
+  "font-size",
+  "font-style",
+  "font-weight",
+  "line-height",
+  "margin",
+  "margin-bottom",
+  "margin-left",
+  "margin-right",
+  "margin-top",
+  "padding",
+  "padding-bottom",
+  "padding-left",
+  "padding-right",
+  "padding-top",
+  "text-align",
+  "text-decoration",
+]);
 
 const DANGEROUS_BLOCKS =
   /<\s*(script|style|iframe|object|embed|link|meta|base|form|input|button|select|textarea|svg|math)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi;
@@ -78,13 +100,37 @@ function isSafeUrl(value: string) {
 
 function isAllowedAttribute(tag: string, attr: string) {
   if (attr.startsWith("on")) return false;
-  if (attr === "style") return false;
   if (GLOBAL_ATTRS.has(attr)) return true;
+  if (attr === "style") return true;
   if (URI_ATTRS.has(attr)) return tag === "a" || tag === "img";
   if (tag === "a" && (attr === "target" || attr === "rel")) return true;
   if (tag === "img" && MEDIA_ATTRS.has(attr)) return true;
   if ((tag === "td" || tag === "th") && TABLE_ATTRS.has(attr)) return true;
   return false;
+}
+
+function sanitizeStyle(value: string) {
+  const safeRules = String(value || "")
+    .split(";")
+    .map((rule) => rule.trim())
+    .map((rule) => {
+      const splitAt = rule.indexOf(":");
+      if (splitAt <= 0) return "";
+
+      const prop = rule.slice(0, splitAt).trim().toLowerCase();
+      const rawValue = rule.slice(splitAt + 1).trim();
+      const lowerValue = rawValue.toLowerCase();
+
+      if (!SAFE_STYLE_ATTRS.has(prop)) return "";
+      if (!rawValue || /[<>]/.test(rawValue)) return "";
+      if (lowerValue.includes("url(") || lowerValue.includes("expression(") || lowerValue.includes("javascript:")) return "";
+      if (rawValue.length > 140) return "";
+
+      return `${prop}: ${rawValue}`;
+    })
+    .filter(Boolean);
+
+  return safeRules.join("; ");
 }
 
 function sanitizeAttributes(tag: string, rawAttrs: string) {
@@ -98,6 +144,11 @@ function sanitizeAttributes(tag: string, rawAttrs: string) {
 
     if (!isAllowedAttribute(tag, attr)) continue;
     if (URI_ATTRS.has(attr) && !isSafeUrl(value)) continue;
+    if (attr === "style") {
+      const safeStyle = sanitizeStyle(value);
+      if (safeStyle) attrs.push(`${attr}="${escapeAttribute(safeStyle)}"`);
+      continue;
+    }
 
     if (tag === "a" && attr === "target" && value !== "_blank") continue;
 

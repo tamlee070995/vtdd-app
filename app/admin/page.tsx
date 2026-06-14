@@ -53,6 +53,8 @@ export default async function AdminPage() {
           adminRole={admin.permission}
           adminName={admin.name}
           adminModules={admin.modules.join(",")}
+          adminActions={admin.actions.join(",")}
+          adminHasExplicitActions={admin.hasExplicitActions}
         />
       </section>
 
@@ -102,8 +104,49 @@ export default async function AdminPage() {
         .admin-cms-pro-ghost { color: #fff; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); }
         .admin-cms-pro-logout { color: #07111f; background: #ffd400; }
         @media (max-width: 760px) {
+          .admin-cms-pro-page { padding: 8px; }
+          .admin-cms-pro-shell { gap: 10px; }
+          .admin-cms-pro-hero {
+            min-height: auto;
+            padding: 14px;
+            border-radius: 22px;
+            gap: 10px;
+          }
+          .admin-cms-pro-logo { width: 42px; height: 42px; border-radius: 14px; }
+          .admin-cms-pro-brand b { font-size: 16px; }
           .admin-cms-pro-actions { position: relative; top: auto; right: auto; }
-          .admin-cms-pro-title h1 { font-size: 44px; }
+          .admin-cms-pro-title h1 {
+            margin-top: 8px;
+            font-size: 30px;
+            line-height: .96;
+            letter-spacing: 0;
+          }
+          .admin-cms-pro-title p { display: none; }
+          .admin-cms-pro-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+          }
+          .admin-cms-pro-meta span {
+            min-height: 30px;
+            padding: 0 9px;
+            border-radius: 12px;
+            font-size: 10px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .admin-cms-pro-meta span:nth-child(3) { grid-column: 1 / -1; }
+          .admin-cms-pro-actions {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 6px;
+          }
+          .admin-cms-pro-ghost,
+          .admin-cms-pro-logout {
+            min-height: 38px;
+            padding: 0 8px;
+            font-size: 10px;
+          }
         }
       `}</style>
     </main>

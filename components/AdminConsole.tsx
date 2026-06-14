@@ -74,6 +74,8 @@ type AdminConsoleProps = {
   adminRole?: AdminRole;
   adminName?: string;
   adminModules?: string;
+  adminActions?: string;
+  adminHasExplicitActions?: boolean;
 };
 
 type OnlineStats = {
@@ -151,6 +153,60 @@ const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: st
   { key: "dashboard-view", label: "Xem dashboard", desc: "Xem log tra giá, top máy và thống kê." },
 ];
 
+const NOTIFY_SETTING_KEYS = [
+  "MARQUEE_MESSAGE",
+  "FIXED_BANNER_MESSAGE",
+  "PUSH_NOTIFY_MESSAGE",
+  "PUSH_NOTIFY_VERSION",
+];
+
+const SYSTEM_SETTING_KEYS = [
+  "PRICE_EFFECTIVE_FROM",
+  "PRICE_EFFECTIVE_TO",
+  "SYSTEM_LOCK_MESSAGE",
+  "SYSTEM_LOCK_ENABLED",
+  "SYSTEM_LOCK_SCHEDULE_ENABLED",
+  "SYSTEM_LOCK_START_AT",
+  "SYSTEM_LOCK_END_AT",
+  "SYSTEM_LOCK_REASON",
+  "STAFF_PAGE_LOCKED",
+  "STAFF_TRADEIN_LOCKED",
+  "STAFF_BUYONLY_LOCKED",
+  "CUSTOMER_PAGE_LOCKED",
+  "CUSTOMER_TRADEIN_LOCKED",
+  "CUSTOMER_BUYONLY_LOCKED",
+];
+
+const PERMISSION_TREE = [
+  {
+    title: "Quản trị vận hành TCDM",
+    desc: "Các tab con trong module quản trị trang tra giá.",
+    module: "tcdm",
+    children: ADMIN_ACTION_OPTIONS,
+  },
+  {
+    title: "Nội dung trang chủ",
+    desc: "Các trang CMS gắn ngoài trang chủ.",
+    children: ADMIN_MODULE_OPTIONS.filter((item) => item.key !== "tcdm" && item.key !== "tools").map((item) => ({
+      module: item.key,
+      label: item.label,
+      desc: "Cho phép mở và chỉnh nội dung module này.",
+    })),
+  },
+  {
+    title: "Công cụ hỗ trợ",
+    desc: "Module số 5 cho PMH/Pincode và các tool gắn thêm sau này.",
+    module: "tools",
+    children: [
+      {
+        module: "tools",
+        label: "PMH / Pincode",
+        desc: "Duyệt hồ sơ, nạp kho PMH, bật/tắt công cụ hỗ trợ.",
+      },
+    ],
+  },
+] as const;
+
 function isOn(value: string) {
   const v = String(value || "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes" || v === "on";
@@ -212,6 +268,21 @@ function parseAdminAccessItems(value: any) {
     });
 }
 
+function parseAdminActionItems(value: any) {
+  const actionKeys = new Set(ADMIN_ACTION_OPTIONS.map((item) => item.key));
+
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase().replace(/^action:/, ""))
+    .filter((item, index, arr): item is AdminActionKey => {
+      return actionKeys.has(item as AdminActionKey) && arr.indexOf(item) === index;
+    });
+}
+
+function adminActionToken(key: AdminActionKey) {
+  return `${ADMIN_ACTION_PREFIX}${key}`;
+}
+
 function summarizeAdminAccess(value: any) {
   const tokens = parseAdminAccessItems(value);
   if (tokens.length === 0) return "—";
@@ -228,7 +299,13 @@ function summarizeAdminAccess(value: any) {
     .join(" · ");
 }
 
-function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsoleProps) {
+function TcdmAdminConsole({
+  initialSettings,
+  adminRole = "admin",
+  adminModules = "",
+  adminActions = "",
+  adminHasExplicitActions = false,
+}: AdminConsoleProps) {
   const [tab, setTab] = useState<TabKey>("overview");
   const [settings, setSettings] = useState<Record<string, string>>(initialSettings);
   const [busy, setBusy] = useState("");
@@ -255,6 +332,30 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
 
   const summary = staffMeta.summary || EMPTY_SUMMARY;
   const isFullAdmin = String(adminRole || "").toLowerCase() === "admin";
+  const grantedModules = parseModuleList(adminModules);
+  const grantedActions = parseAdminActionItems(adminActions);
+  const legacyTcdmAccess = !adminHasExplicitActions && grantedModules.includes("tcdm");
+
+  function canUseAction(action: AdminActionKey) {
+    return isFullAdmin || grantedActions.includes(action) || legacyTcdmAccess;
+  }
+
+  const visibleTabs = TAB_ITEMS.filter((item) => {
+    if (isFullAdmin) return true;
+    if (item.key === "overview") return true;
+    if (item.key === "permission") return false;
+    if (item.key === "staff") return canUseAction("staff-manage");
+    if (item.key === "notify") return canUseAction("settings-write");
+    if (item.key === "system") return canUseAction("settings-write") || canUseAction("reload-data");
+    if (item.key === "dashboard") return canUseAction("dashboard-view");
+    return false;
+  });
+  const activeTabAllowed = visibleTabs.some((item) => item.key === tab);
+  const firstVisibleTab = visibleTabs[0]?.key || "overview";
+  const canManageStaff = canUseAction("staff-manage");
+  const canResetStaffSecurity = canUseAction("staff-security");
+  const canWriteSettings = canUseAction("settings-write");
+  const canReloadData = canUseAction("reload-data");
 
   const lockCount = useMemo(() => {
     return [
@@ -405,6 +506,11 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
   }, []);
 
   useEffect(() => {
+    if (activeTabAllowed) return;
+    setTab(firstVisibleTab);
+  }, [activeTabAllowed, firstVisibleTab]);
+
+  useEffect(() => {
     if (tab !== "staff" && tab !== "permission") return;
     loadStaff(staffPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -496,6 +602,14 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
     await saveSettings({ DATA_VERSION: nextVersion }, { onlyKeys: ["DATA_VERSION"] });
   }
 
+  async function saveNotifySettings(extra?: Record<string, string>) {
+    await saveSettings(extra, { onlyKeys: NOTIFY_SETTING_KEYS });
+  }
+
+  async function saveSystemSettings(extra?: Record<string, string>) {
+    await saveSettings(extra, { onlyKeys: SYSTEM_SETTING_KEYS });
+  }
+
   function setSetting(key: string, value: string) {
     setSettings((current) => ({ ...current, [key]: value }));
   }
@@ -530,7 +644,7 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
       <style>{ADMINX_ONLINE_STYLE}</style>
 
       <nav className="adminx-tabs" aria-label="Admin navigation">
-        {TAB_ITEMS.map((item) => (
+        {visibleTabs.map((item) => (
           <button
             key={item.key}
             className={tab === item.key ? "active" : ""}
@@ -739,21 +853,21 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
                       <button
                         type="button"
                         className="primary"
-                        disabled={busy === `ACTIVE-${item.maNV}` || item.status === "Active"}
+                        disabled={!canManageStaff || busy === `ACTIVE-${item.maNV}` || item.status === "Active"}
                         onClick={() => runStaffAction("ACTIVE", item.maNV)}
                       >
                         Active
                       </button>
                       <button
                         type="button"
-                        disabled={busy === `STANDBY-${item.maNV}` || item.status === "Standby"}
+                        disabled={!canManageStaff || busy === `STANDBY-${item.maNV}` || item.status === "Standby"}
                         onClick={() => runStaffAction("STANDBY", item.maNV)}
                       >
                         Standby
                       </button>
                       <button
                         type="button"
-                        disabled={busy === `RESET_SECURITY-${item.maNV}`}
+                        disabled={!canResetStaffSecurity || busy === `RESET_SECURITY-${item.maNV}`}
                         onClick={() => {
                           const ok = window.confirm(
                             `Reset tài khoản ${item.maNV}: mật khẩu về 123123, xóa bảo mật/Gmail, NEED_SETUP=1 và OTP count=0?`
@@ -765,7 +879,7 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
                       </button>
                       <button
                         type="button"
-                        disabled={busy === `RESET_OTP_COUNT-${item.maNV}`}
+                        disabled={!canResetStaffSecurity || busy === `RESET_OTP_COUNT-${item.maNV}`}
                         onClick={() => runStaffAction("RESET_OTP_COUNT", item.maNV)}
                       >
                         Reset OTP
@@ -912,7 +1026,7 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
               <h2>Thông báo hệ thống</h2>
               <p>Cấu hình nội dung hiển thị trên trang nhân viên và khách hàng.</p>
             </div>
-            <button className="adminx-action-btn" type="button" onClick={() => saveSettings()} disabled={busy === "settings"}>
+            <button className="adminx-action-btn" type="button" onClick={() => saveNotifySettings()} disabled={!canWriteSettings || busy === "settings"}>
               {busy === "settings" ? "Đang lưu..." : "Lưu thông báo"}
             </button>
           </div>
@@ -1001,8 +1115,8 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
           <div className="adminx-inline-actions">
             <button
               type="button"
-              onClick={() => saveSettings({ PUSH_NOTIFY_VERSION: String(Date.now()) })}
-              disabled={busy === "settings"}
+              onClick={() => saveNotifySettings({ PUSH_NOTIFY_VERSION: String(Date.now()) })}
+              disabled={!canWriteSettings || busy === "settings"}
             >
               Lưu & phát push mới
             </button>
@@ -1018,17 +1132,17 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
               <h2>Điều khiển hệ thống</h2>
               <p>Quản lý ngày áp dụng, khóa truy cập và reload dữ liệu bảng giá.</p>
             </div>
-            <div className="adminx-button-stack">
-              <button className="adminx-action-btn" type="button" onClick={() => saveSettings()} disabled={busy === "settings"}>
+            <div className={`adminx-button-stack ${canWriteSettings ? "" : "no-system-save"} ${canReloadData ? "" : "no-reload"}`}>
+              <button className="adminx-action-btn" type="button" onClick={() => saveSystemSettings()} disabled={!canWriteSettings || busy === "settings"}>
                 {busy === "settings" ? "Đang lưu..." : "Lưu hệ thống"}
               </button>
-              <button className="adminx-action-btn secondary" type="button" onClick={reloadDataVersion} disabled={busy === "settings"}>
+              <button className="adminx-action-btn secondary" type="button" onClick={reloadDataVersion} disabled={!canReloadData || busy === "settings"}>
                 Reload data
               </button>
             </div>
           </div>
 
-          <div className="adminx-system-sections">
+          <div className={`adminx-system-sections ${canWriteSettings ? "" : "reload-only"}`}>
             <section className="adminx-system-card">
               <div className="adminx-system-card-head">
                 <span>01</span>
@@ -1057,7 +1171,7 @@ function TcdmAdminConsole({ initialSettings, adminRole = "admin" }: AdminConsole
               </div>
             </section>
 
-            <section className="adminx-system-card">
+            <section className="adminx-system-card adminx-reload-card">
               <div className="adminx-system-card-head">
                 <span>02</span>
                 <div>
@@ -1618,6 +1732,11 @@ const ADMINX_STYLE = `
   gap: 8px;
 }
 
+.adminx-button-stack.no-system-save .adminx-action-btn:not(.secondary),
+.adminx-button-stack.no-reload .adminx-action-btn.secondary {
+  display: none;
+}
+
 .adminx-metric-grid,
 .adminx-overview-grid,
 .adminx-staff-summary,
@@ -1945,6 +2064,10 @@ const ADMINX_STYLE = `
   gap: 12px;
 }
 
+.adminx-system-sections.reload-only .adminx-system-card:not(.adminx-reload-card) {
+  display: none;
+}
+
 .adminx-system-card {
   padding: 14px;
   border-radius: 22px;
@@ -2171,7 +2294,18 @@ const ADMINX_STYLE = `
 
 @media screen and (max-width: 920px) {
   .adminx-tabs {
-    grid-template-columns: repeat(2, 1fr);
+    display: flex;
+    overflow-x: auto;
+    grid-template-columns: none;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .adminx-tabs button {
+    flex: 0 0 auto;
+    min-width: 118px;
+    min-height: 56px;
+    scroll-snap-align: start;
   }
 
   .adminx-metric-grid,
@@ -2224,11 +2358,15 @@ const ADMINX_STYLE = `
     padding: 7px;
     border-radius: 24px;
     gap: 7px;
+    display: flex;
+    overflow-x: auto;
+    grid-template-columns: none;
   }
 
   .adminx-tabs button {
     min-height: 62px;
     padding: 9px;
+    min-width: 112px;
   }
 
   .adminx-tabs button i {
@@ -2535,6 +2673,104 @@ const ADMINX_ONLINE_STYLE = `
   font-weight: 800;
   text-align: center;
 }
+.adminx-permission-tree {
+  display: grid;
+  gap: 10px;
+}
+.adminx-tree-group {
+  padding: 10px;
+  border-radius: 20px;
+  background: #f8fafc;
+  border: 1px solid #dbe4ef;
+}
+.adminx-tree-group.active {
+  background: radial-gradient(circle at 100% 0%, rgba(255,212,0,.16), transparent 38%), #ffffff;
+  border-color: #ffd400;
+}
+.adminx-tree-head {
+  width: 100%;
+  min-height: 58px;
+  padding: 10px;
+  border: 0;
+  border-radius: 16px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  background: #ffffff;
+  color: #07111f;
+  text-align: left;
+  cursor: pointer;
+}
+.adminx-tree-head:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.adminx-tree-head i {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #07111f;
+  color: #ffd400;
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 1000;
+}
+.adminx-tree-head b,
+.adminx-tree-children span {
+  display: block;
+  color: #07111f;
+  font-size: 13px;
+  line-height: 1.15;
+  font-weight: 1000;
+}
+.adminx-tree-head small,
+.adminx-tree-children small {
+  display: block;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 10.5px;
+  line-height: 1.32;
+  font-weight: 850;
+}
+.adminx-tree-children {
+  margin-top: 9px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.adminx-tree-children button {
+  min-height: 66px;
+  padding: 11px;
+  border-radius: 16px;
+  border: 1px solid #dbe4ef;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+}
+.adminx-tree-children button.active {
+  background: #07111f;
+  border-color: #07111f;
+  color: #ffd400;
+  box-shadow: 0 12px 24px rgba(15,23,42,.14);
+}
+.adminx-tree-children button.active span {
+  color: #ffd400;
+}
+.adminx-tree-children button.active small {
+  color: rgba(255,255,255,.72);
+}
+.adminx-permission-box-v2 > .adminx-permission-section-title,
+.adminx-permission-box-v2 > .adminx-module-buttons {
+  display: none;
+}
+@media (max-width: 760px) {
+  .adminx-tree-children {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 980px) { .adminx-permission-card-v3 { grid-template-columns: 1fr; } }
 
 `;
@@ -2608,6 +2844,75 @@ function StaffAdminAccessBox({
         <button type="button" disabled={disabled} className={permission === "mod" ? "active" : ""} onClick={() => setRole("mod")}>Mod<small>Chỉ hạng mục được cấp</small></button>
         <button type="button" disabled={disabled} className={permission === "admin" ? "active" : ""} onClick={() => setRole("admin")}>Admin<small>Toàn quyền hệ thống</small></button>
       </div>
+
+      {permission === "mod" && (
+        <div className="adminx-permission-tree" aria-label="Cây phân quyền module">
+          {PERMISSION_TREE.map((group) => {
+            const groupModule = "module" in group ? String(group.module) : "";
+            const groupActive = groupModule
+              ? accessItems.includes(groupModule)
+              : group.children.some((child) => {
+                  if ("key" in child) return accessItems.includes(adminActionToken(child.key));
+                  return accessItems.includes(String(child.module));
+                });
+
+            return (
+              <section className={`adminx-tree-group ${groupActive ? "active" : ""}`} key={group.title}>
+                <button
+                  type="button"
+                  className="adminx-tree-head"
+                  disabled={disabled || !groupModule}
+                  onClick={() => {
+                    if (groupModule) toggleModule(groupModule);
+                  }}
+                >
+                  <i>{groupActive ? "✓" : "+"}</i>
+                  <span>
+                    <b>{group.title}</b>
+                    <small>{group.desc}</small>
+                  </span>
+                </button>
+
+                <div className="adminx-tree-children">
+                  {group.children.map((child) => {
+                    if ("key" in child) {
+                      const token = adminActionToken(child.key);
+
+                      return (
+                        <button
+                          key={child.key}
+                          type="button"
+                          disabled={disabled}
+                          className={accessItems.includes(token) ? "active" : ""}
+                          onClick={() => toggleAction(child.key)}
+                        >
+                          <span>{child.label}</span>
+                          <small>{child.desc}</small>
+                        </button>
+                      );
+                    }
+
+                    const moduleKey = String(child.module);
+
+                    return (
+                      <button
+                        key={`${moduleKey}-${child.label}`}
+                        type="button"
+                        disabled={disabled}
+                        className={accessItems.includes(moduleKey) ? "active" : ""}
+                        onClick={() => toggleModule(moduleKey)}
+                      >
+                        <span>{child.label}</span>
+                        <small>{child.desc}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
 
       {permission === "mod" && (
         <>
@@ -3061,14 +3366,24 @@ export default function AdminConsole({
   adminRole = "admin",
   adminName = "Admin",
   adminModules = "",
+  adminActions = "",
+  adminHasExplicitActions = false,
 }: AdminConsoleProps) {
-  const [module, setModule] = useState<AdminModuleKey>("tcdm");
+  const [module, setModule] = useState<AdminModuleKey>(() => {
+    if (adminRole === "admin") return "tcdm";
+    return (parseModuleList(adminModules)[0] as AdminModuleKey) || "tcdm";
+  });
   const [cmsItems, setCmsItems] = useState<CmsItems>(EMPTY_CMS);
   const [cmsLoading, setCmsLoading] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
 
   const isAdmin = adminRole === "admin";
-  const allowedModules = useMemo(() => parseModuleList(adminModules), [adminModules]);
+  const allowedModules = parseModuleList(adminModules);
+  const visibleAdminModules = isAdmin
+    ? ADMIN_MODULES
+    : ADMIN_MODULES.filter((item) => allowedModules.includes(item.key));
+  const activeModuleAllowed = visibleAdminModules.some((item) => item.key === module);
+  const firstVisibleModule = visibleAdminModules[0]?.key || "tcdm";
 
   function canAccess(key: AdminModuleKey) {
     if (isAdmin) return true;
@@ -3103,6 +3418,11 @@ export default function AdminConsole({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [module]);
 
+  useEffect(() => {
+    if (activeModuleAllowed) return;
+    setModule(firstVisibleModule);
+  }, [activeModuleAllowed, firstVisibleModule]);
+
   const activeMeta = ADMIN_MODULES.find((item) => item.key === module) || ADMIN_MODULES[0];
   const activeAccess = canAccess(module);
 
@@ -3122,7 +3442,7 @@ export default function AdminConsole({
       </div>
 
       <nav className="admin-cms-module-grid-v5">
-        {ADMIN_MODULES.map((item) => {
+        {visibleAdminModules.map((item) => {
           const allowed = canAccess(item.key);
           return (
             <button
@@ -3154,7 +3474,14 @@ export default function AdminConsole({
                 <p>Toàn bộ chức năng admin cũ được gom vào module này.</p>
               </div>
             </div>
-            <TcdmAdminConsole initialSettings={initialSettings} adminRole={adminRole} adminName={adminName} adminModules={adminModules} />
+            <TcdmAdminConsole
+              initialSettings={initialSettings}
+              adminRole={adminRole}
+              adminName={adminName}
+              adminModules={adminModules}
+              adminActions={adminActions}
+              adminHasExplicitActions={adminHasExplicitActions}
+            />
           </>
         ) : isCmsModule(module) ? (
           cmsLoading ? (
@@ -3360,7 +3687,7 @@ const ADMIN_CMS_STYLE = `
 .adminx-module-checks label { min-height: 36px; padding: 7px 9px; border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; color: #334155; font-size: 11px; font-weight: 850; }
 .adminx-permission-box em { color: #64748b; font-size: 12px; font-style: normal; font-weight: 850; }
 @media (max-width: 1280px) { .admin-cms-module-grid-v5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .cms-pro-editor-grid { grid-template-columns: 1fr; } }
-@media (max-width: 760px) { .admin-cms-headline-v5, .cms-pro-editor-top { display: grid; } .admin-cms-module-grid-v5 { grid-template-columns: 1fr; } .admin-cms-module-grid-v5 button { min-height: 132px; } .cms-actions { display: grid; } .cms-actions button { width: 100%; } .adminx-module-checks { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .admin-cms-headline-v5, .cms-pro-editor-top { display: grid; } .admin-cms-headline-v5 { padding: 14px; border-radius: 22px; } .admin-cms-headline-v5 h2 { font-size: 28px; letter-spacing: 0; } .admin-cms-permission-summary { width: 100%; border-radius: 14px; justify-content: center; text-align: center; } .admin-cms-module-grid-v5 { display: flex; grid-template-columns: none; overflow-x: auto; gap: 8px; padding-bottom: 2px; -webkit-overflow-scrolling: touch; } .admin-cms-module-grid-v5 button { min-height: 92px; min-width: 178px; padding: 12px; border-radius: 18px; } .admin-cms-module-grid-v5 em { display: none; } .admin-cms-module-grid-v5 small { padding: 6px 8px; font-size: 9px; } .admin-cms-module-panel-v5 { padding: 10px; border-radius: 22px; } .admin-cms-module-title-v5 h3 { font-size: 26px; letter-spacing: 0; } .cms-actions { display: grid; } .cms-actions button { width: 100%; } .adminx-module-checks { grid-template-columns: 1fr; } }
 
 /* ===== VTDD ADMIN FIX PACK ===== */
 .adminx-permission-box-v2 { margin-top: 14px; padding: 14px; border-radius: 20px; background: radial-gradient(circle at 100% 0%, rgba(255,212,0,.12), transparent 38%), #ffffff; border: 1px solid #dbe4ef; box-shadow: 0 12px 28px rgba(15,23,42,.045); }
