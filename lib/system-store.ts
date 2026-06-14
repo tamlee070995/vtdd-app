@@ -40,7 +40,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
   TOOL_PMH_SCHEDULE_ENABLED: "0",
   TOOL_PMH_START_AT: "",
   TOOL_PMH_END_AT: "",
-  TOOL_PMH_LOCK_REASON: "Công cụ PMH/Pincode đang tạm đóng theo cài đặt Admin.",
+  TOOL_PMH_LOCK_REASON: "Công cụ PMH/Pincode đang tạm đóng.",
 };
 
 let settingsWriteQueue: Promise<any> = Promise.resolve();

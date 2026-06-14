@@ -84,7 +84,7 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
     TOOL_PMH_SCHEDULE_ENABLED: "0",
     TOOL_PMH_START_AT: "",
     TOOL_PMH_END_AT: "",
-    TOOL_PMH_LOCK_REASON: "Công cụ PMH/Pincode đang tạm đóng theo cài đặt Admin.",
+    TOOL_PMH_LOCK_REASON: "Công cụ PMH/Pincode đang tạm đóng.",
     ...initialSettings,
   });
   const [saving, setSaving] = useState("");
