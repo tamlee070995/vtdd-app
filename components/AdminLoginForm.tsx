@@ -90,7 +90,6 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
           </div>
 
           <div className="admin-login-hero-content">
-            <span>ENTERPRISE ACCESS</span>
             <h1>
               Đăng nhập
               <b>quản trị</b>

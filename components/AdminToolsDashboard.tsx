@@ -5,7 +5,8 @@ import AdminDataSyncPanel from "@/components/AdminDataSyncPanel";
 import PincodeAdminTool from "@/components/PincodeAdminTool";
 import { getPmhToolAvailability } from "@/lib/tool-settings";
 
-type ToolKey = "pmh" | "coming-price" | "support-report";
+type ToolKey = "pmh" | "coming-price" | "support-report" | "telegram";
+type TelegramToolKey = "ChienGia" | "NgoaiDS";
 
 type AdminToolsDashboardProps = {
   initialSettings: Record<string, string>;
@@ -43,6 +44,34 @@ const TOOLS: Array<{
     status: "Đã mở",
     configurable: true,
   },
+  {
+    key: "telegram",
+    no: "04",
+    title: "Thông báo Telegram",
+    desc: "Cấu hình bot, nhóm nhận tin và test riêng cho từng công cụ.",
+    status: "Đã mở",
+    configurable: true,
+  },
+];
+
+const TELEGRAM_TOOLS: Array<{
+  key: TelegramToolKey;
+  prefix: string;
+  title: string;
+  desc: string;
+}> = [
+  {
+    key: "ChienGia",
+    prefix: "TELEGRAM_CHIENGIA",
+    title: "Tổng giá TCDM thấp hơn đối thủ",
+    desc: "Gửi thông báo khi nhân viên tạo hồ sơ chiến giá.",
+  },
+  {
+    key: "NgoaiDS",
+    prefix: "TELEGRAM_NGOAIDS",
+    title: "Máy ngoài danh sách",
+    desc: "Gửi thông báo khi nhân viên tạo hồ sơ máy ngoài danh sách.",
+  },
 ];
 
 function toDatetimeLocalInput(value: any) {
@@ -78,6 +107,12 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
     TOOL_PMH_START_AT: "",
     TOOL_PMH_END_AT: "",
     TOOL_PMH_LOCK_REASON: "Công cụ PMH/Pincode đang tạm đóng.",
+    TELEGRAM_CHIENGIA_ENABLED: "0",
+    TELEGRAM_CHIENGIA_BOT_TOKEN: "",
+    TELEGRAM_CHIENGIA_CHAT_ID: "",
+    TELEGRAM_NGOAIDS_ENABLED: "0",
+    TELEGRAM_NGOAIDS_BOT_TOKEN: "",
+    TELEGRAM_NGOAIDS_CHAT_ID: "",
     ...initialSettings,
   });
   const [saving, setSaving] = useState("");
@@ -144,6 +179,52 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
     );
   }
 
+  function isSettingOn(key: string) {
+    const value = String(settings[key] || "").trim().toLowerCase();
+    return value === "1" || value === "true" || value === "yes" || value === "on";
+  }
+
+  function getTelegramUpdates(prefix: string) {
+    return {
+      [`${prefix}_ENABLED`]: isSettingOn(`${prefix}_ENABLED`) ? "1" : "0",
+      [`${prefix}_BOT_TOKEN`]: settings[`${prefix}_BOT_TOKEN`] || "",
+      [`${prefix}_CHAT_ID`]: settings[`${prefix}_CHAT_ID`] || "",
+    };
+  }
+
+  async function saveTelegramSettings(prefix: string) {
+    await saveToolSettings(getTelegramUpdates(prefix), `telegram-save-${prefix}`);
+  }
+
+  async function testTelegramBot(tool: TelegramToolKey, prefix: string) {
+    try {
+      const updates = getTelegramUpdates(prefix);
+      if (!String(updates[`${prefix}_BOT_TOKEN`] || "").trim() || !String(updates[`${prefix}_CHAT_ID`] || "").trim()) {
+        showToast("Vui lòng nhập Token/ID Bot và ID nhóm trước khi test.");
+        return;
+      }
+
+      setSaving(`telegram-test-${prefix}`);
+
+      const res = await fetch("/api/admin/tools/telegram/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+        cache: "no-store",
+        body: JSON.stringify({ tool, settings: updates }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) throw new Error(data?.message || "Không test được Telegram bot.");
+
+      setSettings((current) => ({ ...current, ...updates, ...(data.settings || {}) }));
+      setSaving("");
+      showToast(data.message || "Đã gửi tin test Telegram.");
+    } catch (err: any) {
+      setSaving("");
+      showToast(err?.message || "Không test được Telegram bot.");
+    }
+  }
+
   function renderPmhConfig() {
     return (
       <section className={`pmh-tool-config ${pmhAvailability.enabled ? "" : "off"}`}>
@@ -189,6 +270,77 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
     );
   }
 
+  function renderTelegramConfig() {
+    return (
+      <section className="telegram-tool-panel">
+        <div className="telegram-tool-head">
+          <span>Telegram Notification</span>
+          <h4>Thông báo bot theo từng công cụ</h4>
+          <p>Nhập Token/ID Bot và ID nhóm riêng cho từng luồng. Khi nhân viên gửi hồ sơ, bot sẽ báo vào nhóm đã cấu hình.</p>
+        </div>
+
+        <div className="telegram-tool-grid">
+          {TELEGRAM_TOOLS.map((item) => {
+            const enabledKey = `${item.prefix}_ENABLED`;
+            const botKey = `${item.prefix}_BOT_TOKEN`;
+            const chatKey = `${item.prefix}_CHAT_ID`;
+            const saveBusy = saving === `telegram-save-${item.prefix}`;
+            const testBusy = saving === `telegram-test-${item.prefix}`;
+
+            return (
+              <article className={`telegram-tool-card ${isSettingOn(enabledKey) ? "on" : ""}`} key={item.key}>
+                <div className="telegram-tool-card-head">
+                  <div>
+                    <b>{item.title}</b>
+                    <small>{item.desc}</small>
+                  </div>
+
+                  <label className="telegram-toggle">
+                    <input
+                      type="checkbox"
+                      checked={isSettingOn(enabledKey)}
+                      onChange={(event) => setSetting(enabledKey, event.target.checked ? "1" : "0")}
+                    />
+                    <span />
+                  </label>
+                </div>
+
+                <label>
+                  <span>Token / ID Bot</span>
+                  <input
+                    value={settings[botKey] || ""}
+                    onChange={(event) => setSetting(botKey, event.target.value)}
+                    placeholder="VD: 123456789:AA..."
+                    autoComplete="off"
+                  />
+                </label>
+
+                <label>
+                  <span>ID nhóm / Chat ID</span>
+                  <input
+                    value={settings[chatKey] || ""}
+                    onChange={(event) => setSetting(chatKey, event.target.value)}
+                    placeholder="VD: -1001234567890"
+                    autoComplete="off"
+                  />
+                </label>
+
+                <div className="telegram-tool-actions">
+                  <button type="button" onClick={() => saveTelegramSettings(item.prefix)} disabled={saveBusy || testBusy}>
+                    {saveBusy ? "Đang lưu..." : "Lưu cấu hình"}
+                  </button>
+                  <button type="button" className="secondary" onClick={() => testTelegramBot(item.key, item.prefix)} disabled={saveBusy || testBusy}>
+                    {testBusy ? "Đang test..." : "Test bot"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="admin-tools-v5">
       <style>{STYLE}</style>
@@ -205,13 +357,15 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
         {TOOLS.map((tool) => {
           const active = openTool === tool.key;
           const isPmh = tool.key === "pmh";
-          const toolEnabled = isPmh ? pmhAvailability.enabled : false;
+          const isTelegram = tool.key === "telegram";
+          const telegramEnabled = TELEGRAM_TOOLS.some((item) => isSettingOn(`${item.prefix}_ENABLED`));
+          const toolEnabled = isPmh ? pmhAvailability.enabled : isTelegram ? telegramEnabled : false;
           const scheduleActive = isPmh ? pmhAvailability.scheduled : false;
 
           return (
             <article
               key={tool.key}
-              className={`tools-v5-card ${active ? "active" : ""} ${tool.configurable ? "" : "disabled"} ${!toolEnabled && isPmh ? "off" : ""} ${showPmhConfig && isPmh ? "with-config" : ""}`}
+              className={`tools-v5-card ${active ? "active" : ""} ${tool.configurable ? "" : "disabled"} ${!toolEnabled && (isPmh || isTelegram) ? "off" : ""} ${showPmhConfig && isPmh ? "with-config" : ""}`}
             >
               <button
                 type="button"
@@ -226,7 +380,7 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
                 </span>
               </button>
 
-              <strong>{isPmh ? "Theo lịch chạy" : tool.status}</strong>
+              <strong>{isPmh ? "Theo lịch chạy" : isTelegram ? "Bot riêng" : tool.status}</strong>
 
               <div className="tools-v5-status">
                 {isPmh
@@ -235,6 +389,10 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
                     : toolEnabled
                       ? "Đang trong giờ chạy"
                       : "Chưa cài giờ chạy"
+                  : isTelegram
+                    ? telegramEnabled
+                      ? "Đang bật bot"
+                      : "Chưa bật bot"
                   : tool.status}
               </div>
 
@@ -267,6 +425,10 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
       ) : openTool === "support-report" ? (
         <div className="tools-v5-panel">
           <AdminDataSyncPanel />
+        </div>
+      ) : openTool === "telegram" ? (
+        <div className="tools-v5-panel">
+          {renderTelegramConfig()}
         </div>
       ) : (
         <div className="tools-v5-empty">
@@ -314,7 +476,7 @@ const STYLE = `
 }
 .tools-v5-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   align-items: start;
 }
@@ -525,6 +687,160 @@ const STYLE = `
   opacity: .58;
   cursor: not-allowed;
 }
+.telegram-tool-panel {
+  padding: 16px;
+  border-radius: 22px;
+  background: #fff;
+  border: 1px solid #dbe5ef;
+  box-shadow: 0 14px 34px rgba(15,23,42,.055);
+  display: grid;
+  gap: 14px;
+}
+.telegram-tool-head span {
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.telegram-tool-head h4 {
+  margin: 7px 0 0;
+  color: #07111f;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 1000;
+}
+.telegram-tool-head p {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 850;
+}
+.telegram-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.telegram-tool-card {
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid #dbe5ef;
+  background: linear-gradient(135deg, #ffffff, #f8fafc);
+  display: grid;
+  gap: 12px;
+}
+.telegram-tool-card.on {
+  border-color: #99f6e4;
+  background: linear-gradient(135deg, #ffffff, #ecfdf5);
+}
+.telegram-tool-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+.telegram-tool-card-head b {
+  display: block;
+  color: #07111f;
+  font-size: 17px;
+  line-height: 1.05;
+  font-weight: 1000;
+}
+.telegram-tool-card-head small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 850;
+}
+.telegram-tool-card label:not(.telegram-toggle) {
+  display: grid;
+  gap: 6px;
+}
+.telegram-tool-card label:not(.telegram-toggle) span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.telegram-tool-card input[type="text"],
+.telegram-tool-card label:not(.telegram-toggle) input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 11px;
+  border-radius: 14px;
+  border: 1px solid #dbe5ef;
+  background: #fff;
+  color: #07111f;
+  outline: none;
+  font-size: 13px;
+  font-weight: 850;
+}
+.telegram-toggle {
+  flex: 0 0 auto;
+  width: 58px;
+  height: 34px;
+  position: relative;
+  cursor: pointer;
+}
+.telegram-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.telegram-toggle span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #cbd5e1;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.5);
+  transition: .18s ease;
+}
+.telegram-toggle span::after {
+  content: "";
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  top: 5px;
+  left: 5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 6px 14px rgba(15,23,42,.2);
+  transition: .18s ease;
+}
+.telegram-toggle input:checked + span {
+  background: #ffd400;
+}
+.telegram-toggle input:checked + span::after {
+  transform: translateX(24px);
+  background: #07111f;
+}
+.telegram-tool-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.telegram-tool-actions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 14px;
+  background: #ffd400;
+  color: #07111f;
+  font-size: 12px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+.telegram-tool-actions button.secondary {
+  background: #07111f;
+  color: #ffd400;
+}
+.telegram-tool-actions button:disabled {
+  opacity: .58;
+  cursor: not-allowed;
+}
 .tools-v5-empty {
   min-height: 180px;
   border-radius: 22px;
@@ -563,7 +879,8 @@ const STYLE = `
 @media (max-width: 980px) {
   .tools-v5-grid,
   .pmh-tool-config,
-  .pmh-tool-config-grid {
+  .pmh-tool-config-grid,
+  .telegram-tool-grid {
     grid-template-columns: 1fr;
   }
   .tools-v5-card {

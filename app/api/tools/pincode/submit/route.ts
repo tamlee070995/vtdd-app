@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { uploadDataUrlToCloudinary } from "@/lib/cloudinary-upload";
 import { createPincodeRequest, normalizePincodeFlow, updatePincodeRequestImages } from "@/lib/pincode-store";
 import { getCurrentPmhToolAvailability, pmhToolClosedJson } from "@/lib/pmh-tool-guard";
+import { getSystemSettings } from "@/lib/system-store";
+import { notifyPincodeRequestTelegram } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,6 +20,17 @@ function formatSubmitError(err: any) {
     message: isQuotaError ? "Google Sheets đang quá tải lượt đọc. Vui lòng chờ khoảng 1 phút rồi gửi lại hồ sơ." : rawMessage || "Không gửi được hồ sơ PMH.",
     status: isQuotaError ? 429 : 400,
   };
+}
+
+async function notifyTelegramIfNeeded(result: any) {
+  if (!result?.success || result?.recovered || !result?.request) return;
+
+  try {
+    const settings = await getSystemSettings();
+    await notifyPincodeRequestTelegram(settings, result.request);
+  } catch (err: any) {
+    console.warn("PINCODE_TELEGRAM_NOTIFY_ERROR:", err?.message || err);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -67,6 +80,8 @@ export async function POST(req: NextRequest) {
         imageUrls,
       });
 
+      await notifyTelegramIfNeeded(result);
+
       return NextResponse.json(result);
     }
 
@@ -84,6 +99,8 @@ export async function POST(req: NextRequest) {
       imageUrls,
       userAgent: getUserAgent(req),
     });
+
+    await notifyTelegramIfNeeded(result);
 
     return NextResponse.json(result);
   } catch (err: any) {

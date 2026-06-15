@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
-import { appendAdminAudit, updateSystemSettings } from "@/lib/system-store";
+import { getSystemSettings, updateSystemSettings, appendAdminAudit } from "@/lib/system-store";
+import { sendTelegramTest, type TelegramToolKey } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const ALLOWED_TOOL_SETTING_KEYS = new Set([
-  "TOOL_PMH_ENABLED",
-  "TOOL_PMH_SCHEDULE_ENABLED",
-  "TOOL_PMH_START_AT",
-  "TOOL_PMH_END_AT",
-  "TOOL_PMH_LOCK_REASON",
+const TOOL_KEYS: TelegramToolKey[] = ["ChienGia", "NgoaiDS"];
+
+const ALLOWED_SETTING_KEYS = new Set([
   "TELEGRAM_CHIENGIA_ENABLED",
   "TELEGRAM_CHIENGIA_BOT_TOKEN",
   "TELEGRAM_CHIENGIA_CHAT_ID",
@@ -43,47 +42,54 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json().catch(() => null);
-    const input = body?.settings || {};
+    const tool = clean(body?.tool) as TelegramToolKey;
+
+    if (!TOOL_KEYS.includes(tool)) {
+      return NextResponse.json({ success: false, message: "Tool Telegram không hợp lệ." }, { status: 400 });
+    }
+
+    const settingsInput = body?.settings || {};
     const updates: Record<string, string> = {};
 
-    Object.entries(input).forEach(([key, value]) => {
-      if (!ALLOWED_TOOL_SETTING_KEYS.has(key)) return;
+    Object.entries(settingsInput).forEach(([key, value]) => {
+      if (!ALLOWED_SETTING_KEYS.has(key)) return;
       updates[key] = clean(value);
     });
 
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ success: false, message: "Không có cấu hình tool hợp lệ để lưu." }, { status: 400 });
+    const adminName = admin?.name || admin?.maNV || "Admin";
+
+    if (Object.keys(updates).length > 0) {
+      await updateSystemSettings(updates, adminName);
     }
 
-    ["TOOL_PMH_START_AT", "TOOL_PMH_END_AT"].forEach((key) => {
-      const value = clean(updates[key]);
-      if (value && !value.startsWith("'")) updates[key] = `'${value}`;
-    });
+    const settings = {
+      ...(await getSystemSettings()),
+      ...updates,
+    };
 
-    const adminName = admin?.name || admin?.maNV || "Admin";
-    await updateSystemSettings(updates, adminName);
+    await sendTelegramTest(settings, tool);
 
     try {
       await appendAdminAudit({
         admin: adminName,
-        action: "UPDATE_TOOL_SETTINGS",
-        target: "Module_05_Tools",
-        newValue: JSON.stringify(updates),
+        action: "TEST_TELEGRAM_BOT",
+        target: `Telegram_${tool}`,
+        newValue: JSON.stringify({ tool }),
         ip: getClientIp(req),
-        note: "Cập nhật bật/tắt và lịch hoạt động công cụ hỗ trợ.",
+        note: "Test bot Telegram cho công cụ hỗ trợ.",
       });
     } catch (auditErr: any) {
-      console.warn("SKIP_TOOL_ADMIN_AUDIT:", auditErr?.message || auditErr);
+      console.warn("SKIP_TELEGRAM_TEST_AUDIT:", auditErr?.message || auditErr);
     }
 
     return NextResponse.json({
       success: true,
-      message: "Đã lưu cấu hình công cụ.",
+      message: "Đã gửi tin test Telegram thành công.",
       settings: updates,
     });
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, message: err?.message || "Không lưu được cấu hình công cụ." },
+      { success: false, message: err?.message || "Không test được Telegram bot." },
       { status: 500 }
     );
   }

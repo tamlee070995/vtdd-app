@@ -42,6 +42,13 @@ export const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
   TOOL_PMH_START_AT: "",
   TOOL_PMH_END_AT: "",
   TOOL_PMH_LOCK_REASON: "Công cụ PMH/Pincode đang tạm đóng.",
+
+  TELEGRAM_CHIENGIA_ENABLED: "0",
+  TELEGRAM_CHIENGIA_BOT_TOKEN: "",
+  TELEGRAM_CHIENGIA_CHAT_ID: "",
+  TELEGRAM_NGOAIDS_ENABLED: "0",
+  TELEGRAM_NGOAIDS_BOT_TOKEN: "",
+  TELEGRAM_NGOAIDS_CHAT_ID: "",
 };
 
 let settingsWriteQueue: Promise<any> = Promise.resolve();
