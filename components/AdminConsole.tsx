@@ -3535,8 +3535,8 @@ function NoAccessPanel({ moduleTitle }: { moduleTitle: string }) {
     <section className="admin-cms-no-access-panel">
       <div>
         <b>Không có quyền truy cập</b>
-        <p>Tài khoản của bạn đang là Mod nhưng chưa được Admin cấp quyền cho hạng mục này.</p>
-        <small>{moduleTitle}</small>
+        <p>Quyền tài khoản: Moderator</p>
+        <p>Admin chưa cấp quyền sử dụng các chức năng.</p>
       </div>
     </section>
   );
@@ -3652,7 +3652,6 @@ export default function AdminConsole({
               <span>01</span>
               <div>
                 <h3>Quản trị: Trang tra giá TCDM</h3>
-                <p>Toàn bộ chức năng admin cũ được gom vào module này.</p>
               </div>
             </div>
             <TcdmAdminConsole
