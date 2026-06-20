@@ -18,6 +18,7 @@ export const STAFF_COOKIES = [
 ];
 
 const STAFF_SESSION_MAX_AGE = 60 * 60 * 12;
+const LEGACY_STAFF_IDENTITY_COOKIES = STAFF_COOKIES.filter((name) => name !== STAFF_SESSION_COOKIE);
 
 type StaffSessionData = {
   maST?: string;
@@ -58,13 +59,13 @@ export function shouldForceStaffSetup(staff: StaffRow, gmail: string, securityQu
   );
 }
 
-function setCookie(res: NextResponse, name: string, value: string, maxAge = STAFF_SESSION_MAX_AGE) {
-  res.cookies.set(name, encodeURIComponent(value || ""), {
+function clearCookie(res: NextResponse, name: string) {
+  res.cookies.set(name, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge,
+    maxAge: 0,
   });
 }
 
@@ -83,11 +84,7 @@ export function setStaffSessionCookies(
   const sessionToken = createSignedSessionToken<StaffSessionData>(
     "staff",
     data.maNV,
-    STAFF_SESSION_MAX_AGE,
-    {
-      maST: data.maST,
-      staffName: data.staffName,
-    }
+    STAFF_SESSION_MAX_AGE
   );
 
   res.cookies.set(STAFF_SESSION_COOKIE, sessionToken, {
@@ -98,13 +95,7 @@ export function setStaffSessionCookies(
     maxAge: STAFF_SESSION_MAX_AGE,
   });
 
-  setCookie(res, "vtdd_staff_nv", data.maNV);
-  setCookie(res, "vtdd_staff_st", data.maST);
-  setCookie(res, "vtdd_staff_name", data.staffName || "Nhân viên");
-  setCookie(res, "vtdd_staff_store_name", data.storeName || "");
-  setCookie(res, "vtdd_staff_department", data.department || "");
-  setCookie(res, "vtdd_staff_gmail", data.gmail || "");
-  setCookie(res, "vtdd_staff_force_setup", data.forceSetup ? "1" : "0");
+  LEGACY_STAFF_IDENTITY_COOKIES.forEach((name) => clearCookie(res, name));
 }
 
 export function clearStaffSessionCookies(res: NextResponse) {

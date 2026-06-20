@@ -738,7 +738,7 @@ export async function lookupPincodeStaff(maST: string, maNV: string): Promise<Pi
       } else if (staff?.status && staff.status.toLowerCase() !== "active") {
         message = "Tài khoản nhân viên chưa Active.";
       } else if (targetStore && staff && staff.maST !== targetStore) {
-        message = `Mã nhân viên ${staff.maNV} thuộc siêu thị ${staff.maST}, không khớp mã ${targetStore}.`;
+        message = "Mã siêu thị hoặc mã nhân viên không hợp lệ/không khớp.";
       }
 
       return {
@@ -778,7 +778,7 @@ export async function lookupPincodeStaff(maST: string, maNV: string): Promise<Pi
   } else if (staff?.status && staff.status.toLowerCase() !== "active") {
     message = "Tài khoản nhân viên chưa Active.";
   } else if (targetStore && staff && staff.maST !== targetStore) {
-    message = `Mã nhân viên ${staff.maNV} thuộc siêu thị ${staff.maST}, không khớp mã ${targetStore}.`;
+    message = "Mã siêu thị hoặc mã nhân viên không hợp lệ/không khớp.";
   }
 
   const valid = Boolean(!message && (!targetStore || store) && (!targetStaff || staff));
@@ -1088,7 +1088,7 @@ export async function createPincodeRequest(data: {
 
   const inputStore = cleanCode(data.maST);
   if (inputStore && staff.maST && inputStore !== staff.maST) {
-    throw new Error(`Mã siêu thị không khớp Data_Staff. NV ${staff.maNV} thuộc ST ${staff.maST}.`);
+    throw new Error("Mã siêu thị hoặc mã nhân viên không hợp lệ/không khớp.");
   }
 
   const imei = normalizeIdentifier(data.imei, data.identifierType);

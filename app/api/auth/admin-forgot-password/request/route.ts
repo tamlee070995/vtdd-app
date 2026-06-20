@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 const OTP_EXPIRES_MINUTES = 10;
 const OTP_MAX_PER_DAY = 3;
+const GENERIC_ADMIN_OTP_MESSAGE =
+  "Nếu tài khoản quản trị hợp lệ và đã cấu hình Gmail khôi phục, hệ thống sẽ gửi OTP trong ít phút.";
 
 function redirectBack(req: NextRequest, params: Record<string, string>) {
   const url = new URL("/admin/forgot-password", req.url);
@@ -49,21 +51,21 @@ export async function POST(req: NextRequest) {
     const staff = await findStaffByMaNV(maNV);
 
     if (!staff) {
-      return redirectBack(req, { error: "Không tìm thấy tài khoản." });
+      return redirectBack(req, { sent: "1", maNV, success: GENERIC_ADMIN_OTP_MESSAGE });
     }
 
     if (String(staff.status || "").trim().toLowerCase() !== "active") {
-      return redirectBack(req, { error: "Tài khoản chưa Active hoặc đã bị khóa." });
+      return redirectBack(req, { sent: "1", maNV, success: GENERIC_ADMIN_OTP_MESSAGE });
     }
 
     if (!hasAdminPermission(staff.permission)) {
-      return redirectBack(req, { error: "Tài khoản này không thuộc đội ngũ quản trị viên." });
+      return redirectBack(req, { sent: "1", maNV, success: GENERIC_ADMIN_OTP_MESSAGE });
     }
 
     const gmail = safeDecrypt(staff.gmail);
 
     if (!gmail) {
-      return redirectBack(req, { error: "Tài khoản chưa cấu hình Gmail khôi phục." });
+      return redirectBack(req, { sent: "1", maNV, success: GENERIC_ADMIN_OTP_MESSAGE });
     }
 
     const today = todayKey();
@@ -108,6 +110,7 @@ export async function POST(req: NextRequest) {
       success: "Đã gửi mã OTP đến email khôi phục. Mã có hiệu lực trong 10 phút.",
     });
   } catch (err: any) {
-    return redirectBack(req, { error: "Lỗi gửi OTP: " + (err?.message || "Không gửi được.") });
+    console.error("ADMIN_FORGOT_OTP_ERROR:", err?.message || err);
+    return redirectBack(req, { error: "Không gửi được OTP. Vui lòng thử lại sau." });
   }
 }

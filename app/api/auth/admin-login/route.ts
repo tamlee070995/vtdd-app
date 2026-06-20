@@ -105,6 +105,7 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (err: any) {
-    return jsonError("Lỗi đăng nhập Admin: " + (err?.message || "Không đăng nhập được."), 500);
+    console.error("ADMIN_LOGIN_ERROR:", err?.message || err);
+    return jsonError("Lỗi đăng nhập Admin. Vui lòng thử lại sau.", 500);
   }
 }

@@ -9,6 +9,12 @@ import {
 } from "@/lib/staff-security";
 import { verifyCaptchaAnswer } from "@/lib/captcha";
 import { sendNewStaffAccountMail } from "@/lib/mail";
+import {
+  checkRegisterRateLimit,
+  checkRegisterTrap,
+  getRegisterClientIp,
+  verifyRegisterTurnstile,
+} from "@/lib/register-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +149,41 @@ export async function POST(req: NextRequest) {
 
     const captchaToken = normalizeText(form.get("captchaToken"));
     const captchaAnswer = normalizeText(form.get("captchaAnswer"));
+    const formStartedAt = normalizeText(form.get("formStartedAt"));
+    const honeypot = normalizeText(form.get("companyWebsite"));
+    const turnstileToken = normalizeText(
+      form.get("turnstileToken") || form.get("cf-turnstile-response")
+    );
+    const clientIp = getRegisterClientIp(req);
+
+    const trapError = checkRegisterTrap({
+      honeypot,
+      formStartedAt,
+    });
+
+    if (trapError) {
+      return redirectRegister(req, "error", trapError);
+    }
+
+    const rateLimitError = checkRegisterRateLimit({
+      ip: clientIp,
+      maNV,
+      gmail,
+    });
+
+    if (rateLimitError) {
+      return redirectRegister(req, "error", rateLimitError);
+    }
+
+    const turnstile = await verifyRegisterTurnstile(turnstileToken, clientIp);
+
+    if (!turnstile.ok) {
+      return redirectRegister(
+        req,
+        "error",
+        turnstile.message || "Không xác thực được chống spam. Vui lòng thử lại."
+      );
+    }
 
     const captchaOK = verifyCaptchaAnswer(captchaToken, captchaAnswer);
 
@@ -227,12 +268,7 @@ export async function POST(req: NextRequest) {
         adminUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://vienthongdidong.com"}/admin`,
       });
 
-      console.log("SEND_NEW_STAFF_ACCOUNT_MAIL_OK", {
-        maNV,
-        maST,
-        staffName,
-        gmail,
-      });
+      console.log("SEND_NEW_STAFF_ACCOUNT_MAIL_OK", { maNV });
     } catch (mailErr) {
       console.error("SEND_NEW_STAFF_ACCOUNT_MAIL_ERROR", mailErr);
     }
@@ -243,10 +279,11 @@ export async function POST(req: NextRequest) {
       "Đã tạo tài khoản chờ duyệt. Vui lòng liên hệ Admin để được kích hoạt."
     );
   } catch (err: any) {
+    console.error("STAFF_REGISTER_ERROR:", err?.message || err);
     return redirectRegister(
       req,
       "error",
-      "Lỗi tạo tài khoản: " + (err?.message || "Không tạo được.")
+      "Không tạo được tài khoản. Vui lòng thử lại sau."
     );
   }
 }

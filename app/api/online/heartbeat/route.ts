@@ -39,10 +39,11 @@ export async function POST(req: NextRequest) {
       online,
     });
   } catch (err: any) {
+    console.error("ONLINE_HEARTBEAT_ERROR:", err?.message || err);
     return NextResponse.json(
       {
         success: false,
-        message: err?.message || "Không ghi nhận được trạng thái online.",
+        message: "Không ghi nhận được trạng thái online.",
       },
       { status: 500 }
     );

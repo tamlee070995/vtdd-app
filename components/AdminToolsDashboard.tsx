@@ -1,15 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AdminDataSyncPanel from "@/components/AdminDataSyncPanel";
 import PincodeAdminTool from "@/components/PincodeAdminTool";
 import { getPmhToolAvailability } from "@/lib/tool-settings";
 
 type ToolKey = "pmh" | "coming-price" | "support-report" | "telegram";
 type TelegramToolKey = "ChienGia" | "NgoaiDS";
+type AdminRole = "admin" | "mod";
+type AdminToolActionKey = "tools-pmh" | "tools-coming" | "tools-report" | "tools-telegram";
 
 type AdminToolsDashboardProps = {
   initialSettings: Record<string, string>;
+  adminRole?: AdminRole;
+  adminModules?: string;
+  adminActions?: string;
+  adminHasExplicitActions?: boolean;
 };
 
 const TOOLS: Array<{
@@ -74,6 +80,28 @@ const TELEGRAM_TOOLS: Array<{
   },
 ];
 
+const TOOL_ACTIONS: Record<ToolKey, AdminToolActionKey> = {
+  pmh: "tools-pmh",
+  "coming-price": "tools-coming",
+  "support-report": "tools-report",
+  telegram: "tools-telegram",
+};
+
+const TOOL_ACTION_LIST = Object.values(TOOL_ACTIONS);
+
+function parseCsv(value: any) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function parseToolActions(value: any) {
+  return parseCsv(value)
+    .map((item) => item.replace(/^action:/, "") as AdminToolActionKey)
+    .filter((item, index, arr) => TOOL_ACTION_LIST.includes(item) && arr.indexOf(item) === index);
+}
+
 function toDatetimeLocalInput(value: any) {
   const raw = String(value || "").trim().replace(/^'/, "");
   if (!raw) return "";
@@ -98,7 +126,12 @@ function toDatetimeLocalInput(value: any) {
   return raw;
 }
 
-export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashboardProps) {
+export default function AdminToolsDashboard({
+  initialSettings,
+  adminRole = "admin",
+  adminModules = "",
+  adminActions = "",
+}: AdminToolsDashboardProps) {
   const [openTool, setOpenTool] = useState<ToolKey | "">("pmh");
   const [showPmhConfig, setShowPmhConfig] = useState(false);
   const [settings, setSettings] = useState<Record<string, string>>({
@@ -119,6 +152,35 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
   const [toast, setToast] = useState("");
 
   const pmhAvailability = useMemo(() => getPmhToolAvailability(settings), [settings]);
+  const isFullAdmin = String(adminRole || "").toLowerCase() === "admin";
+  const grantedModules = useMemo(() => parseCsv(adminModules), [adminModules]);
+  const grantedToolActions = useMemo(() => parseToolActions(adminActions), [adminActions]);
+  const hasToolActions = grantedToolActions.length > 0;
+  const legacyPmhAccess = grantedModules.includes("tools") && !hasToolActions;
+  const visibleTools = useMemo(
+    () =>
+      TOOLS.filter((tool) => {
+        if (isFullAdmin) return true;
+        if (grantedToolActions.includes(TOOL_ACTIONS[tool.key])) return true;
+        return tool.key === "pmh" && legacyPmhAccess;
+      }),
+    [grantedToolActions, isFullAdmin, legacyPmhAccess]
+  );
+  const canUseOpenTool = visibleTools.some((tool) => tool.key === openTool);
+
+  useEffect(() => {
+    if (visibleTools.length === 0) {
+      if (openTool) setOpenTool("");
+      if (showPmhConfig) setShowPmhConfig(false);
+      return;
+    }
+
+    if (!visibleTools.some((tool) => tool.key === openTool)) {
+      const firstConfigurable = visibleTools.find((tool) => tool.configurable);
+      setOpenTool(firstConfigurable?.key || "");
+      setShowPmhConfig(false);
+    }
+  }, [openTool, showPmhConfig, visibleTools]);
 
   function showToast(message: string) {
     setToast(message);
@@ -185,11 +247,16 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
   }
 
   function getTelegramUpdates(prefix: string) {
-    return {
+    const updates: Record<string, string> = {
       [`${prefix}_ENABLED`]: isSettingOn(`${prefix}_ENABLED`) ? "1" : "0",
-      [`${prefix}_BOT_TOKEN`]: settings[`${prefix}_BOT_TOKEN`] || "",
-      [`${prefix}_CHAT_ID`]: settings[`${prefix}_CHAT_ID`] || "",
     };
+    const token = String(settings[`${prefix}_BOT_TOKEN`] || "").trim();
+    const chatId = String(settings[`${prefix}_CHAT_ID`] || "").trim();
+
+    if (token) updates[`${prefix}_BOT_TOKEN`] = token;
+    if (chatId) updates[`${prefix}_CHAT_ID`] = chatId;
+
+    return updates;
   }
 
   async function saveTelegramSettings(prefix: string) {
@@ -199,11 +266,6 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
   async function testTelegramBot(tool: TelegramToolKey, prefix: string) {
     try {
       const updates = getTelegramUpdates(prefix);
-      if (!String(updates[`${prefix}_BOT_TOKEN`] || "").trim() || !String(updates[`${prefix}_CHAT_ID`] || "").trim()) {
-        showToast("Vui lòng nhập Token/ID Bot và ID nhóm trước khi test.");
-        return;
-      }
-
       setSaving(`telegram-test-${prefix}`);
 
       const res = await fetch("/api/admin/tools/telegram/test", {
@@ -354,7 +416,7 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
       </div>
 
       <div className="tools-v5-grid">
-        {TOOLS.map((tool) => {
+        {visibleTools.map((tool) => {
           const active = openTool === tool.key;
           const isPmh = tool.key === "pmh";
           const isTelegram = tool.key === "telegram";
@@ -418,22 +480,22 @@ export default function AdminToolsDashboard({ initialSettings }: AdminToolsDashb
         })}
       </div>
 
-      {openTool === "pmh" ? (
+      {openTool === "pmh" && canUseOpenTool ? (
         <div className="tools-v5-panel">
           <PincodeAdminTool />
         </div>
-      ) : openTool === "support-report" ? (
+      ) : openTool === "support-report" && canUseOpenTool ? (
         <div className="tools-v5-panel">
           <AdminDataSyncPanel />
         </div>
-      ) : openTool === "telegram" ? (
+      ) : openTool === "telegram" && canUseOpenTool ? (
         <div className="tools-v5-panel">
           {renderTelegramConfig()}
         </div>
       ) : (
         <div className="tools-v5-empty">
-          <b>Chưa mở công cụ nào</b>
-          <span>Chọn một công cụ phía trên để thao tác.</span>
+          <b>{visibleTools.length ? "Chưa mở công cụ nào" : "Chưa có quyền công cụ"}</b>
+          <span>{visibleTools.length ? "Chọn một công cụ phía trên để thao tác." : "Vui lòng liên hệ Admin để cấp quyền module 05 phù hợp."}</span>
         </div>
       )}
 

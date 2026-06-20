@@ -9,7 +9,9 @@ import { adminHasAction, requireAdminApi } from "@/lib/admin-auth";
 export const dynamic = "force-dynamic";
 
 const ALLOWED_SETTING_KEYS = new Set(
-  Object.keys(DEFAULT_SYSTEM_SETTINGS).filter((key) => key !== "ADMIN_PIN_HASH")
+  Object.keys(DEFAULT_SYSTEM_SETTINGS).filter(
+    (key) => key !== "ADMIN_PIN_HASH" && !key.startsWith("TOOL_") && !key.startsWith("TELEGRAM_")
+  )
 );
 
 function getClientIp(req: NextRequest) {
@@ -35,6 +37,21 @@ function clean(value: any) {
 function isOn(value: unknown) {
   const v = clean(value).toLowerCase();
   return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function redactSensitiveSettings(settings: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(settings).map(([key, value]) => [
+      key,
+      /(TOKEN|SECRET|HASH|PASSWORD|PASS|PIN)/i.test(key) ? "[REDACTED]" : value,
+    ])
+  );
+}
+
+function omitSensitiveSettings(settings: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(settings).filter(([key]) => !/(TOKEN|SECRET|HASH|PASSWORD|PASS|PIN)/i.test(key))
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -100,7 +117,7 @@ export async function POST(req: NextRequest) {
         admin: admin?.name || admin?.maNV || "Admin",
         action: "UPDATE_SETTINGS",
         target: "System_Settings",
-        newValue: JSON.stringify(updates),
+        newValue: JSON.stringify(redactSensitiveSettings(updates)),
         ip: getClientIp(req),
         note: "Cập nhật cấu hình hệ thống.",
       });
@@ -111,7 +128,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Đã lưu cấu hình hệ thống.",
-      settings: updates,
+      settings: omitSensitiveSettings(updates),
     });
   } catch (err: any) {
     console.error("ADMIN_SETTINGS_SAVE_ERROR:", err);
@@ -119,9 +136,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        message:
-          err?.message ||
-          "Không lưu được cấu hình. Kiểm tra quyền Service Account với Google Sheet.",
+        message: "Không lưu được cấu hình hệ thống.",
       },
       { status: 500 }
     );

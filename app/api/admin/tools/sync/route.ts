@@ -5,6 +5,9 @@ import { exportSyncTarget, getSyncSummary, importSyncCsv } from "@/lib/data-sync
 
 export const dynamic = "force-dynamic";
 
+const ADMIN_ONLY_EXPORT_TARGETS = new Set(["staff", "system_settings", "admin_audit", "backup"]);
+const ADMIN_ONLY_IMPORT_TARGETS = new Set(["staff"]);
+
 function noStoreHeaders(extra?: HeadersInit) {
   return {
     "Cache-Control": "no-store, no-cache, must-revalidate",
@@ -13,7 +16,7 @@ function noStoreHeaders(extra?: HeadersInit) {
 }
 
 export async function GET(req: NextRequest) {
-  const { response } = await requireAdminApi(req, { module: "tools" });
+  const { admin, response } = await requireAdminApi(req, { action: "tools-report" });
   if (response) return response;
 
   try {
@@ -30,6 +33,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if (ADMIN_ONLY_EXPORT_TARGETS.has(target) && admin?.permission !== "admin") {
+      return NextResponse.json(
+        { success: false, message: "Chỉ Admin được xuất dữ liệu nhạy cảm." },
+        { status: 403, headers: noStoreHeaders() }
+      );
+    }
+
     const exported = await exportSyncTarget(target);
 
     return new NextResponse(exported.body, {
@@ -40,6 +50,8 @@ export async function GET(req: NextRequest) {
       }),
     });
   } catch (err: any) {
+    console.error("ADMIN_SYNC_EXPORT_ERROR:", err?.message || err);
+    err = null;
     return NextResponse.json(
       {
         success: false,
@@ -51,13 +63,20 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { admin, response } = await requireAdminApi(req, { module: "tools" });
+  const { admin, response } = await requireAdminApi(req, { action: "tools-report" });
   if (response) return response;
 
   try {
     const form = await req.formData();
     const target = String(form.get("target") || "").trim();
     const file = form.get("file");
+
+    if (ADMIN_ONLY_IMPORT_TARGETS.has(target) && admin?.permission !== "admin") {
+      return NextResponse.json(
+        { success: false, message: "Chỉ Admin được import dữ liệu nhân viên." },
+        { status: 403, headers: noStoreHeaders() }
+      );
+    }
 
     if (!(file instanceof File)) {
       return NextResponse.json(
@@ -86,6 +105,8 @@ export async function POST(req: NextRequest) {
       { headers: noStoreHeaders() }
     );
   } catch (err: any) {
+    console.error("ADMIN_SYNC_IMPORT_ERROR:", err?.message || err);
+    err = null;
     return NextResponse.json(
       {
         success: false,

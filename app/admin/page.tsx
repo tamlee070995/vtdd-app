@@ -3,10 +3,83 @@ import Link from "next/link";
 import AdminConsole from "@/components/AdminConsole";
 import AdminProfileButton from "@/components/AdminProfileButton";
 import { getSystemSettings } from "@/lib/system-store";
-import { requireAdminPage } from "@/lib/admin-auth";
+import { adminCanUsePmhTool, adminHasAction, requireAdminPage } from "@/lib/admin-auth";
 import { ensureStaffAdminHeaders } from "@/lib/staff-store";
 
 export const dynamic = "force-dynamic";
+
+const TCDM_CLIENT_SETTING_KEYS = [
+  "MARQUEE_MESSAGE",
+  "FIXED_BANNER_MESSAGE",
+  "PUSH_NOTIFY_MESSAGE",
+  "PUSH_NOTIFY_VERSION",
+  "PRICE_EFFECTIVE_FROM",
+  "PRICE_EFFECTIVE_TO",
+  "DATA_VERSION",
+  "SYSTEM_LOCK_ENABLED",
+  "SYSTEM_LOCK_MESSAGE",
+  "SYSTEM_LOCK_SCHEDULE_ENABLED",
+  "SYSTEM_LOCK_START_AT",
+  "SYSTEM_LOCK_END_AT",
+  "SYSTEM_LOCK_REASON",
+  "STAFF_PAGE_LOCKED",
+  "CUSTOMER_PAGE_LOCKED",
+  "STAFF_TRADEIN_LOCKED",
+  "STAFF_BUYONLY_LOCKED",
+  "CUSTOMER_TRADEIN_LOCKED",
+  "CUSTOMER_BUYONLY_LOCKED",
+];
+
+const PMH_CLIENT_SETTING_KEYS = [
+  "TOOL_PMH_ENABLED",
+  "TOOL_PMH_SCHEDULE_ENABLED",
+  "TOOL_PMH_START_AT",
+  "TOOL_PMH_END_AT",
+  "TOOL_PMH_LOCK_REASON",
+];
+
+const TELEGRAM_CLIENT_SETTING_KEYS = [
+  "TELEGRAM_CHIENGIA_ENABLED",
+  "TELEGRAM_NGOAIDS_ENABLED",
+];
+
+function isSensitiveSettingKey(key: string) {
+  return /(TOKEN|SECRET|HASH|PASSWORD|PASS|PIN)/i.test(key);
+}
+
+function buildClientSettings(settings: Record<string, string>, admin: Awaited<ReturnType<typeof requireAdminPage>>) {
+  if (!admin) return {};
+  if (admin.permission === "admin") {
+    return Object.fromEntries(
+      Object.entries(settings).filter(([key]) => !isSensitiveSettingKey(key))
+    );
+  }
+
+  const keys = new Set<string>();
+
+  if (
+    adminHasAction(admin, "settings-write", "tcdm") ||
+    adminHasAction(admin, "reload-data", "tcdm") ||
+    adminHasAction(admin, "dashboard-view", "tcdm")
+  ) {
+    TCDM_CLIENT_SETTING_KEYS.forEach((key) => keys.add(key));
+  }
+
+  if (adminCanUsePmhTool(admin)) {
+    PMH_CLIENT_SETTING_KEYS.forEach((key) => keys.add(key));
+  }
+
+  if (adminHasAction(admin, "tools-telegram")) {
+    TELEGRAM_CLIENT_SETTING_KEYS.forEach((key) => keys.add(key));
+  }
+
+  const filtered: Record<string, string> = {};
+  keys.forEach((key) => {
+    if (isSensitiveSettingKey(key)) return;
+    filtered[key] = String(settings[key] ?? "");
+  });
+  return filtered;
+}
 
 export default async function AdminPage() {
   const admin = await requireAdminPage();
@@ -17,6 +90,7 @@ export default async function AdminPage() {
 
   await ensureStaffAdminHeaders();
   const settings = await getSystemSettings();
+  const clientSettings = buildClientSettings(settings, admin);
 
   return (
     <main className="admin-cms-pro-page">
@@ -49,7 +123,7 @@ export default async function AdminPage() {
         </header>
 
         <AdminConsole
-          initialSettings={settings}
+          initialSettings={clientSettings}
           adminRole={admin.permission}
           adminName={admin.name}
           adminModules={admin.modules.join(",")}

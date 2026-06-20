@@ -51,6 +51,33 @@ export const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
   TELEGRAM_NGOAIDS_CHAT_ID: "",
 };
 
+const PUBLIC_SYSTEM_SETTING_KEYS = [
+  "MARQUEE_MESSAGE",
+  "FIXED_BANNER_MESSAGE",
+  "PUSH_NOTIFY_MESSAGE",
+  "PUSH_NOTIFY_VERSION",
+  "PRICE_EFFECTIVE_FROM",
+  "PRICE_EFFECTIVE_TO",
+  "SYSTEM_LOCK_ENABLED",
+  "SYSTEM_LOCK_MESSAGE",
+  "SYSTEM_LOCK_SCHEDULE_ENABLED",
+  "SYSTEM_LOCK_START_AT",
+  "SYSTEM_LOCK_END_AT",
+  "SYSTEM_LOCK_REASON",
+  "STAFF_PAGE_LOCKED",
+  "CUSTOMER_PAGE_LOCKED",
+  "STAFF_TRADEIN_LOCKED",
+  "STAFF_BUYONLY_LOCKED",
+  "CUSTOMER_TRADEIN_LOCKED",
+  "CUSTOMER_BUYONLY_LOCKED",
+  "DATA_VERSION",
+  "TOOL_PMH_ENABLED",
+  "TOOL_PMH_SCHEDULE_ENABLED",
+  "TOOL_PMH_START_AT",
+  "TOOL_PMH_END_AT",
+  "TOOL_PMH_LOCK_REASON",
+];
+
 let settingsWriteQueue: Promise<any> = Promise.resolve();
 
 function enqueueSettingsWrite<T>(job: () => Promise<T>) {
@@ -261,8 +288,11 @@ export async function getSystemSettings() {
 
 export async function getPublicSystemSettings() {
   const settings = await getSystemSettings();
-  const publicSettings = { ...settings };
-  delete publicSettings.ADMIN_PIN_HASH;
+  const publicSettings: Record<string, string> = {};
+
+  PUBLIC_SYSTEM_SETTING_KEYS.forEach((key) => {
+    publicSettings[key] = clean(settings[key] ?? DEFAULT_SYSTEM_SETTINGS[key] ?? "");
+  });
 
   const from = clean(publicSettings.PRICE_EFFECTIVE_FROM);
   const to = clean(publicSettings.PRICE_EFFECTIVE_TO);

@@ -10,7 +10,11 @@ export type AdminActionKey =
   | "staff-security"
   | "settings-write"
   | "reload-data"
-  | "dashboard-view";
+  | "dashboard-view"
+  | "tools-pmh"
+  | "tools-coming"
+  | "tools-report"
+  | "tools-telegram";
 
 export const ADMIN_COOKIE = "vtdd_admin_token";
 export const ADMIN_NV_COOKIE = "vtdd_admin_nv";
@@ -25,6 +29,10 @@ const ACTIONS: AdminActionKey[] = [
   "settings-write",
   "reload-data",
   "dashboard-view",
+  "tools-pmh",
+  "tools-coming",
+  "tools-report",
+  "tools-telegram",
 ];
 const ACTION_PREFIX = "action:";
 const ADMIN_SESSION_MAX_AGE = 60 * 60 * 8;
@@ -55,6 +63,17 @@ export function normalizeAdminModules(value: any): AdminModuleKey[] {
     MODULES.includes(item as AdminModuleKey)
   );
 }
+
+function clearLegacyAdminCookie(res: NextResponse, name: string) {
+  res.cookies.set(name, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+}
+
 
 export function normalizeAdminActions(value: any): AdminActionKey[] {
   return normalizeAdminAccessTokens(value)
@@ -120,6 +139,23 @@ export function adminHasAction(
   if ((admin.actions || []).includes(action)) return true;
   if (admin.hasExplicitActions) return false;
   return legacyModule ? adminCanAccessModule(admin, legacyModule) : false;
+}
+
+export function adminCanUsePmhTool(
+  admin:
+    | {
+        permission: AdminPermission;
+        modules?: AdminModuleKey[];
+        actions?: AdminActionKey[];
+      }
+    | null
+) {
+  if (!admin) return false;
+  if (admin.permission === "admin") return true;
+  const actions = admin.actions || [];
+  if (actions.includes("tools-pmh")) return true;
+  const hasToolActions = actions.some((action) => String(action).startsWith("tools-"));
+  return !hasToolActions && (admin.modules || []).includes("tools");
 }
 
 export async function getCurrentAdmin() {
@@ -246,10 +282,9 @@ export function setAdminCookies(
   );
 
   res.cookies.set(ADMIN_COOKIE, sessionToken, base);
-  res.cookies.set(ADMIN_NV_COOKIE, encodeURIComponent(data.maNV || ""), base);
-  res.cookies.set(ADMIN_NAME_COOKIE, encodeURIComponent(data.name || "Admin"), base);
-  res.cookies.set(ADMIN_PERMISSION_COOKIE, data.permission, base);
-  res.cookies.set(ADMIN_MODULES_COOKIE, encodeURIComponent(modules), base);
+  [ADMIN_NV_COOKIE, ADMIN_NAME_COOKIE, ADMIN_PERMISSION_COOKIE, ADMIN_MODULES_COOKIE].forEach((name) =>
+    clearLegacyAdminCookie(res, name)
+  );
 }
 
 export function clearAdminCookies(res: NextResponse) {

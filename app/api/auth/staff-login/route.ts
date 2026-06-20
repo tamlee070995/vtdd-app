@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     if (!staff) {
       return redirectLogin(
         req,
-        "Tài khoản chưa tồn tại trên hệ thống. Vui lòng kiểm tra lại mã nhân viên hoặc tạo tài khoản mới."
+        "Tài khoản chưa tồn tại trên hệ thống. Vui lòng kiểm tra lại mã nhân viên hoặc tạo tài khoản mới và liên hệ admin duyệt để sử dụng."
       );
     }
 
@@ -92,9 +92,10 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (err: any) {
+    console.error("STAFF_LOGIN_ERROR:", err?.message || err);
     return redirectLogin(
       req,
-      "Lỗi hệ thống đăng nhập: " + (err?.message || "Không xác thực được.")
+      "Lỗi hệ thống đăng nhập. Vui lòng thử lại sau."
     );
   }
 }

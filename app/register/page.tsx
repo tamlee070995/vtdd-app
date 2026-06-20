@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Script from "next/script";
 import { useEffect, useMemo, useState } from "react";
 
 type CaptchaPayload = {
@@ -33,6 +34,9 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [formStartedAt] = useState(() => String(Date.now()));
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
   const gmailError = useMemo(() => {
     const value = gmail.trim().toLowerCase();
@@ -79,6 +83,25 @@ export default function RegisterPage() {
     loadCaptcha();
   }, []);
 
+  useEffect(() => {
+    const targetWindow = window as Window & {
+      handleRegisterTurnstile?: (token: string) => void;
+      handleRegisterTurnstileExpired?: () => void;
+    };
+
+    targetWindow.handleRegisterTurnstile = (token: string) => {
+      setTurnstileToken(token || "");
+    };
+    targetWindow.handleRegisterTurnstileExpired = () => {
+      setTurnstileToken("");
+    };
+
+    return () => {
+      delete targetWindow.handleRegisterTurnstile;
+      delete targetWindow.handleRegisterTurnstileExpired;
+    };
+  }, []);
+
   return (
     <main className="register-vtd-page">
       <style>{styles}</style>
@@ -109,6 +132,14 @@ export default function RegisterPage() {
           method="POST"
           onSubmit={() => setSubmitting(true)}
         >
+          <div className="register-vtd-honeypot" aria-hidden="true">
+            <label>
+              Company website
+              <input name="companyWebsite" type="text" tabIndex={-1} autoComplete="off" />
+            </label>
+          </div>
+          <input type="hidden" name="formStartedAt" value={formStartedAt} />
+
           {error && <div className="register-vtd-alert error">⚠️ {error}</div>}
 
           <div className="register-vtd-grid two">
@@ -228,7 +259,33 @@ export default function RegisterPage() {
             </label>
           </div>
 
-          <button className="register-vtd-submit" type="submit" disabled={!!gmailError || submitting}>
+          {turnstileSiteKey ? (
+            <div className="register-vtd-turnstile">
+              <Script
+                src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+                strategy="afterInteractive"
+                async
+                defer
+              />
+              <input type="hidden" name="turnstileToken" value={turnstileToken} />
+              <div
+                className="cf-turnstile"
+                data-sitekey={turnstileSiteKey}
+                data-callback="handleRegisterTurnstile"
+                data-expired-callback="handleRegisterTurnstileExpired"
+                data-error-callback="handleRegisterTurnstileExpired"
+                data-theme="light"
+              />
+            </div>
+          ) : (
+            <input type="hidden" name="turnstileToken" value="" />
+          )}
+
+          <button
+            className="register-vtd-submit"
+            type="submit"
+            disabled={!!gmailError || submitting || Boolean(turnstileSiteKey && !turnstileToken)}
+          >
             {submitting ? "Đang gửi yêu cầu..." : "Tạo tài khoản chờ duyệt"}
           </button>
 
@@ -378,6 +435,14 @@ const styles = `
   box-shadow: 0 22px 70px rgba(15, 23, 42, .08);
 }
 
+.register-vtd-honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 .register-vtd-grid.two {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -512,6 +577,13 @@ const styles = `
   color: #07111f;
   font-size: 14px;
   font-weight: 1000;
+}
+
+.register-vtd-turnstile {
+  min-height: 65px;
+  margin: 4px 0 14px;
+  display: flex;
+  justify-content: center;
 }
 
 .register-vtd-submit {

@@ -248,8 +248,6 @@ export async function GET(req: NextRequest) {
           // Thông báo dùng dạng camelCase để client đọc đúng.
           notify,
 
-          // Giữ thêm rawSettings để sau này debug hoặc component mới cần dùng.
-          rawSettings: settings,
         },
       },
       {
@@ -262,12 +260,12 @@ export async function GET(req: NextRequest) {
       }
     );
   } catch (err: any) {
-    console.error("SUPER_FAST_DATA_ERROR:", err);
+    console.error("SUPER_FAST_DATA_ERROR:", err?.message || err);
 
     return NextResponse.json(
       {
         success: false,
-        message: err?.message || "Không tải được dữ liệu tra cứu.",
+        message: "Không tải được dữ liệu tra cứu.",
       },
       {
         status: 500,

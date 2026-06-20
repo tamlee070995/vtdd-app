@@ -67,7 +67,11 @@ type AdminActionKey =
   | "staff-security"
   | "settings-write"
   | "reload-data"
-  | "dashboard-view";
+  | "dashboard-view"
+  | "tools-pmh"
+  | "tools-coming"
+  | "tools-report"
+  | "tools-telegram";
 
 type AdminConsoleProps = {
   initialSettings: Record<string, string>;
@@ -153,6 +157,21 @@ const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: st
   { key: "dashboard-view", label: "Xem dashboard", desc: "Xem log tra giá, top máy và thống kê." },
 ];
 
+const TOOL_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
+  { key: "tools-pmh", label: "PMH / Pincode", desc: "Duyệt hồ sơ, nạp kho PMH và cấu hình lịch chạy." },
+  { key: "tools-coming", label: "Công cụ sắp thêm", desc: "Cho phép nhìn thấy ô công cụ chờ gắn thêm." },
+  { key: "tools-report", label: "Báo cáo hỗ trợ", desc: "Import/export CSV, xuất log và tạo file backup." },
+  { key: "tools-telegram", label: "Thông báo Telegram", desc: "Cài bot, nhóm nhận tin và test bot cho từng công cụ." },
+];
+
+const ALL_ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
+  ...ADMIN_ACTION_OPTIONS,
+  ...TOOL_ACTION_OPTIONS,
+];
+
+const TOOL_ACTION_KEYS = new Set(TOOL_ACTION_OPTIONS.map((item) => item.key));
+const TCDM_ACTION_KEYS = new Set(ADMIN_ACTION_OPTIONS.map((item) => item.key));
+
 const NOTIFY_SETTING_KEYS = [
   "MARQUEE_MESSAGE",
   "FIXED_BANNER_MESSAGE",
@@ -192,13 +211,7 @@ const PERMISSION_TREE = [
     title: "Công cụ hỗ trợ",
     desc: "Module số 5 cho PMH/Pincode và các tool gắn thêm sau này.",
     module: "tools",
-    children: [
-      {
-        module: "tools",
-        label: "PMH / Pincode",
-        desc: "Duyệt hồ sơ, nạp kho PMH, bật/tắt công cụ hỗ trợ.",
-      },
-    ],
+    children: TOOL_ACTION_OPTIONS,
   },
 ] as const;
 
@@ -251,7 +264,7 @@ function toDatetimeLocalInput(value: any) {
 function parseAdminAccessItems(value: any) {
   const moduleKeys = new Set(ADMIN_MODULE_OPTIONS.map((item) => item.key));
   const actionKeys = new Set(
-    ADMIN_ACTION_OPTIONS.map((item) => `${ADMIN_ACTION_PREFIX}${item.key}`)
+    ALL_ADMIN_ACTION_OPTIONS.map((item) => `${ADMIN_ACTION_PREFIX}${item.key}`)
   );
 
   return String(value || "")
@@ -264,7 +277,7 @@ function parseAdminAccessItems(value: any) {
 }
 
 function parseAdminActionItems(value: any) {
-  const actionKeys = new Set(ADMIN_ACTION_OPTIONS.map((item) => item.key));
+  const actionKeys = new Set(ALL_ADMIN_ACTION_OPTIONS.map((item) => item.key));
 
   return String(value || "")
     .split(",")
@@ -288,7 +301,7 @@ function summarizeAdminAccess(value: any) {
       if (moduleOption) return moduleOption.label;
 
       const actionKey = token.slice(ADMIN_ACTION_PREFIX.length);
-      const action = ADMIN_ACTION_OPTIONS.find((item) => item.key === actionKey);
+      const action = ALL_ADMIN_ACTION_OPTIONS.find((item) => item.key === actionKey);
       return action ? action.label : token;
     })
     .join(" · ");
@@ -2963,8 +2976,14 @@ function StaffAdminAccessBox({
   function toggleModule(key: string) {
     setAccessItems((current) => {
       if (!current.includes(key)) return [...current, key];
-      if (key === "tcdm") {
-        return current.filter((item) => item !== key && !item.startsWith(ADMIN_ACTION_PREFIX));
+      if (key === "tcdm" || key === "tools") {
+        const actionKeys = key === "tools" ? TOOL_ACTION_KEYS : TCDM_ACTION_KEYS;
+        return current.filter((item) => {
+          if (item === key) return false;
+          if (!item.startsWith(ADMIN_ACTION_PREFIX)) return true;
+          const action = item.slice(ADMIN_ACTION_PREFIX.length) as AdminActionKey;
+          return !actionKeys.has(action);
+        });
       }
       return current.filter((item) => item !== key);
     });
@@ -2976,9 +2995,10 @@ function StaffAdminAccessBox({
     setAccessItems((current) => {
       if (current.includes(token)) return current.filter((item) => item !== token);
 
-      const next = current.includes("tcdm")
+      const parentModule = TOOL_ACTION_KEYS.has(key) ? "tools" : "tcdm";
+      const next = current.includes(parentModule)
         ? [...current, token]
-        : ["tcdm", ...current, token];
+        : [parentModule, ...current, token];
 
       return parseAdminAccessItems(next.join(","));
     });
@@ -3656,7 +3676,13 @@ export default function AdminConsole({
             />
           )
         ) : (
-          <AdminToolsDashboard initialSettings={initialSettings} />
+          <AdminToolsDashboard
+            initialSettings={initialSettings}
+            adminRole={adminRole}
+            adminModules={adminModules}
+            adminActions={adminActions}
+            adminHasExplicitActions={adminHasExplicitActions}
+          />
         )}
       </section>
 

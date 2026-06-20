@@ -21,6 +21,12 @@ function clean(value: unknown) {
   return String(value ?? "").trim();
 }
 
+function omitSensitiveSettings(settings: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(settings).filter(([key]) => !/(TOKEN|SECRET|HASH|PASSWORD|PASS|PIN)/i.test(key))
+  );
+}
+
 function getClientIp(req: NextRequest) {
   const forwarded = req.headers.get("forwarded") || "";
   const forwardedFor = forwarded.match(/for="?([^;,"]+)/i)?.[1] || "";
@@ -37,7 +43,7 @@ function getClientIp(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { admin, response } = await requireAdminApi(req, { module: "tools" });
+  const { admin, response } = await requireAdminApi(req, { action: "tools-telegram" });
   if (response) return response;
 
   try {
@@ -85,11 +91,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Đã gửi tin test Telegram thành công.",
-      settings: updates,
+      settings: omitSensitiveSettings(updates),
     });
   } catch (err: any) {
+    console.error("ADMIN_TELEGRAM_TEST_ERROR:", err?.message || err);
     return NextResponse.json(
-      { success: false, message: err?.message || "Không test được Telegram bot." },
+      { success: false, message: "Không test được Telegram bot." },
       { status: 500 }
     );
   }

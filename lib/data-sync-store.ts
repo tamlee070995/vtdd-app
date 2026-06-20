@@ -426,6 +426,32 @@ function makeCsv(headers: string[], rows: unknown[][]) {
     .join("\r\n");
 }
 
+function redactStaffRow(row: any) {
+  return {
+    ma_nv: row.ma_nv,
+    staff_name: row.staff_name,
+    ma_st: row.ma_st,
+    store_name: row.store_name,
+    department: row.department,
+    status: row.status,
+    reset_otp_count: row.reset_otp_count,
+    need_setup: row.need_setup,
+    permission: row.permission,
+    module_permissions: row.module_permissions,
+    source_row: row.source_row,
+  };
+}
+
+function redactSystemSettingRow(row: any) {
+  const key = clean(row.key);
+  const isSecret = /(TOKEN|SECRET|HASH|PASSWORD|PASS|PIN)/i.test(key);
+
+  return {
+    ...row,
+    value: isSecret ? "[REDACTED]" : row.value,
+  };
+}
+
 function sourceSort(a: any, b: any) {
   const aRow = Number(clean(a.source_row));
   const bRow = Number(clean(b.source_row));
@@ -499,23 +525,16 @@ async function exportCsv(target: Exclude<SyncExportTarget, "backup">) {
   }
 
   if (target === "staff") {
-    const rows = (await selectAllRows<any>("staff")).sort(sourceSort);
+    const rows = (await selectAllRows<any>("staff")).sort(sourceSort).map(redactStaffRow);
     return makeCsv(
-      ["MÃ NHÂN VIÊN", "TÊN NHÂN VIÊN", "MÃ SIÊU THỊ", "TÊN SIÊU THỊ", "TÊN PHÒNG BAN", "MẬT KHẨU", "CÂU HỎI BẢO MẬT", "CÂU TRẢ LỜI BẢO MẬT", "GMAIL", "TRẠNG THÁI", "RESET_OTP_HASH", "RESET_OTP_EXPIRES", "RESET_OTP_DAY", "RESET_OTP_COUNT", "NEED_SETUP", "PERMISSION", "ADMIN_MODULES"],
+      ["MA_NHAN_VIEN", "TEN_NHAN_VIEN", "MA_SIEU_THI", "TEN_SIEU_THI", "TEN_PHONG_BAN", "TRANG_THAI", "RESET_OTP_COUNT", "NEED_SETUP", "PERMISSION", "ADMIN_MODULES"],
       rows.map((row) => [
         row.ma_nv,
         row.staff_name,
         row.ma_st,
         row.store_name,
         row.department,
-        row.password_hash,
-        row.security_question,
-        row.security_answer,
-        row.gmail,
         row.status,
-        row.reset_otp_hash,
-        row.reset_otp_expires,
-        row.reset_otp_day,
         row.reset_otp_count,
         row.need_setup,
         row.permission,
@@ -561,7 +580,7 @@ async function exportCsv(target: Exclude<SyncExportTarget, "backup">) {
   }
 
   if (target === "system_settings") {
-    const rows = (await selectAllRows<any>("system_settings", { order: "key.asc" }));
+    const rows = (await selectAllRows<any>("system_settings", { order: "key.asc" })).map(redactSystemSettingRow);
     return makeCsv(
       ["KEY", "VALUE", "TYPE", "UPDATED_AT", "UPDATED_BY"],
       rows.map((row) => [row.key, row.value, row.type, row.updated_at_text, row.updated_by])
@@ -627,13 +646,13 @@ async function exportBackupJson() {
   return {
     exportedAt: new Date().toISOString(),
     tables: {
-      staff,
+      staff: (staff as any[]).map(redactStaffRow),
       stores,
       products_new: productsNew,
       products_old: productsOld,
       pmh_codes: pmhCodes,
       pincode_requests: pincodeRequests,
-      system_settings: systemSettings,
+      system_settings: (systemSettings as any[]).map(redactSystemSettingRow),
       admin_audit: adminAudit,
       quote_logs: quoteLogs,
     },

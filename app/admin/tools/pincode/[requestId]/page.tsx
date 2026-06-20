@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import PincodeReviewPage from "@/components/PincodeReviewPage";
-import { adminCanAccessModule, requireAdminPage } from "@/lib/admin-auth";
+import { adminCanUsePmhTool, requireAdminPage } from "@/lib/admin-auth";
 import { getPincodeRequestById, getPmhStats } from "@/lib/pincode-store";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export default async function AdminPincodeReviewPage({ params }: PageProps) {
     redirect("/admin/login");
   }
 
-  if (!adminCanAccessModule(admin, "tools")) {
+  if (!adminCanUsePmhTool(admin)) {
     redirect("/admin");
   }
 

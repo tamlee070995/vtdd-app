@@ -405,7 +405,13 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
   async function loadStatus(requestId: string, options?: { silent?: boolean }) {
     try {
       if (!options?.silent) setLoadingStatus(true);
-      const res = await fetch(`/api/tools/pincode/status?requestId=${encodeURIComponent(requestId)}`, {
+      const params = new URLSearchParams({ requestId });
+      const ownerMaST = clean(request?.maST || maST);
+      const ownerMaNV = clean(request?.maNV || maNV);
+      if (ownerMaST) params.set("maST", ownerMaST);
+      if (ownerMaNV) params.set("maNV", ownerMaNV);
+
+      const res = await fetch(`/api/tools/pincode/status?${params.toString()}`, {
         cache: "no-store",
         headers: { "Cache-Control": "no-store" },
       });
@@ -743,7 +749,7 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
         method: "POST",
         headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
         cache: "no-store",
-        body: JSON.stringify({ requestId: target.requestId, action: "DONE" }),
+        body: JSON.stringify({ requestId: target.requestId, action: "DONE", maST: target.maST, maNV: target.maNV }),
       });
       await loadStatus(target.requestId, { silent: true });
       showToast(copied ? "Đã copy mã PMH." : "PMH đã hiển thị, hãy copy thủ công nếu cần.");
@@ -775,10 +781,11 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
         method: "POST",
         headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
         cache: "no-store",
-        body: JSON.stringify({ requestId: target.requestId, action: "SKIP" }),
+        body: JSON.stringify({ requestId: target.requestId, action: "SKIP", maST: target.maST, maNV: target.maNV }),
       });
       setDismissedFollowUpId(target.requestId);
       setFollowUpPrompt(null);
+      resetFormFields();
       if (request?.requestId === target.requestId) setRequest(null);
       showToast("Đã bỏ qua PMH cũ, có thể tạo yêu cầu mới.");
     } catch {
@@ -858,7 +865,34 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
     window.location.href = "/cong-cu-ho-tro";
   }
 
+  function resetFormFields() {
+    Object.values(uploads).forEach((item) => {
+      if (item?.preview) URL.revokeObjectURL(item.preview);
+    });
+
+    setMaST("");
+    setMaNV("");
+    setStaffLookup(null);
+    setLookupLoading(false);
+    setIdentifierType("IMEI");
+    setIdentifier("");
+    setModelCu("");
+    setOldModelQuery("");
+    setOldModelMenuOpen(false);
+    setOldModelError("");
+    setOldRamRom("");
+    setDeviceCategory("");
+    setModelMoi("");
+    setModelQuery("");
+    setModelMenuOpen(false);
+    setModelOptions([]);
+    setModelError("");
+    setUploads({});
+    setPreviewFile(null);
+  }
+
   function startFresh() {
+    resetFormFields();
     setRequest(null);
     setRevealed(false);
     setSubmitPhase("");

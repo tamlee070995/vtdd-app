@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/admin-auth";
+import { adminCanUsePmhTool, requireAdminApi } from "@/lib/admin-auth";
 import {
   approvePincodeRequest,
   getPincodeAdminDashboard,
@@ -20,8 +20,11 @@ function formatQuotaMessage(err: any, fallback: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const { response } = await requireAdminApi(req, { module: "tools" });
+  const { admin, response } = await requireAdminApi(req);
   if (response) return response;
+  if (!adminCanUsePmhTool(admin)) {
+    return NextResponse.json({ success: false, message: "Không có quyền PMH/Pincode." }, { status: 403 });
+  }
 
   try {
     const dashboard = await getPincodeAdminDashboard();
@@ -40,8 +43,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { admin, response } = await requireAdminApi(req, { module: "tools" });
+  const { admin, response } = await requireAdminApi(req);
   if (response) return response;
+  if (!adminCanUsePmhTool(admin)) {
+    return NextResponse.json({ success: false, message: "Không có quyền PMH/Pincode." }, { status: 403 });
+  }
 
   try {
     const body = await req.json().catch(() => null);

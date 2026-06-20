@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
 
     return redirectLogin(req, "Đã đặt lại mật khẩu. Vui lòng đăng nhập lại.");
   } catch (err: any) {
-    return redirectForgot(req, { error: "Lỗi đặt lại mật khẩu: " + (err?.message || "Không thực hiện được.") });
+    console.error("ADMIN_FORGOT_RESET_ERROR:", err?.message || err);
+    return redirectForgot(req, { error: "Không đặt lại được mật khẩu. Vui lòng thử lại sau." });
   }
 }

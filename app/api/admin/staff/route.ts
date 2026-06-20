@@ -99,8 +99,9 @@ export async function GET(req: NextRequest) {
       ...data,
     });
   } catch (err: any) {
+    console.error("ADMIN_STAFF_LIST_ERROR:", err?.message || err);
     return NextResponse.json(
-      { success: false, message: err?.message || "Không tải được danh sách nhân viên." },
+      { success: false, message: "Không tải được danh sách nhân viên." },
       { status: 500 }
     );
   }
@@ -223,7 +224,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Đã reset bảo mật NV ${target.maNV}. Mật khẩu mặc định: ${defaultPassword}.`,
+        message: `Đã reset bảo mật NV ${target.maNV}. Nhân viên cần đăng nhập và thiết lập lại bảo mật.`,
       });
     }
 
@@ -260,8 +261,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: false, message: "Action không hợp lệ." }, { status: 400 });
   } catch (err: any) {
+    console.error("ADMIN_STAFF_ACTION_ERROR:", err?.message || err);
     return NextResponse.json(
-      { success: false, message: err?.message || "Không xử lý được yêu cầu nhân viên." },
+      { success: false, message: "Không xử lý được yêu cầu nhân viên." },
       { status: 500 }
     );
   }

@@ -20,7 +20,21 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      ...lookup,
+      valid: lookup.valid,
+      message: lookup.valid ? "" : "Mã siêu thị hoặc mã nhân viên không hợp lệ/không khớp.",
+      staff: lookup.staff
+        ? {
+            maNV: lookup.staff.maNV,
+            staffName: "Mã nhân viên hợp lệ",
+          }
+        : null,
+      store: lookup.store
+        ? {
+            maST: lookup.store.maST,
+            storeName: "Mã siêu thị hợp lệ",
+          }
+        : null,
+      query: lookup.query,
     });
   } catch (err: any) {
     const rawMessage = String(err?.message || "");
@@ -32,7 +46,7 @@ export async function GET(req: NextRequest) {
         valid: false,
         message: isQuotaError
           ? "Google Sheets đang quá tải lượt đọc. Vui lòng chờ khoảng 1 phút rồi nhập lại mã."
-          : rawMessage || "Không kiểm tra được mã siêu thị / nhân viên.",
+          : "Không kiểm tra được mã siêu thị / nhân viên.",
       },
       { status: isQuotaError ? 429 : 500 }
     );

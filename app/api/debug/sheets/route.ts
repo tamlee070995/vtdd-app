@@ -17,14 +17,13 @@ export async function GET() {
       success: true,
       message: "Kết nối Google Sheet OK",
       rowCount: rows.length,
-      sample: rows,
     });
   } catch (err: any) {
-    console.error("debug sheets error:", err);
+    console.error("debug sheets error:", err?.message || err);
 
     return NextResponse.json({
       success: false,
-      message: err?.message || "Không đọc được Google Sheet",
+      message: "Không đọc được Google Sheet",
     });
   }
 }

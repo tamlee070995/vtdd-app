@@ -29,10 +29,6 @@ function getSessionSecret() {
   return secret;
 }
 
-function b64url(value: string) {
-  return Buffer.from(value, "utf8").toString("base64url");
-}
-
 function fromB64url(value: string) {
   return Buffer.from(value, "base64url").toString("utf8");
 }
@@ -42,6 +38,39 @@ function sign(value: string) {
     .createHmac("sha256", getSessionSecret())
     .update(value)
     .digest("base64url");
+}
+
+function getEncryptionKey() {
+  return crypto.createHash("sha256").update(getSessionSecret()).digest();
+}
+
+function encryptPayload(value: string) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", getEncryptionKey(), iv);
+  cipher.setAAD(Buffer.from("vtdd-session-v2"));
+
+  const encrypted = Buffer.concat([
+    cipher.update(value, "utf8"),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+
+  return `v2.${iv.toString("base64url")}.${encrypted.toString("base64url")}.${tag.toString("base64url")}`;
+}
+
+function decryptPayload(ivText: string, encryptedText: string, tagText: string) {
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    getEncryptionKey(),
+    Buffer.from(ivText, "base64url")
+  );
+  decipher.setAAD(Buffer.from("vtdd-session-v2"));
+  decipher.setAuthTag(Buffer.from(tagText, "base64url"));
+
+  return Buffer.concat([
+    decipher.update(Buffer.from(encryptedText, "base64url")),
+    decipher.final(),
+  ]).toString("utf8");
 }
 
 function safeEqual(left: string, right: string) {
@@ -75,10 +104,7 @@ export function createSignedSessionToken<T extends Record<string, unknown>>(
     throw new Error("Cannot create a session without a subject.");
   }
 
-  const encodedPayload = b64url(JSON.stringify(payload));
-  const signature = sign(encodedPayload);
-
-  return `v1.${encodedPayload}.${signature}`;
+  return encryptPayload(JSON.stringify(payload));
 }
 
 export function verifySignedSessionToken<T extends Record<string, unknown>>(
@@ -86,7 +112,28 @@ export function verifySignedSessionToken<T extends Record<string, unknown>>(
   expectedKind: SessionKind
 ) {
   try {
-    const [version, encodedPayload, signature] = String(token || "").split(".");
+    const parts = String(token || "").split(".");
+    const [version] = parts;
+
+    if (version === "v2") {
+      const [, iv, encryptedPayload, tag] = parts;
+      if (!iv || !encryptedPayload || !tag) return null;
+
+      const payload = JSON.parse(decryptPayload(iv, encryptedPayload, tag)) as SignedSessionPayload<T>;
+
+      if (
+        payload.kind !== expectedKind ||
+        !payload.sub ||
+        !Number.isFinite(payload.exp) ||
+        Date.now() > payload.exp
+      ) {
+        return null;
+      }
+
+      return payload;
+    }
+
+    const [, encodedPayload, signature] = parts;
 
     if (version !== "v1" || !encodedPayload || !signature) {
       return null;

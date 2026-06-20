@@ -86,10 +86,11 @@ export async function POST(req: NextRequest) {
       message: "Đã đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.",
     });
   } catch (err: any) {
+    console.error("STAFF_FORGOT_RESET_ERROR:", err?.message || err);
     return NextResponse.json(
       {
         success: false,
-        message: err?.message || "Không đặt lại được mật khẩu.",
+        message: "Không đặt lại được mật khẩu.",
       },
       { status: 500 }
     );

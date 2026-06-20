@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const MAX_OTP_PER_DAY = 3;
+const GENERIC_OTP_SENT_MESSAGE =
+  "Nếu mã nhân viên hợp lệ và đã cấu hình Gmail bảo mật, hệ thống sẽ gửi OTP trong ít phút.";
 
 function makeOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -58,17 +60,11 @@ export async function POST(req: NextRequest) {
     const staff = await findStaffByMaNV(maNV);
 
     if (!staff) {
-      return NextResponse.json(
-        { success: false, message: "Không tìm thấy tài khoản nhân viên." },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: true, message: GENERIC_OTP_SENT_MESSAGE });
     }
 
     if (staff.status.toLowerCase() === "standby") {
-      return NextResponse.json(
-        { success: false, message: "Tài khoản chưa được duyệt sử dụng, vui lòng liên hệ Admin." },
-        { status: 403 }
-      );
+      return NextResponse.json({ success: true, message: GENERIC_OTP_SENT_MESSAGE });
     }
 
     const retryAfterSec = secondsLeft(staff.resetOtpExpires);
@@ -101,10 +97,7 @@ export async function POST(req: NextRequest) {
     const gmail = decryptText(staff.gmail);
 
     if (!gmail) {
-      return NextResponse.json(
-        { success: false, message: "Tài khoản chưa có Gmail bảo mật. Vui lòng liên hệ Admin." },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: true, message: GENERIC_OTP_SENT_MESSAGE });
     }
 
     const otp = makeOtp();
@@ -131,10 +124,11 @@ export async function POST(req: NextRequest) {
       message: `Đã gửi mã xác thực đến Gmail ${maskEmail(gmail)}. Còn ${MAX_OTP_PER_DAY - (currentCount + 1)} lượt gửi trong hôm nay.`,
     });
   } catch (err: any) {
+    console.error("STAFF_FORGOT_OTP_ERROR:", err?.message || err);
     return NextResponse.json(
       {
         success: false,
-        message: err?.message || "Không gửi được mã xác thực.",
+        message: "Không gửi được mã xác thực.",
       },
       { status: 500 }
     );

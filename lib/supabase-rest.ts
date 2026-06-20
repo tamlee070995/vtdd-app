@@ -49,9 +49,7 @@ function getConfig() {
     String(process.env.SUPABASE_SECRET_KEY || "").trim() ||
     String(process.env.SERVICE_ROLE_KEY || "").trim() ||
     String(process.env.service_role_key || "").trim() ||
-    String(process.env.SUPABASE_SERVICE_KEY || "").trim() ||
-    String(process.env.SUPABASE_ANON_KEY || "").trim() ||
-    String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "").trim();
+    String(process.env.SUPABASE_SERVICE_KEY || "").trim();
 
   if (!supabaseUrl || !serviceKey) return null;
   return { supabaseUrl, serviceKey };
@@ -66,9 +64,7 @@ function hasSupabaseEnvHint() {
       String(process.env.SUPABASE_SECRET_KEY || "").trim() ||
       String(process.env.SERVICE_ROLE_KEY || "").trim() ||
       String(process.env.service_role_key || "").trim() ||
-      String(process.env.SUPABASE_SERVICE_KEY || "").trim() ||
-      String(process.env.SUPABASE_ANON_KEY || "").trim() ||
-      String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "").trim()
+      String(process.env.SUPABASE_SERVICE_KEY || "").trim()
   );
 }
 

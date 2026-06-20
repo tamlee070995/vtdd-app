@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/admin-auth";
+import { adminCanUsePmhTool, adminHasAction, requireAdminApi } from "@/lib/admin-auth";
 import { appendAdminAudit, updateSystemSettings } from "@/lib/system-store";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +18,40 @@ const ALLOWED_TOOL_SETTING_KEYS = new Set([
   "TELEGRAM_NGOAIDS_CHAT_ID",
 ]);
 
+const PMH_SETTING_KEYS = new Set([
+  "TOOL_PMH_ENABLED",
+  "TOOL_PMH_SCHEDULE_ENABLED",
+  "TOOL_PMH_START_AT",
+  "TOOL_PMH_END_AT",
+  "TOOL_PMH_LOCK_REASON",
+]);
+
+const TELEGRAM_SETTING_KEYS = new Set([
+  "TELEGRAM_CHIENGIA_ENABLED",
+  "TELEGRAM_CHIENGIA_BOT_TOKEN",
+  "TELEGRAM_CHIENGIA_CHAT_ID",
+  "TELEGRAM_NGOAIDS_ENABLED",
+  "TELEGRAM_NGOAIDS_BOT_TOKEN",
+  "TELEGRAM_NGOAIDS_CHAT_ID",
+]);
+
 function clean(value: unknown) {
   return String(value ?? "").trim();
+}
+
+function redactSensitiveSettings(settings: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(settings).map(([key, value]) => [
+      key,
+      /(TOKEN|SECRET|HASH|PASSWORD|PASS|PIN)/i.test(key) ? "[REDACTED]" : value,
+    ])
+  );
+}
+
+function omitSensitiveSettings(settings: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(settings).filter(([key]) => !/(TOKEN|SECRET|HASH|PASSWORD|PASS|PIN)/i.test(key))
+  );
 }
 
 function getClientIp(req: NextRequest) {
@@ -38,7 +70,7 @@ function getClientIp(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { admin, response } = await requireAdminApi(req, { module: "tools" });
+  const { admin, response } = await requireAdminApi(req);
   if (response) return response;
 
   try {
@@ -55,6 +87,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "Không có cấu hình tool hợp lệ để lưu." }, { status: 400 });
     }
 
+    const updateKeys = Object.keys(updates);
+    const needsPmhPermission = updateKeys.some((key) => PMH_SETTING_KEYS.has(key));
+    const needsTelegramPermission = updateKeys.some((key) => TELEGRAM_SETTING_KEYS.has(key));
+
+    if (needsPmhPermission && !adminCanUsePmhTool(admin)) {
+      return NextResponse.json({ success: false, message: "Không có quyền cấu hình PMH/Pincode." }, { status: 403 });
+    }
+
+    if (needsTelegramPermission && !adminHasAction(admin, "tools-telegram")) {
+      return NextResponse.json({ success: false, message: "Không có quyền cấu hình Telegram." }, { status: 403 });
+    }
+
     ["TOOL_PMH_START_AT", "TOOL_PMH_END_AT"].forEach((key) => {
       const value = clean(updates[key]);
       if (value && !value.startsWith("'")) updates[key] = `'${value}`;
@@ -68,7 +112,7 @@ export async function POST(req: NextRequest) {
         admin: adminName,
         action: "UPDATE_TOOL_SETTINGS",
         target: "Module_05_Tools",
-        newValue: JSON.stringify(updates),
+        newValue: JSON.stringify(redactSensitiveSettings(updates)),
         ip: getClientIp(req),
         note: "Cập nhật bật/tắt và lịch hoạt động công cụ hỗ trợ.",
       });
@@ -79,11 +123,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Đã lưu cấu hình công cụ.",
-      settings: updates,
+      settings: omitSensitiveSettings(updates),
     });
   } catch (err: any) {
+    console.error("ADMIN_TOOL_SETTINGS_ERROR:", err?.message || err);
     return NextResponse.json(
-      { success: false, message: err?.message || "Không lưu được cấu hình công cụ." },
+      { success: false, message: "Không lưu được cấu hình công cụ." },
       { status: 500 }
     );
   }

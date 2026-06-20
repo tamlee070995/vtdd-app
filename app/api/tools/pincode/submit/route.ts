@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadDataUrlToCloudinary } from "@/lib/cloudinary-upload";
-import { createPincodeRequest, normalizePincodeFlow, updatePincodeRequestImages } from "@/lib/pincode-store";
+import { createPincodeRequest, getPincodeRequestById, normalizePincodeFlow, updatePincodeRequestImages } from "@/lib/pincode-store";
 import { getCurrentPmhToolAvailability, pmhToolClosedJson } from "@/lib/pmh-tool-guard";
 import { getSystemSettings } from "@/lib/system-store";
 import { notifyPincodeRequestTelegram } from "@/lib/telegram";
@@ -15,11 +15,28 @@ function getUserAgent(req: NextRequest) {
 function formatSubmitError(err: any) {
   const rawMessage = String(err?.message || "");
   const isQuotaError = /quota|read requests|sheets\.googleapis\.com/i.test(rawMessage);
+  const leaksStaffMapping = /Data_Staff|thuộc ST|không khớp/i.test(rawMessage);
+  const isSafeInputError = /Lỗi cú pháp|Serial Number|IMEI|Vui lòng|Không tìm thấy mã nhân viên|Tài khoản nhân viên/i.test(rawMessage);
 
   return {
-    message: isQuotaError ? "Google Sheets đang quá tải lượt đọc. Vui lòng chờ khoảng 1 phút rồi gửi lại hồ sơ." : rawMessage || "Không gửi được hồ sơ PMH.",
+    message: isQuotaError
+      ? "Google Sheets đang quá tải lượt đọc. Vui lòng chờ khoảng 1 phút rồi gửi lại hồ sơ."
+      : leaksStaffMapping
+        ? "Mã siêu thị hoặc mã nhân viên không hợp lệ/không khớp."
+        : isSafeInputError
+          ? rawMessage
+          : "Không gửi được hồ sơ PMH.",
     status: isQuotaError ? 429 : 400,
   };
+}
+
+function cleanCode(value: unknown) {
+  return String(value ?? "").trim().replace(/\.0$/, "");
+}
+
+function requestBelongsToOwner(request: { maST?: string; maNV?: string } | null, maST: unknown, maNV: unknown) {
+  if (!request) return false;
+  return cleanCode(request.maST) === cleanCode(maST) && cleanCode(request.maNV) === cleanCode(maNV);
 }
 
 async function notifyTelegramIfNeeded(result: any) {
@@ -57,6 +74,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (requestId) {
+      const request = await getPincodeRequestById(requestId);
+      if (!request) {
+        return NextResponse.json(
+          { success: false, message: "Không tìm thấy hồ sơ cần cập nhật ảnh." },
+          { status: 404 }
+        );
+      }
+
+      if (!requestBelongsToOwner(request, body?.maST, body?.maNV)) {
+        return NextResponse.json(
+          { success: false, message: "Không có quyền cập nhật hồ sơ PMH này." },
+          { status: 403 }
+        );
+      }
+    }
+
     const imageUrls = await Promise.all(
       images.map((item: any, index: number) => {
         const dataUrl = String(item?.dataUrl || "");
@@ -65,7 +99,7 @@ export async function POST(req: NextRequest) {
         if (dataUrl.startsWith("data:image/") || dataUrl.startsWith("data:audio/")) {
           return uploadDataUrlToCloudinary(dataUrl, {
             folder: "vtdd/pincode",
-            name: `${body?.maNV || "nv"}-${String(body?.imei || "imei").replace(/[^\w-]+/g, "_")}-${index + 1}`,
+            name: `pmh-${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${index + 1}`,
           });
         }
 
