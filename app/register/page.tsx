@@ -156,7 +156,7 @@ export default function RegisterPage() {
 
           <label className="register-vtd-field">
             <span>Tên nhân viên</span>
-            <input name="staffName" placeholder="Ví dụ: Lê Minh Tâm" autoComplete="name" required />
+            <input name="staffName" placeholder="Ví dụ: Nguyễn Văn A" autoComplete="name" required />
           </label>
 
           <div className="register-vtd-grid two">
