@@ -63,6 +63,212 @@ function ensureRecipientAccepted(report: ReturnType<typeof buildDeliveryReport>,
   }
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function safeUrl(value: unknown) {
+  const url = String(value || "").trim();
+  if (!url) return "#";
+  if (/^https?:\/\//i.test(url)) return url;
+  return "#";
+}
+
+function buildPreheader(text: string) {
+  return `
+    <div style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all;">
+      ${escapeHtml(text)}
+    </div>
+  `;
+}
+
+function buildBrandHeader(statusLabel: string) {
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+      <tr>
+        <td align="left" style="padding:0;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+              <td width="48" height="48" align="center" valign="middle" style="width:48px;height:48px;border-radius:16px;background:#ffd400;color:#07111f;font-family:Roboto,Arial,sans-serif;font-size:15px;line-height:15px;font-weight:900;letter-spacing:-1px;">
+                VT
+              </td>
+              <td style="padding-left:13px;">
+                <div style="font-family:Roboto,Arial,sans-serif;color:#ffffff;font-size:17px;line-height:20px;font-weight:900;letter-spacing:-.3px;">
+                  Viễn Thông Di Động
+                </div>
+                <div style="margin-top:3px;font-family:Roboto,Arial,sans-serif;color:rgba(255,255,255,.66);font-size:10px;line-height:12px;font-weight:900;letter-spacing:1.7px;text-transform:uppercase;">
+                  Staff Access System
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td align="right" style="padding:0;">
+          <span style="display:inline-block;padding:10px 14px;border-radius:999px;background:rgba(34,197,94,.14);border:1px solid rgba(74,222,128,.32);font-family:Roboto,Arial,sans-serif;color:#86efac;font-size:11px;line-height:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;">
+            ${escapeHtml(statusLabel)}
+          </span>
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
+function buildInfoRows(rows: Array<{ label: string; value: string; accent?: boolean }>) {
+  return rows
+    .map((row, index) => {
+      const border = index === rows.length - 1 ? "" : "border-bottom:1px solid #e5e7eb;";
+      const color = row.accent ? "#047857" : "#0f172a";
+
+      return `
+        <tr>
+          <td style="padding:15px 16px;${border}">
+            <div style="font-family:Roboto,Arial,sans-serif;color:#64748b;font-size:10px;line-height:12px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;">
+              ${escapeHtml(row.label)}
+            </div>
+            <div style="margin-top:6px;font-family:Roboto,Arial,sans-serif;color:${color};font-size:17px;line-height:22px;font-weight:900;letter-spacing:-.2px;">
+              ${escapeHtml(row.value)}
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function buildActionButton(label: string, url: string) {
+  const href = safeUrl(url);
+
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:22px;">
+      <tr>
+        <td align="center" style="border-radius:18px;background:#ffd400;box-shadow:0 14px 30px rgba(245,158,11,.22);">
+          <a href="${escapeHtml(href)}" target="_blank" style="display:block;padding:18px 18px;border-radius:18px;font-family:Roboto,Arial,sans-serif;color:#07111f;text-decoration:none;font-size:13px;line-height:16px;font-weight:900;letter-spacing:1.1px;text-transform:uppercase;">
+            ${escapeHtml(label)}
+          </a>
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
+function buildEmailShell(params: {
+  preheader: string;
+  statusLabel: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  body: string;
+  footerNote?: string;
+}) {
+  return `<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>${escapeHtml(params.title)}</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
+      body, table, td, a, div, p, span, h1, h2, h3 { font-family: Roboto, Arial, sans-serif !important; }
+      @media only screen and (max-width: 620px) {
+        .vtdd-container { width: 100% !important; border-radius: 0 !important; }
+        .vtdd-outer { padding: 0 !important; }
+        .vtdd-hero { padding: 24px 20px 28px !important; }
+        .vtdd-content { padding: 20px !important; }
+        .vtdd-title { font-size: 30px !important; line-height: 34px !important; }
+        .vtdd-description { font-size: 14px !important; line-height: 21px !important; }
+        .vtdd-card { border-radius: 18px !important; }
+      }
+    </style>
+  </head>
+  <body style="margin:0;padding:0;background:#eef2f7;">
+    ${buildPreheader(params.preheader)}
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#eef2f7;">
+      <tr>
+        <td class="vtdd-outer" align="center" style="padding:30px 14px;">
+          <table role="presentation" class="vtdd-container" width="620" cellspacing="0" cellpadding="0" border="0" style="width:620px;max-width:620px;background:#ffffff;border-radius:30px;overflow:hidden;border:1px solid #dbe3ee;box-shadow:0 28px 80px rgba(15,23,42,.14);">
+            <tr>
+              <td class="vtdd-hero" style="padding:30px 30px 34px;background:#07111f;background-image:radial-gradient(circle at 82% 10%, rgba(255,212,0,.32), transparent 30%),radial-gradient(circle at 0% 100%, rgba(34,211,238,.10), transparent 32%),linear-gradient(135deg,#07111f 0%,#111827 58%,#191b07 100%);">
+                ${buildBrandHeader(params.statusLabel)}
+
+                <div style="margin-top:30px;font-family:Roboto,Arial,sans-serif;color:#ffd400;font-size:11px;line-height:13px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;">
+                  ${escapeHtml(params.eyebrow)}
+                </div>
+
+                <h1 class="vtdd-title" style="margin:12px 0 0;font-family:Roboto,Arial,sans-serif;color:#ffffff;font-size:42px;line-height:45px;font-weight:900;letter-spacing:-1.7px;">
+                  ${escapeHtml(params.title)}
+                </h1>
+
+                <p class="vtdd-description" style="margin:14px 0 0;font-family:Roboto,Arial,sans-serif;color:rgba(255,255,255,.76);font-size:15px;line-height:23px;font-weight:700;">
+                  ${params.description}
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="vtdd-content" style="padding:26px 26px 28px;background:#ffffff;">
+                ${params.body}
+
+                <div style="height:1px;background:#e5e7eb;margin:24px 0 0;"></div>
+
+                <p style="margin:18px 0 0;font-family:Roboto,Arial,sans-serif;color:#94a3b8;font-size:12px;line-height:18px;font-weight:700;text-align:left;">
+                  ${escapeHtml(params.footerNote || "Email tự động từ hệ thống Viễn Thông Di Động. Vui lòng không trả lời email này.")}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+function buildSuccessBox(params: { title: string; desc: string }) {
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="border-radius:22px;background:#ecfdf5;border:1px solid #bbf7d0;overflow:hidden;">
+      <tr>
+        <td width="56" valign="top" style="padding:18px 0 18px 18px;">
+          <div style="width:38px;height:38px;border-radius:999px;background:#d1fae5;border:1px solid #86efac;color:#047857;font-family:Roboto,Arial,sans-serif;font-size:24px;line-height:38px;font-weight:900;text-align:center;">
+            ✓
+          </div>
+        </td>
+        <td style="padding:18px 18px 18px 0;">
+          <div style="font-family:Roboto,Arial,sans-serif;color:#0f172a;font-size:16px;line-height:20px;font-weight:900;">
+            ${escapeHtml(params.title)}
+          </div>
+          <div style="margin-top:6px;font-family:Roboto,Arial,sans-serif;color:#64748b;font-size:13px;line-height:20px;font-weight:700;">
+            ${escapeHtml(params.desc)}
+          </div>
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
+function buildWarningBox(params: { title: string; desc: string }) {
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="margin-top:16px;border-radius:18px;background:#fff7ed;border:1px solid #fed7aa;overflow:hidden;">
+      <tr>
+        <td style="padding:14px 16px;">
+          <div style="font-family:Roboto,Arial,sans-serif;color:#9a3412;font-size:13px;line-height:19px;font-weight:900;">
+            ${escapeHtml(params.title)}
+          </div>
+          <div style="margin-top:5px;font-family:Roboto,Arial,sans-serif;color:#9a3412;font-size:12px;line-height:18px;font-weight:700;">
+            ${params.desc}
+          </div>
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
 export async function sendResetOtpMail(params: {
   to: string;
   staffName: string;
@@ -70,27 +276,54 @@ export async function sendResetOtpMail(params: {
   otp: string;
 }) {
   const transporter = getMailer();
+  const staffName = params.staffName || "Nhân viên";
+  const otp = String(params.otp || "").trim();
 
-  await transporter.sendMail({
+  const html = buildEmailShell({
+    preheader: `Mã OTP đặt lại mật khẩu của bạn là ${otp}. Mã có hiệu lực trong 10 phút.`,
+    statusLabel: "OTP 10 phút",
+    eyebrow: "Password Reset",
+    title: "Mã xác thực đặt lại mật khẩu",
+    description: `Xin chào <b style="color:#ffffff;">${escapeHtml(staffName)}</b>, mã xác thực cho tài khoản <b style="color:#ffffff;">${escapeHtml(params.maNV)}</b> đã được tạo.`,
+    body: `
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="border-radius:24px;background:#fffbea;border:1px solid #fde68a;overflow:hidden;">
+        <tr>
+          <td align="center" style="padding:24px 18px;">
+            <div style="font-family:Roboto,Arial,sans-serif;color:#854d0e;font-size:10px;line-height:12px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;">
+              Mã OTP của bạn
+            </div>
+            <div style="margin-top:10px;font-family:Roboto,Arial,sans-serif;color:#07111f;font-size:42px;line-height:48px;font-weight:900;letter-spacing:9px;">
+              ${escapeHtml(otp)}
+            </div>
+            <div style="margin-top:10px;font-family:Roboto,Arial,sans-serif;color:#92400e;font-size:13px;line-height:20px;font-weight:800;">
+              Mã này có hiệu lực trong 10 phút. Không chia sẻ mã này cho bất kỳ ai.
+            </div>
+          </td>
+        </tr>
+      </table>
+      ${buildWarningBox({
+        title: "Không phải bạn yêu cầu?",
+        desc: "Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này và kiểm tra lại bảo mật tài khoản.",
+      })}
+    `,
+  });
+
+  const text = [
+    `Xin chào ${staffName},`,
+    `Mã xác thực đặt lại mật khẩu cho tài khoản ${params.maNV} là: ${otp}`,
+    "Mã này có hiệu lực trong 10 phút. Không chia sẻ mã này cho bất kỳ ai.",
+    "Email tự động từ hệ thống Viễn Thông Di Động.",
+  ].join("\n\n");
+
+  const info = await transporter.sendMail({
     from: getMailFrom(),
     to: params.to,
     subject: "Viễn Thông Di Động - Mã xác thực đặt lại mật khẩu",
-    html: `
-      <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;">
-        <div style="max-width:520px;margin:auto;background:#ffffff;border-radius:18px;padding:24px;border:1px solid #e2e8f0;">
-          <h2 style="margin:0;color:#0f172a;">Viễn Thông Di Động</h2>
-          <p style="color:#64748b;font-weight:700;">Xin chào ${params.staffName || "Nhân viên"},</p>
-          <p style="color:#0f172a;">Mã xác thực đặt lại mật khẩu cho tài khoản <b>${params.maNV}</b> là:</p>
-          <div style="font-size:34px;font-weight:900;letter-spacing:8px;color:#111827;background:#ffd400;border-radius:14px;padding:16px;text-align:center;">
-            ${params.otp}
-          </div>
-          <p style="color:#64748b;font-size:13px;line-height:1.5;margin-top:18px;">
-            Mã này có hiệu lực trong 10 phút. Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.
-          </p>
-        </div>
-      </div>
-    `,
+    text,
+    html,
   });
+
+  return buildDeliveryReport(info);
 }
 
 export async function sendNewStaffAccountMail(params: {
@@ -107,51 +340,48 @@ export async function sendNewStaffAccountMail(params: {
     throw new Error("Thiếu email nhận thông báo tài khoản mới.");
   }
 
-  await transporter.sendMail({
+  const staffName = params.staffName || "Nhân viên mới";
+  const adminUrl = safeUrl(params.adminUrl);
+
+  const html = buildEmailShell({
+    preheader: `Tài khoản mới ${params.maNV} đang chờ Admin duyệt Active.`,
+    statusLabel: "Chờ duyệt",
+    eyebrow: "New Staff Account",
+    title: "Có tài khoản mới chờ duyệt",
+    description: `Một nhân viên vừa tạo tài khoản trên hệ thống TCDM. Vui lòng kiểm tra thông tin và chuyển trạng thái <b style="color:#ffffff;">Active</b> nếu hợp lệ.`,
+    body: `
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="border-radius:22px;border:1px solid #e5e7eb;background:#ffffff;overflow:hidden;">
+        ${buildInfoRows([
+          { label: "Mã nhân viên", value: params.maNV },
+          { label: "Tên nhân viên", value: staffName },
+          { label: "Gmail xác thực", value: params.gmail },
+        ])}
+      </table>
+      ${buildActionButton("Mở trang Admin để duyệt", adminUrl)}
+      ${buildWarningBox({
+        title: "Gợi ý xử lý",
+        desc: "Kiểm tra mã nhân viên, siêu thị/phòng ban và Gmail trước khi duyệt Active để tránh cấp nhầm tài khoản.",
+      })}
+    `,
+  });
+
+  const text = [
+    "Có tài khoản mới chờ duyệt.",
+    `Mã nhân viên: ${params.maNV}`,
+    `Tên nhân viên: ${staffName}`,
+    `Gmail xác thực: ${params.gmail}`,
+    `Mở Admin: ${adminUrl}`,
+  ].join("\n\n");
+
+  const info = await transporter.sendMail({
     from: getMailFrom(),
     to,
     subject: `Viễn Thông Di Động - Tài khoản mới chờ duyệt: ${params.maNV}`,
-    html: `
-      <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;">
-        <div style="max-width:560px;margin:auto;background:#ffffff;border-radius:20px;padding:24px;border:1px solid #e2e8f0;">
-          <div style="display:inline-block;padding:8px 12px;border-radius:999px;background:#0f172a;color:#ffd400;font-size:11px;font-weight:900;letter-spacing:.08em;">
-            NEW STAFF ACCOUNT
-          </div>
-
-          <h2 style="margin:16px 0 8px;color:#0f172a;font-size:24px;">Có tài khoản mới chờ duyệt</h2>
-
-          <p style="color:#475569;font-size:14px;line-height:1.5;">
-            Một nhân viên vừa tạo tài khoản trên trang TCDM. Vui lòng kiểm tra và chuyển trạng thái Active nếu hợp lệ.
-          </p>
-
-          <div style="margin-top:16px;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
-            <div style="padding:12px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
-              <b style="color:#64748b;font-size:12px;">Mã nhân viên</b>
-              <div style="margin-top:5px;color:#0f172a;font-size:18px;font-weight:900;">${params.maNV}</div>
-            </div>
-
-            <div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;">
-              <b style="color:#64748b;font-size:12px;">Tên nhân viên</b>
-              <div style="margin-top:5px;color:#0f172a;font-size:16px;font-weight:900;">${params.staffName}</div>
-            </div>
-
-            <div style="padding:12px 14px;">
-              <b style="color:#64748b;font-size:12px;">Gmail xác thực</b>
-              <div style="margin-top:5px;color:#0f172a;font-size:15px;font-weight:900;">${params.gmail}</div>
-            </div>
-          </div>
-
-          <a href="${params.adminUrl}" style="margin-top:18px;width:100%;min-height:50px;border-radius:16px;background:#ffd400;color:#111827;text-decoration:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;letter-spacing:.06em;">
-            MỞ TRANG ADMIN ĐỂ DUYỆT
-          </a>
-
-          <p style="margin-top:16px;color:#94a3b8;font-size:12px;line-height:1.5;">
-            Email tự động từ hệ thống Viễn Thông Di Động.
-          </p>
-        </div>
-      </div>
-    `,
+    text,
+    html,
   });
+
+  return buildDeliveryReport(info);
 }
 
 export async function sendStaffActivatedMail(params: {
@@ -162,26 +392,43 @@ export async function sendStaffActivatedMail(params: {
 }) {
   const transporter = getMailer();
   const smtpUser = String(process.env.MAIL_USER || "").trim();
-
-  function escapeHtml(value: unknown) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  const staffName = escapeHtml(params.staffName || "Nhân viên");
-  const maNV = escapeHtml(params.maNV);
-  const loginUrl = escapeHtml(params.loginUrl);
+  const staffName = params.staffName || "Nhân viên";
+  const loginUrl = safeUrl(params.loginUrl);
 
   const text = [
-    `Xin chào ${params.staffName || "Nhân viên"},`,
+    `Xin chào ${staffName},`,
     `Tài khoản nhân viên ${params.maNV} của bạn đã được Admin duyệt Active trên trang TCDM.`,
-    `Đăng nhập tại: ${params.loginUrl}`,
+    `Đăng nhập tại: ${loginUrl}`,
     "Email tự động từ hệ thống Viễn Thông Di Động.",
   ].join("\n\n");
+
+  const html = buildEmailShell({
+    preheader: `Tài khoản nhân viên ${params.maNV} đã được kích hoạt. Bạn có thể đăng nhập và sử dụng hệ thống.`,
+    statusLabel: "Đã kích hoạt",
+    eyebrow: "Account Activated",
+    title: "Tài khoản của bạn đã sẵn sàng",
+    description: `Xin chào <b style="color:#ffffff;">${escapeHtml(staffName)}</b>, tài khoản nhân viên <b style="color:#ffd400;">${escapeHtml(params.maNV)}</b> đã được Admin duyệt Active trên hệ thống TCDM.`,
+    body: `
+      ${buildSuccessBox({
+        title: "Bạn có thể đăng nhập và sử dụng hệ thống ngay.",
+        desc: "Sau khi đăng nhập lần đầu, hãy cập nhật Gmail, câu hỏi bảo mật và mật khẩu để bảo vệ tài khoản.",
+      })}
+
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="margin-top:18px;border-radius:22px;border:1px solid #e5e7eb;background:#ffffff;overflow:hidden;">
+        ${buildInfoRows([
+          { label: "Mã nhân viên", value: params.maNV },
+          { label: "Trạng thái", value: "Active - Đã được phép truy cập", accent: true },
+        ])}
+      </table>
+
+      ${buildActionButton("Mở trang đăng nhập", loginUrl)}
+
+      ${buildWarningBox({
+        title: "Không mở được nút đăng nhập?",
+        desc: `Copy link này và dán vào trình duyệt:<br><a href="${escapeHtml(loginUrl)}" target="_blank" style="color:#0f172a;font-weight:900;text-decoration:underline;">${escapeHtml(loginUrl)}</a>`,
+      })}
+    `,
+  });
 
   const info = await transporter.sendMail({
     from: getMailFrom(),
@@ -191,129 +438,11 @@ export async function sendStaffActivatedMail(params: {
     to: params.to,
     text,
     subject: "Viễn Thông Di Động - Tài khoản đã được kích hoạt",
-    html: `
-      <!doctype html>
-      <html lang="vi">
-        <head>
-          <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <title>Tài khoản đã được kích hoạt</title>
-        </head>
-        <body style="margin:0;padding:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#eef2f7;margin:0;padding:0;">
-            <tr>
-              <td align="center" style="padding:28px 14px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;width:100%;border-collapse:separate;border-spacing:0;">
-                  <tr>
-                    <td style="border-radius:30px 30px 0 0;overflow:hidden;background:#07111f;">
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:linear-gradient(135deg,#07111f 0%,#101827 48%,#2b2600 100%);">
-                        <tr>
-                          <td style="padding:28px 28px 26px;">
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                              <tr>
-                                <td align="left" style="vertical-align:middle;">
-                                  <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-                                    <tr>
-                                      <td style="width:46px;height:46px;border-radius:16px;background:#ffd400;text-align:center;vertical-align:middle;color:#07111f;font-weight:900;font-size:18px;line-height:46px;box-shadow:0 0 0 6px rgba(255,212,0,.13);">
-                                        VT
-                                      </td>
-                                      <td style="padding-left:12px;vertical-align:middle;">
-                                        <div style="font-size:16px;font-weight:900;color:#ffffff;line-height:1.1;">Viễn Thông Di Động</div>
-                                        <div style="margin-top:4px;font-size:11px;font-weight:800;color:rgba(255,255,255,.62);letter-spacing:.08em;text-transform:uppercase;">Staff Access System</div>
-                                      </td>
-                                    </tr>
-                                  </table>
-                                </td>
-                                <td align="right" style="vertical-align:middle;">
-                                  <span style="display:inline-block;padding:9px 12px;border-radius:999px;background:rgba(34,197,94,.14);border:1px solid rgba(34,197,94,.34);color:#86efac;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;">
-                                    Đã kích hoạt
-                                  </span>
-                                </td>
-                              </tr>
-                            </table>
-
-                            <div style="margin-top:34px;font-size:12px;font-weight:900;letter-spacing:.10em;text-transform:uppercase;color:#ffd400;">
-                              Account activated
-                            </div>
-                            <h1 style="margin:10px 0 0;color:#ffffff;font-size:34px;line-height:1.05;font-weight:900;letter-spacing:-.04em;">
-                              Tài khoản của bạn đã sẵn sàng
-                            </h1>
-                            <p style="margin:14px 0 0;max-width:520px;color:rgba(255,255,255,.76);font-size:15px;line-height:1.55;font-weight:700;">
-                              Xin chào <b style="color:#ffffff;">${staffName}</b>, tài khoản nhân viên <b style="color:#ffd400;">${maNV}</b> đã được Admin duyệt Active trên hệ thống TCDM.
-                            </p>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="background:#ffffff;padding:0 28px 28px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;border-radius:0 0 30px 30px;box-shadow:0 24px 70px rgba(15,23,42,.12);">
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:-18px;">
-                        <tr>
-                          <td style="padding:18px;border-radius:22px;background:#f8fafc;border:1px solid #e2e8f0;">
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                              <tr>
-                                <td width="46" style="vertical-align:top;">
-                                  <div style="width:38px;height:38px;border-radius:999px;background:#dcfce7;border:1px solid #86efac;color:#047857;text-align:center;line-height:38px;font-weight:900;font-size:18px;">✓</div>
-                                </td>
-                                <td style="vertical-align:top;">
-                                  <div style="font-size:16px;line-height:1.35;font-weight:900;color:#0f172a;">Bạn có thể đăng nhập và sử dụng hệ thống ngay.</div>
-                                  <div style="margin-top:7px;color:#64748b;font-size:13px;line-height:1.5;font-weight:700;">
-                                    Sau khi đăng nhập lần đầu, hãy cập nhật Gmail, câu hỏi bảo mật và mật khẩu để bảo vệ tài khoản.
-                                  </div>
-                                </td>
-                              </tr>
-                            </table>
-                          </td>
-                        </tr>
-                      </table>
-
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:18px;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
-                        <tr>
-                          <td style="padding:14px 16px;background:#ffffff;border-bottom:1px solid #e2e8f0;">
-                            <div style="font-size:11px;font-weight:900;color:#64748b;letter-spacing:.08em;text-transform:uppercase;">Mã nhân viên</div>
-                            <div style="margin-top:5px;color:#0f172a;font-size:18px;line-height:1.2;font-weight:900;">${maNV}</div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding:14px 16px;background:#ffffff;">
-                            <div style="font-size:11px;font-weight:900;color:#64748b;letter-spacing:.08em;text-transform:uppercase;">Trạng thái</div>
-                            <div style="margin-top:5px;color:#047857;font-size:15px;line-height:1.35;font-weight:900;">Active - Đã được phép truy cập</div>
-                          </td>
-                        </tr>
-                      </table>
-
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:20px;">
-                        <tr>
-                          <td align="center" style="border-radius:18px;background:#ffd400;">
-                            <a href="${loginUrl}" target="_blank" style="display:block;padding:17px 18px;border-radius:18px;background:#ffd400;color:#111827;text-decoration:none;font-size:14px;line-height:1;font-weight:900;letter-spacing:.08em;text-transform:uppercase;">
-                              Mở trang đăng nhập
-                            </a>
-                          </td>
-                        </tr>
-                      </table>
-
-                      <div style="margin-top:16px;padding:13px 14px;border-radius:16px;background:#fffbea;border:1px solid rgba(250,204,21,.45);color:#854d0e;font-size:12.5px;line-height:1.5;font-weight:800;">
-                        Nếu nút đăng nhập không mở được, hãy copy link này và dán vào trình duyệt:<br />
-                        <a href="${loginUrl}" target="_blank" style="color:#0f172a;text-decoration:underline;font-weight:900;word-break:break-all;">${loginUrl}</a>
-                      </div>
-
-                      <div style="margin-top:22px;padding-top:18px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:12px;line-height:1.55;font-weight:700;">
-                        Email tự động từ hệ thống Viễn Thông Di Động. Vui lòng không trả lời email này.
-                      </div>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `,
+    html,
   });
 
   const report = buildDeliveryReport(info);
   ensureRecipientAccepted(report, params.to);
+
   return report;
 }
