@@ -74,6 +74,21 @@ function maskEmail(email: string) {
   return `${name.slice(0, 2)}***@${domain}`;
 }
 
+function normalizeEmail(value: any) {
+  const email = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^mailto:/i, "");
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "";
+  return email;
+}
+
+function getStaffNotificationEmail(staff: any) {
+  const raw = safeDecrypt(staff?.gmail);
+  return normalizeEmail(raw);
+}
+
 function getLoginUrl(req: NextRequest) {
   const baseUrl = String(process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin).replace(/\/+$/, "");
   return `${baseUrl}/login`;
@@ -159,38 +174,49 @@ export async function POST(req: NextRequest) {
       const guard = denyModTouchingAdmin(admin, target);
       if (guard) return guard;
 
+      const wasAlreadyActive = String(target.status || "").trim().toLowerCase() === "active";
+
       await updateStaffStatus(target.rowNumber, "Active");
 
-      const gmail = safeDecrypt(target.gmail).toLowerCase();
+      const refreshedTarget = (await findStaffByMaNV(maNV)) || target;
+      const gmail = getStaffNotificationEmail(refreshedTarget) || getStaffNotificationEmail(target);
+      const staffName = refreshedTarget.staffName || target.staffName;
 
       if (!gmail) {
         return NextResponse.json({
           success: true,
           mailSent: false,
-          message: `Đã Active tài khoản NV ${target.maNV}, nhưng tài khoản chưa có Gmail để gửi thông báo.`,
+          message: `Đã Active tài khoản NV ${target.maNV}, nhưng tài khoản chưa có Gmail hợp lệ để gửi thông báo.`,
         });
       }
 
       try {
         await sendStaffActivatedMail({
           to: gmail,
-          staffName: target.staffName,
+          staffName,
           maNV: target.maNV,
           loginUrl: getLoginUrl(req),
         });
 
+        console.log("SEND_STAFF_ACTIVATED_MAIL_OK", { maNV: target.maNV });
+
         return NextResponse.json({
           success: true,
           mailSent: true,
-          message: `Đã Active tài khoản NV ${target.maNV} và gửi Gmail thông báo đến ${maskEmail(gmail)}.`,
+          message: wasAlreadyActive
+            ? `Đã gửi lại Gmail thông báo Active cho NV ${target.maNV} đến ${maskEmail(gmail)}.`
+            : `Đã Active tài khoản NV ${target.maNV} và gửi Gmail thông báo đến ${maskEmail(gmail)}.`,
         });
       } catch (mailErr: any) {
-        console.error("SEND_STAFF_ACTIVATED_MAIL_ERROR:", mailErr);
+        console.error("SEND_STAFF_ACTIVATED_MAIL_ERROR:", {
+          maNV: target.maNV,
+          message: mailErr?.message || mailErr,
+        });
 
         return NextResponse.json({
           success: true,
           mailSent: false,
-          message: `Đã Active tài khoản NV ${target.maNV}, nhưng chưa gửi được Gmail thông báo. Kiểm tra cấu hình Gmail SMTP.`,
+          message: `Đã Active tài khoản NV ${target.maNV}, nhưng chưa gửi được Gmail thông báo. Kiểm tra SMTP/DNS mail rồi bấm gửi lại.`,
         });
       }
     }

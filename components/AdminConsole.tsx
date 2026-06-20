@@ -899,10 +899,17 @@ function TcdmAdminConsole({
                       <button
                         type="button"
                         className="primary"
-                        disabled={!canManageStaff || isStaffAdminLocked(item) || busy === `ACTIVE-${item.maNV}` || item.status === "Active"}
-                        onClick={() => runStaffAction("ACTIVE", item.maNV)}
+                        disabled={!canManageStaff || isStaffAdminLocked(item) || busy === `ACTIVE-${item.maNV}`}
+                        onClick={() => {
+                          if (item.status === "Active") {
+                            const ok = window.confirm(`Gửi lại Gmail thông báo tài khoản đã Active cho NV ${item.maNV}?`);
+                            if (!ok) return;
+                          }
+
+                          runStaffAction("ACTIVE", item.maNV);
+                        }}
                       >
-                        Active
+                        {item.status === "Active" ? "Gửi mail Active" : "Active"}
                       </button>
                       <button
                         type="button"

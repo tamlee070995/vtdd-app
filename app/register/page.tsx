@@ -2,11 +2,29 @@
 
 import Link from "next/link";
 import Script from "next/script";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 type CaptchaPayload = {
   question?: string;
   token?: string;
+};
+
+type TurnstileApi = {
+  render: (
+    container: HTMLElement,
+    options: {
+      sitekey: string;
+      callback: (token: string) => void;
+      "expired-callback": () => void;
+      "error-callback": () => void;
+      theme: "light" | "dark" | "auto";
+    }
+  ) => string;
+  remove: (widgetId: string) => void;
+};
+
+type TurnstileWindow = Window & {
+  turnstile?: TurnstileApi;
 };
 
 const SECURITY_QUESTIONS = [
@@ -36,7 +54,11 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formStartedAt] = useState(() => String(Date.now()));
   const [turnstileToken, setTurnstileToken] = useState("");
-  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+  const [turnstileScriptReady, setTurnstileScriptReady] = useState(false);
+  const [turnstileError, setTurnstileError] = useState("");
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
+  const turnstileWidgetIdRef = useRef<string | null>(null);
+  const turnstileSiteKey = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "").trim();
 
   const gmailError = useMemo(() => {
     const value = gmail.trim().toLowerCase();
@@ -84,23 +106,161 @@ export default function RegisterPage() {
   }, []);
 
   useEffect(() => {
-    const targetWindow = window as Window & {
-      handleRegisterTurnstile?: (token: string) => void;
-      handleRegisterTurnstileExpired?: () => void;
+    if (!turnstileSiteKey) return;
+
+    let stopped = false;
+    let tries = 0;
+
+    const probeTurnstile = () => {
+      if (stopped) return;
+
+      const targetWindow = window as TurnstileWindow;
+
+      if (targetWindow.turnstile?.render) {
+        setTurnstileScriptReady(true);
+        setTurnstileError("");
+        return;
+      }
+
+      tries += 1;
+
+      if (tries >= 40) {
+        setTurnstileError("Không tải được xác thực chống spam. Vui lòng tải lại trang hoặc kiểm tra domain Turnstile.");
+        return;
+      }
+
+      window.setTimeout(probeTurnstile, 250);
     };
 
-    targetWindow.handleRegisterTurnstile = (token: string) => {
-      setTurnstileToken(token || "");
-    };
-    targetWindow.handleRegisterTurnstileExpired = () => {
-      setTurnstileToken("");
-    };
+    probeTurnstile();
 
     return () => {
-      delete targetWindow.handleRegisterTurnstile;
-      delete targetWindow.handleRegisterTurnstileExpired;
+      stopped = true;
     };
-  }, []);
+  }, [turnstileSiteKey]);
+
+  useEffect(() => {
+    if (!turnstileSiteKey || !turnstileScriptReady || !turnstileContainerRef.current) return;
+
+    const targetWindow = window as TurnstileWindow;
+    const turnstile = targetWindow.turnstile;
+    const container = turnstileContainerRef.current;
+
+    if (!turnstile) return;
+
+    if (turnstileWidgetIdRef.current) {
+      try {
+        turnstile.remove(turnstileWidgetIdRef.current);
+      } catch {
+        // Widget can already be gone after a fast refresh.
+      }
+      turnstileWidgetIdRef.current = null;
+    }
+
+    container.innerHTML = "";
+    setTurnstileToken("");
+
+    try {
+      const widgetId = turnstile.render(container, {
+        sitekey: turnstileSiteKey,
+        callback: (token: string) => {
+          setTurnstileToken(token || "");
+          setTurnstileError("");
+        },
+        "expired-callback": () => setTurnstileToken(""),
+        "error-callback": () => {
+          setTurnstileToken("");
+          setTurnstileError("Turnstile chưa xác thực được. Vui lòng tải lại trang hoặc kiểm tra domain đã khai báo.");
+        },
+        theme: "light",
+      });
+
+      turnstileWidgetIdRef.current = widgetId;
+      setTurnstileError("");
+    } catch {
+      setTurnstileToken("");
+      setTurnstileError("Không khởi tạo được Turnstile. Vui lòng kiểm tra Site key và domain.");
+    }
+
+    return () => {
+      if (!turnstileWidgetIdRef.current) return;
+
+      try {
+        turnstile.remove(turnstileWidgetIdRef.current);
+      } catch {
+        // Widget can already be gone after a fast refresh.
+      }
+      turnstileWidgetIdRef.current = null;
+    };
+  }, [turnstileScriptReady, turnstileSiteKey]);
+
+  function getFormText(form: HTMLFormElement, name: string) {
+    return String(new FormData(form).get(name) || "").trim();
+  }
+
+  function focusField(form: HTMLFormElement, name: string) {
+    const field = form.elements.namedItem(name);
+    const input = Array.isArray(field) ? field[0] : field;
+
+    if (input instanceof HTMLElement) {
+      input.focus({ preventScroll: true });
+      input.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  function stopSubmitWithMessage(form: HTMLFormElement, fieldName: string, message: string) {
+    setSubmitting(false);
+    setError(message);
+
+    window.setTimeout(() => {
+      focusField(form, fieldName);
+    }, 0);
+  }
+
+  function handleRegisterSubmit(event: FormEvent<HTMLFormElement>) {
+    const form = event.currentTarget;
+    const question = getFormText(form, "questionType");
+    const checks = [
+      { name: "maNV", message: "Vui lòng nhập mã nhân viên." },
+      { name: "maST", message: "Vui lòng nhập mã siêu thị." },
+      { name: "staffName", message: "Vui lòng nhập tên nhân viên." },
+      { name: "password", message: "Vui lòng nhập mật khẩu đăng nhập." },
+      { name: "confirmPassword", message: "Vui lòng nhập lại mật khẩu xác nhận." },
+      ...(question === "custom" ? [{ name: "customQuestion", message: "Vui lòng nhập câu hỏi bảo mật tự tạo." }] : []),
+      { name: "answer", message: "Vui lòng nhập câu trả lời bảo mật." },
+      { name: "gmail", message: "Vui lòng nhập Gmail xác thực." },
+      { name: "captchaAnswer", message: "Vui lòng nhập kết quả captcha." },
+    ];
+
+    for (const item of checks) {
+      if (getFormText(form, item.name)) continue;
+
+      event.preventDefault();
+      stopSubmitWithMessage(form, item.name, item.message);
+      return;
+    }
+
+    if (passwordHint !== "Mật khẩu hợp lệ.") {
+      event.preventDefault();
+      stopSubmitWithMessage(form, "password", passwordHint);
+      return;
+    }
+
+    if (gmailError) {
+      event.preventDefault();
+      stopSubmitWithMessage(form, "gmail", gmailError);
+      return;
+    }
+
+    if (turnstileSiteKey && !turnstileToken) {
+      event.preventDefault();
+      stopSubmitWithMessage(form, "captchaAnswer", "Vui lòng hoàn tất xác thực chống spam trước khi tạo tài khoản.");
+      return;
+    }
+
+    setError("");
+    setSubmitting(true);
+  }
 
   return (
     <main className="register-vtd-page">
@@ -130,7 +290,8 @@ export default function RegisterPage() {
           className="register-vtd-card"
           action="/api/auth/staff-register"
           method="POST"
-          onSubmit={() => setSubmitting(true)}
+          noValidate
+          onSubmit={handleRegisterSubmit}
         >
           <div className="register-vtd-honeypot" aria-hidden="true">
             <label>
@@ -262,20 +423,29 @@ export default function RegisterPage() {
           {turnstileSiteKey ? (
             <div className="register-vtd-turnstile">
               <Script
-                src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+                id="register-turnstile-script"
+                src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
                 strategy="afterInteractive"
                 async
                 defer
+                onReady={() => {
+                  setTurnstileScriptReady(true);
+                  setTurnstileError("");
+                }}
+                onLoad={() => setTurnstileScriptReady(true)}
+                onError={() => {
+                  setTurnstileScriptReady(false);
+                  setTurnstileError("Không tải được xác thực chống spam. Vui lòng kiểm tra mạng hoặc domain Turnstile.");
+                }}
               />
               <input type="hidden" name="turnstileToken" value={turnstileToken} />
-              <div
-                className="cf-turnstile"
-                data-sitekey={turnstileSiteKey}
-                data-callback="handleRegisterTurnstile"
-                data-expired-callback="handleRegisterTurnstileExpired"
-                data-error-callback="handleRegisterTurnstileExpired"
-                data-theme="light"
-              />
+              <div ref={turnstileContainerRef} className="register-vtd-turnstile-frame" />
+              {!turnstileScriptReady && !turnstileError && (
+                <span className="register-vtd-turnstile-loading">Đang tải xác thực chống spam...</span>
+              )}
+              {turnstileError && (
+                <span className="register-vtd-turnstile-loading error">{turnstileError}</span>
+              )}
             </div>
           ) : (
             <input type="hidden" name="turnstileToken" value="" />
@@ -284,7 +454,7 @@ export default function RegisterPage() {
           <button
             className="register-vtd-submit"
             type="submit"
-            disabled={!!gmailError || submitting || Boolean(turnstileSiteKey && !turnstileToken)}
+            disabled={submitting}
           >
             {submitting ? "Đang gửi yêu cầu..." : "Tạo tài khoản chờ duyệt"}
           </button>
@@ -583,7 +753,33 @@ const styles = `
   min-height: 65px;
   margin: 4px 0 14px;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  gap: 8px;
+}
+
+.register-vtd-turnstile-frame {
+  min-height: 65px;
+  display: grid;
+  place-items: center;
+}
+
+.register-vtd-turnstile-loading {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  font-weight: 900;
+}
+
+.register-vtd-turnstile-loading.error {
+  max-width: 100%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 .register-vtd-submit {
