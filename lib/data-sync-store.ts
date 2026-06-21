@@ -107,6 +107,23 @@ function hasAppleKeyword(...values: unknown[]) {
   return text.includes("apple") || text.includes("iphone") || text.includes("ipad");
 }
 
+function productNewDuplicateKey(row: any) {
+  return [
+    row.brand,
+    row.product_name,
+    row.category,
+    row.subsidy_ratio,
+    row.subsidy_ratio_apple,
+    row.subsidy_amount,
+    row.min_subsidy_amount,
+    row.min_subsidy_amount_apple,
+  ].map(compactKey).join("|");
+}
+
+function productNewDuplicateLabel(row: any) {
+  return [clean(row.product_name), clean(row.category)].filter(Boolean).join(" / ");
+}
+
 function getDuplicateSummary<T>(
   rows: T[],
   keyer: (row: T) => string,
@@ -511,10 +528,10 @@ export async function previewSyncCsv(target: string, csvText: string) {
 
     const duplicate = getDuplicateSummary(
       rows,
-      (row) => compactKey(row.product_name),
-      (row) => clean(row.product_name)
+      productNewDuplicateKey,
+      productNewDuplicateLabel
     );
-    if (duplicate.groups > 0) warnings.push(`Có ${duplicate.groups} tên máy mới bị trùng: ${duplicate.samples.join(", ")}.`);
+    if (duplicate.groups > 0) warnings.push(`Có ${duplicate.groups} dòng Data_Moi trùng nội dung: ${duplicate.samples.join(", ")}.`);
   } else if (importTarget === "products_old_phone" || importTarget === "products_old_tablet") {
     const sourceSheet = importTarget === "products_old_phone" ? "Data_Cu" : "Data_Cu_Tablet";
     rows = buildOldProductRows(csvText, sourceSheet);
@@ -922,8 +939,8 @@ export async function getDataQualityReport() {
 
   const duplicateNew = getDuplicateSummary(
     productsNew,
-    (row) => compactKey(row.product_name),
-    (row) => clean(row.product_name)
+    productNewDuplicateKey,
+    productNewDuplicateLabel
   );
   const duplicateOld = getDuplicateSummary(
     productsOld,
@@ -972,7 +989,7 @@ export async function getDataQualityReport() {
       title: "Data_Moi",
       total: productsNew.length,
       issues: [
-        makeIssue("Tên máy mới bị trùng", duplicateNew.groups, duplicateNew.groups > 0 ? "warn" : "ok", duplicateNew.samples),
+        makeIssue("Dòng Data_Moi trùng nội dung", duplicateNew.groups, duplicateNew.groups > 0 ? "warn" : "ok", duplicateNew.samples),
         makeIssue(
           "Thiếu ngành hàng",
           newMissingCategory.length,
