@@ -17,17 +17,17 @@ function clean(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function parseLocalDateTime(value: unknown) {
+function parseVietnamDateTimeMs(value: unknown) {
   const raw = clean(value).replace(/^'/, "");
   if (!raw) return null;
 
   const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
   if (isoMatch) {
-    return new Date(
+    return Date.UTC(
       Number(isoMatch[1]),
       Number(isoMatch[2]) - 1,
       Number(isoMatch[3]),
-      Number(isoMatch[4]),
+      Number(isoMatch[4]) - 7,
       Number(isoMatch[5])
     );
   }
@@ -39,11 +39,11 @@ function parseLocalDateTime(value: unknown) {
     const month = a > 12 ? b : a;
     const day = a > 12 ? a : b;
 
-    return new Date(
+    return Date.UTC(
       Number(slashMatch[3]),
       month - 1,
       day,
-      Number(slashMatch[4]),
+      Number(slashMatch[4]) - 7,
       Number(slashMatch[5])
     );
   }
@@ -51,7 +51,7 @@ function parseLocalDateTime(value: unknown) {
   const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
   const parsed = new Date(normalized);
 
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
 }
 
 export function getPmhToolAvailability(
@@ -70,14 +70,15 @@ export function getPmhToolAvailability(
   let hasValidWindow = false;
 
   if (scheduleApplies && hasWindowInput) {
-    const start = parseLocalDateTime(startAt);
-    const end = parseLocalDateTime(endAt);
+    const start = parseVietnamDateTimeMs(startAt);
+    const end = parseVietnamDateTimeMs(endAt);
     const startOk = !startAt || Boolean(start);
     const endOk = !endAt || Boolean(end);
 
     if (startOk && endOk) {
-      const afterStart = !start || now.getTime() >= start.getTime();
-      const beforeEnd = !end || now.getTime() <= end.getTime();
+      const currentTime = now.getTime();
+      const afterStart = !start || currentTime >= start;
+      const beforeEnd = !end || currentTime <= end;
       hasValidWindow = true;
       activeInWindow = afterStart && beforeEnd;
     }

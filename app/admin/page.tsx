@@ -12,7 +12,14 @@ const TCDM_CLIENT_SETTING_KEYS = [
   "MARQUEE_MESSAGE",
   "FIXED_BANNER_MESSAGE",
   "PUSH_NOTIFY_MESSAGE",
-  "PUSH_NOTIFY_VERSION",
+  "STAFF_POPUP_TRADEIN_ENABLED",
+  "STAFF_POPUP_TRADEIN_MESSAGE",
+  "STAFF_POPUP_TRADEIN_SECONDS",
+  "STAFF_POPUP_TRADEIN_VERSION",
+  "STAFF_POPUP_BUYONLY_ENABLED",
+  "STAFF_POPUP_BUYONLY_MESSAGE",
+  "STAFF_POPUP_BUYONLY_SECONDS",
+  "STAFF_POPUP_BUYONLY_VERSION",
   "PRICE_EFFECTIVE_FROM",
   "PRICE_EFFECTIVE_TO",
   "DATA_VERSION",
@@ -28,6 +35,9 @@ const TCDM_CLIENT_SETTING_KEYS = [
   "STAFF_BUYONLY_LOCKED",
   "CUSTOMER_TRADEIN_LOCKED",
   "CUSTOMER_BUYONLY_LOCKED",
+  "FIREWALL_BLACKLIST",
+  "FIREWALL_WHITELIST",
+  "FIREWALL_MESSAGE",
 ];
 
 const PMH_CLIENT_SETTING_KEYS = [
@@ -47,11 +57,15 @@ function isSensitiveSettingKey(key: string) {
   return /(TOKEN|SECRET|HASH|PASSWORD|PASS|PIN)/i.test(key);
 }
 
+function isHiddenClientSettingKey(key: string) {
+  return key === "PUSH_NOTIFY_VERSION";
+}
+
 function buildClientSettings(settings: Record<string, string>, admin: Awaited<ReturnType<typeof requireAdminPage>>) {
   if (!admin) return {};
   if (admin.permission === "admin") {
     return Object.fromEntries(
-      Object.entries(settings).filter(([key]) => !isSensitiveSettingKey(key))
+      Object.entries(settings).filter(([key]) => !isSensitiveSettingKey(key) && !isHiddenClientSettingKey(key))
     );
   }
 

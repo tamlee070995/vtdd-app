@@ -12,8 +12,6 @@ type SystemSettings = Record<string, string>;
 type NotifySettings = {
   marquee: string;
   fixedBanner: string;
-  pushMessage: string;
-  pushVersion: string;
   priceEffectiveFrom: string;
   priceEffectiveTo: string;
 };
@@ -21,11 +19,18 @@ type NotifySettings = {
 const EMPTY_NOTIFY: NotifySettings = {
   marquee: "",
   fixedBanner: "",
-  pushMessage: "",
-  pushVersion: "",
   priceEffectiveFrom: "",
   priceEffectiveTo: "",
 };
+
+function makeNotifySettings(data: any): NotifySettings {
+  return {
+    marquee: data?.marquee || "",
+    fixedBanner: data?.fixedBanner || "",
+    priceEffectiveFrom: data?.priceEffectiveFrom || "",
+    priceEffectiveTo: data?.priceEffectiveTo || "",
+  };
+}
 
 const SYSTEM_UI_CSS = `
 .vtdd-system-marquee {
@@ -271,75 +276,6 @@ const SYSTEM_UI_CSS = `
   font-weight: 1000;
   cursor: pointer;
 }
-
-.vtdd-push-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 999999;
-  padding: 16px;
-  display: grid;
-  place-items: center;
-  background: rgba(15, 23, 42, .58);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-.vtdd-push-card {
-  width: min(100%, 420px);
-  padding: 20px;
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .20), transparent 38%),
-    #ffffff;
-  border: 1px solid rgba(226, 232, 240, .95);
-  box-shadow: 0 28px 88px rgba(15, 23, 42, .32);
-}
-
-.vtdd-push-card span {
-  width: fit-content;
-  padding: 8px 11px;
-  border-radius: 999px;
-  display: inline-flex;
-  background: #0f172a;
-  color: #ffd400;
-  font-size: 9.5px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: .10em;
-  text-transform: uppercase;
-}
-
-.vtdd-push-card h2 {
-  margin-top: 14px;
-  color: #0f172a;
-  font-size: 24px;
-  line-height: 1.05;
-  font-weight: 900;
-  letter-spacing: -.045em;
-}
-
-.vtdd-push-card p {
-  margin-top: 10px;
-  color: #475569;
-  font-size: 13px;
-  line-height: 1.5;
-  font-weight: 800;
-}
-
-.vtdd-push-card button {
-  width: 100%;
-  min-height: 52px;
-  margin-top: 16px;
-  border: 0;
-  border-radius: 18px;
-  background: #ffd400;
-  color: #111827;
-  font-size: 11.5px;
-  font-weight: 900;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
-
 
 .vtdd-product-trigger {
   width: 100%;
@@ -1848,7 +1784,6 @@ export default function CustomerPage() {
   const [dataTablet, setDataTablet] = useState<SheetRow[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({});
   const [notifySettings, setNotifySettings] = useState<NotifySettings>(EMPTY_NOTIFY);
-  const [showSystemPush, setShowSystemPush] = useState(false);
   const [dataVersion, setDataVersion] = useState("");
   const [newDataVersion, setNewDataVersion] = useState("");
   const [showDataReload, setShowDataReload] = useState(false);
@@ -1878,14 +1813,7 @@ export default function CustomerPage() {
         setDataTablet(json.data.tablet || []);
         setDataVersion(String(json.dataVersion || json.data?.system?.DATA_VERSION || "1"));
         setSystemSettings(json.data.system || {});
-        setNotifySettings({
-          marquee: "",
-          fixedBanner: json.data.notify?.fixedBanner || "",
-          pushMessage: "",
-          pushVersion: "",
-          priceEffectiveFrom: json.data.notify?.priceEffectiveFrom || "",
-          priceEffectiveTo: json.data.notify?.priceEffectiveTo || "",
-        });
+        setNotifySettings(makeNotifySettings(json.data.notify));
         setLoading(false);
       } catch {
         setLoadMsg("Lỗi kết nối dữ liệu.");
@@ -1917,6 +1845,14 @@ export default function CustomerPage() {
         });
         const json = await res.json().catch(() => null);
         const nextVersion = String(json?.dataVersion || "");
+
+        if (!stopped && json?.system) {
+          setSystemSettings(json.system || {});
+        }
+
+        if (!stopped && json?.notify) {
+          setNotifySettings(makeNotifySettings(json.notify));
+        }
 
         if (!stopped && nextVersion && nextVersion !== dataVersion) {
           setNewDataVersion(nextVersion);
@@ -2076,22 +2012,6 @@ export default function CustomerPage() {
     };
   }, [mode, selectedNewRow, selectedOldRow, loai]);
 
-
-  useEffect(() => {
-    if (!notifySettings.pushMessage) return;
-
-    const version = notifySettings.pushVersion || notifySettings.pushMessage;
-    const key = `vtdd_customer_push_seen_${version}`;
-
-    try {
-      if (window.localStorage.getItem(key) !== "1") {
-        setShowSystemPush(true);
-      }
-    } catch {
-      setShowSystemPush(true);
-    }
-  }, [notifySettings.pushMessage, notifySettings.pushVersion]);
-
   useEffect(() => {
     if (mode === "tradein" && customerTradeinLocked && !customerBuyonlyLocked) {
       setMode("buyonly");
@@ -2109,16 +2029,6 @@ export default function CustomerPage() {
       setLoai("");
     }
   }, [mode, customerTradeinLocked, customerBuyonlyLocked]);
-
-  function closeSystemPush() {
-    const version = notifySettings.pushVersion || notifySettings.pushMessage;
-
-    if (version) {
-      window.localStorage.setItem(`vtdd_customer_push_seen_${version}`, "1");
-    }
-
-    setShowSystemPush(false);
-  }
 
   function renderSystemStyle() {
     return <style>{SYSTEM_UI_CSS}</style>;
@@ -2142,21 +2052,6 @@ export default function CustomerPage() {
     if (!effectiveRange) return null;
 
     return <div className="vtdd-hero-effective-pill">{effectiveRange}</div>;
-  }
-
-  function renderPushNotify() {
-    if (!showSystemPush || !notifySettings.pushMessage) return null;
-
-    return (
-      <section className="vtdd-push-layer" role="dialog" aria-modal="true">
-        <div className="vtdd-push-card">
-          <span>Thông báo mới</span>
-          <h2>Thông báo từ Admin</h2>
-          <p>{notifySettings.pushMessage}</p>
-          <button type="button" onClick={closeSystemPush}>ĐÃ HIỂU</button>
-        </div>
-      </section>
-    );
   }
 
   function renderSystemLock() {
@@ -2436,7 +2331,6 @@ export default function CustomerPage() {
         </section>
       )}
 
-      {/* Push notify chỉ áp dụng cho trang nhân viên */}
     </main>
   );
 }

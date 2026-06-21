@@ -1,18 +1,12 @@
-import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import type { ReactNode } from "react";
 import FirewallBlockedPage from "@/components/FirewallBlockedPage";
-import StaffTradeInApp from "@/components/StaffTradeInApp";
 import { checkFirewallAccess, getClientIpFromHeaders } from "@/lib/firewall";
-import { getCurrentStaffFromCookies } from "@/lib/staff-auth";
 import { getSystemSettings } from "@/lib/system-store";
 
-export default async function StaffPage() {
-  const currentStaff = await getCurrentStaffFromCookies();
+export const dynamic = "force-dynamic";
 
-  if (!currentStaff) {
-    redirect("/login");
-  }
-
+export default async function CustomerLayout({ children }: { children: ReactNode }) {
   const headersList = await headers();
   const settings = await getSystemSettings();
   const firewall = checkFirewallAccess(settings, getClientIpFromHeaders(headersList));
@@ -21,12 +15,5 @@ export default async function StaffPage() {
     return <FirewallBlockedPage ip={firewall.ip} message={firewall.reason} />;
   }
 
-  return (
-    <StaffTradeInApp
-      maNV={currentStaff.maNV}
-      maST={currentStaff.maST}
-      staffName={currentStaff.staffName}
-      forceSetup={currentStaff.forceSetup}
-    />
-  );
+  return children;
 }

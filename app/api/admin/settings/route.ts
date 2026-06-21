@@ -106,8 +106,6 @@ export async function POST(req: NextRequest) {
         updates.CUSTOMER_TRADEIN_LOCKED = "0";
         updates.CUSTOMER_BUYONLY_LOCKED = "0";
       }
-
-      updates.DATA_VERSION = String(Date.now());
     }
 
     await updateSystemSettings(updates, admin?.name || admin?.maNV || "Admin");

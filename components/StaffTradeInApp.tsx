@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import { sanitizeHtml } from "@/lib/html-sanitize";
 import { getActiveSystemLock } from "@/lib/system-lock";
@@ -31,6 +31,9 @@ type QuoteHistoryItem = {
   troGiaMWG: number;
   tongTien: number;
   khachCanBu: number;
+  ip?: string;
+  deviceLabel?: string;
+  networkType?: string;
 };
 
 
@@ -41,8 +44,28 @@ type NotifySettings = {
   fixedBanner: string;
   pushMessage: string;
   pushVersion: string;
+  staffPopupTradeinEnabled: string;
+  staffPopupTradeinMessage: string;
+  staffPopupTradeinSeconds: string;
+  staffPopupTradeinVersion: string;
+  staffPopupBuyonlyEnabled: string;
+  staffPopupBuyonlyMessage: string;
+  staffPopupBuyonlySeconds: string;
+  staffPopupBuyonlyVersion: string;
   priceEffectiveFrom: string;
   priceEffectiveTo: string;
+};
+
+type StaffPriceCache = {
+  dataVersion: string;
+  savedAt: number;
+  data: {
+    moi: SheetRow[];
+    cu: SheetRow[];
+    tablet: SheetRow[];
+    system: SystemSettings;
+    notify: NotifySettings;
+  };
 };
 
 const EMPTY_NOTIFY: NotifySettings = {
@@ -50,9 +73,20 @@ const EMPTY_NOTIFY: NotifySettings = {
   fixedBanner: "",
   pushMessage: "",
   pushVersion: "",
+  staffPopupTradeinEnabled: "0",
+  staffPopupTradeinMessage: "",
+  staffPopupTradeinSeconds: "10",
+  staffPopupTradeinVersion: "",
+  staffPopupBuyonlyEnabled: "0",
+  staffPopupBuyonlyMessage: "",
+  staffPopupBuyonlySeconds: "10",
+  staffPopupBuyonlyVersion: "",
   priceEffectiveFrom: "",
   priceEffectiveTo: "",
 };
+
+const STAFF_PRICE_CACHE_KEY = "vtdd_staff_price_cache_v2";
+const STAFF_PRICE_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 
 const SYSTEM_UI_CSS = `
 .vtdd-system-marquee {
@@ -235,25 +269,27 @@ const SYSTEM_UI_CSS = `
 
 .vtdd-push-layer {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 999999;
-  padding: 16px;
-  display: grid;
-  place-items: center;
-  background: rgba(15, 23, 42, .58);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  padding: max(12px, env(safe-area-inset-top)) 12px 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .vtdd-push-card {
-  width: min(100%, 420px);
-  padding: 20px;
-  border-radius: 28px;
+  width: min(calc(100% - 16px), 520px);
+  padding: 14px;
+  border-radius: 0 0 24px 24px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .20), transparent 38%),
-    #ffffff;
-  border: 1px solid rgba(226, 232, 240, .95);
-  box-shadow: 0 28px 88px rgba(15, 23, 42, .32);
+    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .28), transparent 38%),
+    linear-gradient(135deg, #0f172a, #020617);
+  border: 1px solid rgba(255, 212, 0, .32);
+  box-shadow: 0 22px 62px rgba(15, 23, 42, .26);
+  pointer-events: auto;
+  animation: vtddPushSlideDown .34s ease-out both, vtddPushSlideUp .34s ease-in 29.6s forwards;
 }
 
 .vtdd-push-card span {
@@ -271,17 +307,17 @@ const SYSTEM_UI_CSS = `
 }
 
 .vtdd-push-card h2 {
-  margin-top: 14px;
-  color: #0f172a;
-  font-size: 24px;
+  margin-top: 10px;
+  color: #ffffff;
+  font-size: 20px;
   line-height: 1.05;
   font-weight: 900;
   letter-spacing: -.045em;
 }
 
 .vtdd-push-card p {
-  margin-top: 10px;
-  color: #475569;
+  margin-top: 8px;
+  color: rgba(255,255,255,.82);
   font-size: 13px;
   line-height: 1.5;
   font-weight: 800;
@@ -289,8 +325,8 @@ const SYSTEM_UI_CSS = `
 
 .vtdd-push-card button {
   width: 100%;
-  min-height: 52px;
-  margin-top: 16px;
+  min-height: 42px;
+  margin-top: 12px;
   border: 0;
   border-radius: 18px;
   background: #ffd400;
@@ -299,6 +335,29 @@ const SYSTEM_UI_CSS = `
   font-weight: 900;
   letter-spacing: .06em;
   text-transform: uppercase;
+}
+
+.vtdd-staff-notify-popup {
+  border-radius: 28px !important;
+  border: 1px solid rgba(226, 232, 240, .95) !important;
+  box-shadow: 0 28px 88px rgba(15, 23, 42, .20) !important;
+}
+
+.vtdd-staff-notify-confirm {
+  color: #111827 !important;
+  font-weight: 1000 !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+@keyframes vtddPushSlideDown {
+  from { opacity: 0; transform: translateY(-120%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes vtddPushSlideUp {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-120%); }
 }
 /* STAFF ONLY - nổi bật thông báo hệ thống và tự xuống hàng */
 .vtdd-system-banner-featured {
@@ -1239,6 +1298,10 @@ const SYSTEM_UI_CSS = `
   font-size: 9px;
   font-weight: 950;
   letter-spacing: -.08em;
+  background-image: url("/mwg-logo.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 78% 78%;
   box-shadow: 0 0 0 4px rgba(255, 212, 0, .13);
 }
 
@@ -1299,6 +1362,19 @@ const SYSTEM_UI_CSS = `
     font-size: clamp(8.9px, 2.35vw, 10px) !important;
     max-width: calc(100% - 14px) !important;
     padding: 0 8px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .staff-command .vtdd-hero-effective-pill {
+    width: 100% !important;
+    max-width: 100% !important;
+    justify-content: center !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.22 !important;
+    text-align: center !important;
   }
 }
 
@@ -1517,6 +1593,24 @@ const QUOTE_TOOLS_CSS = `
   line-height: 1.35;
   font-weight: 800;
 }
+.quote-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+.quote-history-meta em {
+  width: fit-content;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #334155;
+  font-size: 9.5px;
+  line-height: 1;
+  font-style: normal;
+  font-weight: 900;
+}
 .quote-history-empty {
   margin: 0;
   color: #64748b;
@@ -1529,9 +1623,55 @@ const QUOTE_TOOLS_CSS = `
   background: #0f172a;
   color: #fff;
 }
+.result-explain-card {
+  display: grid;
+  gap: 8px;
+  background: #fffaf0 !important;
+  border: 1px solid rgba(255, 212, 0, .48) !important;
+  box-shadow: 0 12px 26px rgba(255, 212, 0, .10) !important;
+}
+.result-explain-title {
+  margin-bottom: 2px;
+  color: #07111f !important;
+  font-size: 12px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.result-explain-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 9px 0;
+  border-top: 1px solid rgba(15, 23, 42, .10);
+}
+.result-explain-row span {
+  display: block;
+  color: #07111f !important;
+  font-size: 12px;
+  font-weight: 1000;
+}
+.result-explain-row small {
+  display: block;
+  margin-top: 3px;
+  color: #334155 !important;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+.result-explain-row b {
+  color: #07111f !important;
+  font-size: 12px;
+  font-weight: 1000;
+  white-space: nowrap;
+}
 @media (max-width: 760px) {
   .vtdd-data-reload-actions,
   .quote-history-item {
+    grid-template-columns: 1fr;
+  }
+  .result-explain-row {
     grid-template-columns: 1fr;
   }
 }
@@ -1604,6 +1744,64 @@ function isAppleBrand(value: any) {
 
 function unique(list: string[]) {
   return Array.from(new Set(list.filter(Boolean)));
+}
+
+function makeNotifySettings(data: any): NotifySettings {
+  return {
+    marquee: data?.marquee || "",
+    fixedBanner: data?.fixedBanner || "",
+    pushMessage: data?.pushMessage || "",
+    pushVersion: data?.pushVersion || "",
+    staffPopupTradeinEnabled: data?.staffPopupTradeinEnabled || "0",
+    staffPopupTradeinMessage: data?.staffPopupTradeinMessage || "",
+    staffPopupTradeinSeconds: data?.staffPopupTradeinSeconds || "10",
+    staffPopupTradeinVersion: data?.staffPopupTradeinVersion || "",
+    staffPopupBuyonlyEnabled: data?.staffPopupBuyonlyEnabled || "0",
+    staffPopupBuyonlyMessage: data?.staffPopupBuyonlyMessage || "",
+    staffPopupBuyonlySeconds: data?.staffPopupBuyonlySeconds || "10",
+    staffPopupBuyonlyVersion: data?.staffPopupBuyonlyVersion || "",
+    priceEffectiveFrom: data?.priceEffectiveFrom || "",
+    priceEffectiveTo: data?.priceEffectiveTo || "",
+  };
+}
+
+function isEnabledFlag(value: any) {
+  const v = String(value || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function popupAutoCloseMs(value: any) {
+  const n = Number(String(value || "").replace(/[^\d]/g, ""));
+  if (!Number.isFinite(n) || n <= 0) return 10000;
+  return n > 600 ? n : n * 1000;
+}
+
+function readStaffPriceCache(): StaffPriceCache | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(STAFF_PRICE_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as StaffPriceCache;
+    if (!parsed?.dataVersion || !parsed?.data) return null;
+    if (!Array.isArray(parsed.data.moi) || !Array.isArray(parsed.data.cu) || !Array.isArray(parsed.data.tablet)) return null;
+    if (Date.now() - Number(parsed.savedAt || 0) > STAFF_PRICE_CACHE_MAX_AGE_MS) return null;
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveStaffPriceCache(cache: StaffPriceCache) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(STAFF_PRICE_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Cache chi de tang toc lan tai sau, loi dung luong localStorage khong anh huong luong chinh.
+  }
 }
 
 
@@ -1960,6 +2158,7 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({});
   const [notifySettings, setNotifySettings] = useState<NotifySettings>(EMPTY_NOTIFY);
   const [showSystemPush, setShowSystemPush] = useState(false);
+  const shownStaffPopupKeysRef = useRef<Set<string>>(new Set());
 
   const [mode, setMode] = useState<"tradein" | "buyonly">("tradein");
   const [hang, setHang] = useState("");
@@ -1993,33 +2192,58 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   const [profileSaving, setProfileSaving] = useState(false);
 
   useEffect(() => {
+    const cached = readStaffPriceCache();
+    let hadUsableCache = false;
+
+    if (cached) {
+      hadUsableCache = true;
+      setDataMoi(cached.data.moi || []);
+      setDataCu(cached.data.cu || []);
+      setDataTablet(cached.data.tablet || []);
+      setDataVersion(String(cached.dataVersion || cached.data.system?.DATA_VERSION || "1"));
+      setSystemSettings(cached.data.system || {});
+      setNotifySettings(makeNotifySettings(cached.data.notify));
+      setLoading(false);
+    }
+
     async function load() {
       try {
         const res = await fetch("/api/data/super-fast", { cache: "no-store" });
         const json = await res.json();
 
         if (!json.success) {
-          setLoadMsg(json.message || "Không tải được dữ liệu.");
+          if (!hadUsableCache) {
+            setLoadMsg(json.message || "Không tải được dữ liệu.");
+          }
           setLoading(false);
           return;
         }
 
+        const nextNotify = makeNotifySettings(json.data.notify);
+        const nextVersion = String(json.dataVersion || json.data?.system?.DATA_VERSION || "1");
+
         setDataMoi(json.data.moi || []);
         setDataCu(json.data.cu || []);
         setDataTablet(json.data.tablet || []);
-        setDataVersion(String(json.dataVersion || json.data?.system?.DATA_VERSION || "1"));
+        setDataVersion(nextVersion);
         setSystemSettings(json.data.system || {});
-        setNotifySettings({
-          marquee: json.data.notify?.marquee || "",
-          fixedBanner: json.data.notify?.fixedBanner || "",
-          pushMessage: json.data.notify?.pushMessage || "",
-          pushVersion: json.data.notify?.pushVersion || "",
-          priceEffectiveFrom: json.data.notify?.priceEffectiveFrom || "",
-          priceEffectiveTo: json.data.notify?.priceEffectiveTo || "",
+        setNotifySettings(nextNotify);
+        saveStaffPriceCache({
+          dataVersion: nextVersion,
+          savedAt: Date.now(),
+          data: {
+            moi: json.data.moi || [],
+            cu: json.data.cu || [],
+            tablet: json.data.tablet || [],
+            system: json.data.system || {},
+            notify: nextNotify,
+          },
         });
         setLoading(false);
       } catch {
-        setLoadMsg("Lỗi kết nối dữ liệu.");
+        if (!hadUsableCache) {
+          setLoadMsg("Lỗi kết nối dữ liệu.");
+        }
         setLoading(false);
       }
     }
@@ -2044,6 +2268,14 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
         });
         const json = await res.json().catch(() => null);
         const nextVersion = String(json?.dataVersion || "");
+
+        if (!stopped && json?.system) {
+          setSystemSettings(json.system || {});
+        }
+
+        if (!stopped && json?.notify) {
+          setNotifySettings(makeNotifySettings(json.notify));
+        }
 
         if (!stopped && nextVersion && nextVersion !== dataVersion) {
           setNewDataVersion(nextVersion);
@@ -2358,6 +2590,75 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   }, [notifySettings.pushMessage, notifySettings.pushVersion]);
 
   useEffect(() => {
+    if (!showSystemPush || !notifySettings.pushMessage) return;
+
+    const timer = window.setTimeout(() => {
+      const version = notifySettings.pushVersion || notifySettings.pushMessage;
+
+      if (version) {
+        window.localStorage.setItem(`vtdd_staff_push_seen_${version}`, "1");
+      }
+
+      setShowSystemPush(false);
+    }, 30000);
+
+    return () => window.clearTimeout(timer);
+  }, [showSystemPush, notifySettings.pushMessage, notifySettings.pushVersion]);
+
+  useEffect(() => {
+    if (staffAccessLocked || currentStaffTabLocked) return;
+
+    const isTradein = mode === "tradein";
+    const enabled = isTradein
+      ? notifySettings.staffPopupTradeinEnabled
+      : notifySettings.staffPopupBuyonlyEnabled;
+    const message = String(
+      isTradein ? notifySettings.staffPopupTradeinMessage : notifySettings.staffPopupBuyonlyMessage
+    ).trim();
+
+    if (!isEnabledFlag(enabled) || !message) return;
+
+    const seconds = isTradein
+      ? notifySettings.staffPopupTradeinSeconds
+      : notifySettings.staffPopupBuyonlySeconds;
+    const version =
+      (isTradein ? notifySettings.staffPopupTradeinVersion : notifySettings.staffPopupBuyonlyVersion) ||
+      `${mode}:${message}:${seconds}`;
+    const popupKey = `${mode}:${version}`;
+
+    if (shownStaffPopupKeysRef.current.has(popupKey)) return;
+    shownStaffPopupKeysRef.current.add(popupKey);
+
+    void Swal.fire({
+      title: isTradein ? "Thông báo Thu Cũ Đổi Mới" : "Thông báo Thu Cũ Không Đổi Mới",
+      text: message,
+      icon: "info",
+      confirmButtonText: "Đồng ý",
+      confirmButtonColor: "#ffd400",
+      color: "#0f172a",
+      timer: popupAutoCloseMs(seconds),
+      timerProgressBar: true,
+      allowOutsideClick: true,
+      customClass: {
+        popup: "vtdd-staff-notify-popup",
+        confirmButton: "vtdd-staff-notify-confirm",
+      },
+    });
+  }, [
+    mode,
+    staffAccessLocked,
+    currentStaffTabLocked,
+    notifySettings.staffPopupTradeinEnabled,
+    notifySettings.staffPopupTradeinMessage,
+    notifySettings.staffPopupTradeinSeconds,
+    notifySettings.staffPopupTradeinVersion,
+    notifySettings.staffPopupBuyonlyEnabled,
+    notifySettings.staffPopupBuyonlyMessage,
+    notifySettings.staffPopupBuyonlySeconds,
+    notifySettings.staffPopupBuyonlyVersion,
+  ]);
+
+  useEffect(() => {
     if (mode === "tradein" && staffTradeinLocked && !staffBuyonlyLocked) {
       setMode("buyonly");
       setHang("");
@@ -2415,6 +2716,46 @@ function resetForm() {
       `Cập nhật: ${quoteTime || getQuoteTime()}\n\n` +
       "Lưu ý: Giá tham khảo tại thời điểm tra cứu. Kết quả cuối cùng phụ thuộc tình trạng máy thực tế khi kiểm tra tại siêu thị."
     );
+  }
+
+  function getPriceExplanationRows() {
+    const type = TYPE_OPTIONS.find((item) => item.value === loai);
+    const rate = priceInfo.tiLe > 0 ? `${Math.round(priceInfo.tiLe * 100)}%` : "0%";
+
+    return [
+      {
+        label: "Giá xác máy cũ",
+        value: formatMoney(priceInfo.giaXac),
+        note: type ? `Lấy theo ${type.label} trong bảng máy cũ.` : "Chưa chọn loại máy.",
+      },
+      {
+        label: "Hỗ trợ lên đời",
+        value: mode === "tradein" ? formatMoney(priceInfo.troGiaHang) : "0 đ",
+        note:
+          mode === "tradein"
+            ? `Tính theo tỷ lệ ${rate}, có áp dụng mức min/max của máy mới.`
+            : "Luồng thu cũ không đổi mới không có hỗ trợ lên đời.",
+      },
+      {
+        label: "Ưu đãi MWG",
+        value: formatMoney(priceInfo.troGiaMWG),
+        note: priceInfo.troGiaMWG > 0 ? "Chỉ áp dụng theo dòng dữ liệu Loại 1/Loại 2." : "Không có ưu đãi MWG phù hợp.",
+      },
+      {
+        label: "Tổng khách nhận",
+        value: formatMoney(priceInfo.tongTien),
+        note: "Giá xác + hỗ trợ lên đời + ưu đãi MWG.",
+      },
+      ...(mode === "tradein" && priceInfo.giaBanMoi > 0
+        ? [
+            {
+              label: "Khách cần bù",
+              value: formatMoney(priceInfo.khachCanBu),
+              note: "Giá máy mới trừ tổng tiền khách nhận, không âm.",
+            },
+          ]
+        : []),
+    ];
   }
 
   function escapeHtml(value: string) {
@@ -2516,9 +2857,9 @@ function resetForm() {
     ctx.fillRect(0, 0, canvas.width, 18);
 
     ctx.fillStyle = "#0f172a";
-    ctx.font = "900 46px Arial";
+    ctx.font = "900 46px Roboto";
     ctx.fillText("Viễn Thông Di Động", 70, 95);
-    ctx.font = "800 24px Arial";
+    ctx.font = "800 24px Roboto";
     ctx.fillStyle = "#64748b";
     ctx.fillText(snapshot.title, 70, 132);
 
@@ -2530,14 +2871,14 @@ function resetForm() {
     ctx.stroke();
 
     ctx.fillStyle = "#111827";
-    ctx.font = "900 34px Arial";
+    ctx.font = "900 34px Roboto";
     ctx.fillText("TỔNG TIỀN KHÁCH NHẬN", 100, 250);
     ctx.fillStyle = "#dc2626";
-    ctx.font = "900 78px Arial";
+    ctx.font = "900 78px Roboto";
     ctx.fillText(formatMoney(priceInfo.tongTien), 100, 345);
 
     ctx.fillStyle = "#64748b";
-    ctx.font = "700 22px Arial";
+    ctx.font = "700 22px Roboto";
     ctx.fillText(`Cập nhật: ${snapshot.time}`, 100, 395);
 
     let y = 470;
@@ -2550,10 +2891,10 @@ function resetForm() {
 
     metaRows.forEach(([label, value]) => {
       ctx.fillStyle = "#64748b";
-      ctx.font = "800 21px Arial";
+      ctx.font = "800 21px Roboto";
       ctx.fillText(label.toUpperCase(), 100, y);
       ctx.fillStyle = "#0f172a";
-      ctx.font = "900 27px Arial";
+      ctx.font = "900 27px Roboto";
       y = drawWrappedText(ctx, value, 100, y + 38, 980, 34) + 18;
     });
 
@@ -2567,18 +2908,18 @@ function resetForm() {
     snapshot.rows.forEach(([label, value], index) => {
       const isTotal = index >= snapshot.rows.length - (priceInfo.khachCanBu > 0 ? 2 : 1);
       ctx.fillStyle = isTotal ? "#0f172a" : "#334155";
-      ctx.font = isTotal ? "900 30px Arial" : "800 25px Arial";
+      ctx.font = isTotal ? "900 30px Roboto" : "800 25px Roboto";
       ctx.fillText(label, 100, y);
       ctx.textAlign = "right";
       ctx.fillStyle = isTotal ? "#dc2626" : "#0f172a";
-      ctx.font = isTotal ? "900 34px Arial" : "900 27px Arial";
+      ctx.font = isTotal ? "900 34px Roboto" : "900 27px Roboto";
       ctx.fillText(value, 1100, y);
       ctx.textAlign = "left";
       y += 62;
     });
 
     ctx.fillStyle = "#64748b";
-    ctx.font = "700 20px Arial";
+    ctx.font = "700 20px Roboto";
     drawWrappedText(
       ctx,
       "Lưu ý: Giá tham khảo tại thời điểm tra cứu. Kết quả cuối cùng phụ thuộc tình trạng máy thực tế khi kiểm tra tại siêu thị.",
@@ -2628,7 +2969,7 @@ function resetForm() {
       )
       .join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(snapshot.title)}</title><style>
-      body{margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a}
+      body{margin:0;background:#f8fafc;font-family:Roboto,Arial,sans-serif;color:#0f172a}
       main{width:760px;margin:24px auto;background:#fff;border:1px solid #e2e8f0;border-radius:22px;padding:32px}
       h1{margin:0;color:#0f172a;font-size:30px} .brand{color:#64748b;font-weight:900;margin-bottom:18px}
       .total{margin:18px 0 8px;color:#dc2626;font-size:48px;font-weight:1000}.time{color:#64748b;font-weight:800}
@@ -2677,7 +3018,7 @@ function resetForm() {
     setShowQuote(true);
   }
 
-      async function getClientIpHint() {
+async function getClientIpHint() {
   try {
     const cached = window.sessionStorage.getItem("vtdd_client_ip_hint");
 
@@ -2720,8 +3061,38 @@ function resetForm() {
   }
 }
 
+function getClientDeviceMeta() {
+  const nav = navigator as Navigator & {
+    connection?: { type?: string; effectiveType?: string };
+    mozConnection?: { type?: string; effectiveType?: string };
+    webkitConnection?: { type?: string; effectiveType?: string };
+  };
+  const ua = nav.userAgent || "";
+  const uaLower = ua.toLowerCase();
+  const connection = nav.connection || nav.mozConnection || nav.webkitConnection;
+  const type = String(connection?.type || "").toLowerCase();
+  const effectiveType = String(connection?.effectiveType || "").toLowerCase();
+
+  let clientDevice = "Không rõ";
+  if (uaLower.includes("iphone")) clientDevice = "iPhone";
+  else if (uaLower.includes("ipad")) clientDevice = "iPad";
+  else if (uaLower.includes("android")) clientDevice = "Android";
+  else if (uaLower.includes("windows") || uaLower.includes("macintosh") || uaLower.includes("linux")) clientDevice = "Máy tính";
+
+  let networkType = "Không rõ";
+  if (type.includes("wifi") || type.includes("ethernet")) networkType = "WiFi";
+  else if (type.includes("cell")) networkType = effectiveType ? effectiveType.toUpperCase() : "4G/5G";
+  else if (effectiveType.includes("5g")) networkType = "5G";
+  else if (effectiveType.includes("4g")) networkType = "4G";
+  else if (effectiveType.includes("3g")) networkType = "3G";
+  else if (effectiveType.includes("2g")) networkType = "2G";
+
+  return { clientDevice, networkType };
+}
+
     async function sendQuoteLog(action: "TRA_GIA" | "COPY" | "SHARE" | "CUSTOMER_VIEW") {
   try {
+    const clientMeta = getClientDeviceMeta();
     const res = await fetch("/api/log/quote", {
       method: "POST",
       headers: {
@@ -2746,6 +3117,8 @@ function resetForm() {
         giaBanMoi: priceInfo.giaBanMoi,
         khachCanBu: priceInfo.khachCanBu,
         clientIpHint: await getClientIpHint(),
+        clientDevice: clientMeta.clientDevice,
+        networkType: clientMeta.networkType,
       }),
     });
 
@@ -3317,7 +3690,7 @@ function renderPushNotify() {
   if (!showSystemPush || !notifySettings.pushMessage) return null;
 
   return (
-    <section className="vtdd-push-layer" role="dialog" aria-modal="true">
+    <section className="vtdd-push-layer" role="status" aria-live="polite">
       <div className="vtdd-push-card">
         <span>Thông báo mới</span>
         <h2>Thông báo từ Admin</h2>
@@ -3379,7 +3752,10 @@ function renderSystemLock() {
       <section className="staff-os-shell">
         <header className="staff-command">
           <div>
-            <div className="staff-logo-mwg" aria-label="MWG"><span className="staff-logo-mwg-icon">VTDD</span><span>MWG</span></div>
+            <div className="staff-logo-mwg" aria-label="MWG">
+              <span className="staff-logo-mwg-icon" aria-hidden="true" />
+              <span>MWG</span>
+            </div>
             <h1>Tra cứu thu cũ</h1>
             <p>
               {staffName ? `${staffName} • ` : ""}NV: {maNV} • ST: {maST}
@@ -3685,6 +4061,19 @@ function renderSystemLock() {
             )}
           </div>
 
+          <div className="result-card result-explain-card">
+            <div className="result-explain-title">Giải thích giá</div>
+            {getPriceExplanationRows().map((item) => (
+              <div className="result-explain-row" key={item.label}>
+                <div>
+                  <span>{item.label}</span>
+                  <small>{item.note}</small>
+                </div>
+                <b>{item.value}</b>
+              </div>
+            ))}
+          </div>
+
           <div className="result-actions">
             <button className="result-btn result-btn-copy" onClick={copyQuote}>
               📋 COPY
@@ -3727,6 +4116,11 @@ function renderSystemLock() {
                     <span>
                       {item.time} · {item.action} · {formatMoney(item.tongTien)}
                     </span>
+                    <small className="quote-history-meta">
+                      <em>{item.deviceLabel || "Không rõ"}</em>
+                      <em>{item.ip || "Không rõ IP"}</em>
+                      <em>{item.networkType || "Không rõ mạng"}</em>
+                    </small>
                   </div>
                   <button type="button" onClick={() => applyHistoryItem(item)}>
                     Dùng lại

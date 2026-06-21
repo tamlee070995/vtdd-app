@@ -48,6 +48,8 @@ type DashboardLogRow = {
   loai: string;
   tongTien: number;
   ip: string;
+  deviceLabel: string;
+  networkType: string;
 };
 
 type AdminDashboard = {
@@ -172,11 +174,20 @@ const ALL_ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc
 const TOOL_ACTION_KEYS = new Set(TOOL_ACTION_OPTIONS.map((item) => item.key));
 const TCDM_ACTION_KEYS = new Set(ADMIN_ACTION_OPTIONS.map((item) => item.key));
 
-const NOTIFY_SETTING_KEYS = [
-  "MARQUEE_MESSAGE",
-  "FIXED_BANNER_MESSAGE",
-  "PUSH_NOTIFY_MESSAGE",
-  "PUSH_NOTIFY_VERSION",
+const NOTICE_CONTENT_SETTING_KEYS = ["MARQUEE_MESSAGE", "FIXED_BANNER_MESSAGE"];
+const PUSH_NOTIFY_SETTING_KEYS = ["PUSH_NOTIFY_MESSAGE", "PUSH_NOTIFY_VERSION"];
+const HIDDEN_CLIENT_SETTING_KEYS = new Set(["PUSH_NOTIFY_VERSION"]);
+const STAFF_POPUP_TRADEIN_SETTING_KEYS = [
+  "STAFF_POPUP_TRADEIN_ENABLED",
+  "STAFF_POPUP_TRADEIN_MESSAGE",
+  "STAFF_POPUP_TRADEIN_SECONDS",
+  "STAFF_POPUP_TRADEIN_VERSION",
+];
+const STAFF_POPUP_BUYONLY_SETTING_KEYS = [
+  "STAFF_POPUP_BUYONLY_ENABLED",
+  "STAFF_POPUP_BUYONLY_MESSAGE",
+  "STAFF_POPUP_BUYONLY_SECONDS",
+  "STAFF_POPUP_BUYONLY_VERSION",
 ];
 
 const PRICE_SETTING_KEYS = ["PRICE_EFFECTIVE_FROM", "PRICE_EFFECTIVE_TO"];
@@ -190,6 +201,11 @@ const SCHEDULE_LOCK_SETTING_KEYS = [
 ];
 const STAFF_LOCK_SETTING_KEYS = ["STAFF_PAGE_LOCKED", "STAFF_TRADEIN_LOCKED", "STAFF_BUYONLY_LOCKED"];
 const CUSTOMER_LOCK_SETTING_KEYS = ["CUSTOMER_PAGE_LOCKED", "CUSTOMER_TRADEIN_LOCKED", "CUSTOMER_BUYONLY_LOCKED"];
+const FIREWALL_SETTING_KEYS = ["FIREWALL_BLACKLIST", "FIREWALL_WHITELIST", "FIREWALL_MESSAGE"];
+
+function stripHiddenClientSettings(values: Record<string, string>) {
+  return Object.fromEntries(Object.entries(values).filter(([key]) => !HIDDEN_CLIENT_SETTING_KEYS.has(key)));
+}
 
 const PERMISSION_TREE = [
   {
@@ -388,6 +404,8 @@ function TcdmAdminConsole({
       settings.MARQUEE_MESSAGE,
       settings.FIXED_BANNER_MESSAGE,
       settings.PUSH_NOTIFY_MESSAGE,
+      settings.STAFF_POPUP_TRADEIN_MESSAGE,
+      settings.STAFF_POPUP_BUYONLY_MESSAGE,
     ].filter((item) => String(item || "").trim()).length;
   }, [settings]);
 
@@ -602,7 +620,7 @@ function TcdmAdminConsole({
         settings: apiPayload,
       });
 
-      setSettings({ ...payload, ...(data.settings || {}) });
+      setSettings(stripHiddenClientSettings({ ...payload, ...(data.settings || {}) }));
       showToast("success", data.message || "Đã lưu cấu hình.");
       setBusy("");
     } catch (err: any) {
@@ -616,8 +634,28 @@ function TcdmAdminConsole({
     await saveSettings({ DATA_VERSION: nextVersion }, { onlyKeys: RELOAD_SETTING_KEYS, busyKey: "reload-data" });
   }
 
-  async function saveNotifySettings(extra?: Record<string, string>) {
-    await saveSettings(extra, { onlyKeys: NOTIFY_SETTING_KEYS, busyKey: "notify-settings" });
+  async function saveNoticeContent() {
+    await saveSettings({}, { onlyKeys: NOTICE_CONTENT_SETTING_KEYS, busyKey: "notice-content" });
+  }
+
+  async function sendPushNotifyNow() {
+    await saveSettings(
+      { PUSH_NOTIFY_VERSION: String(Date.now()) },
+      { onlyKeys: PUSH_NOTIFY_SETTING_KEYS, busyKey: "push-notify" }
+    );
+  }
+
+  async function saveStaffPopup(kind: "tradein" | "buyonly") {
+    const isTradein = kind === "tradein";
+    await saveSettings(
+      {
+        [isTradein ? "STAFF_POPUP_TRADEIN_VERSION" : "STAFF_POPUP_BUYONLY_VERSION"]: String(Date.now()),
+      },
+      {
+        onlyKeys: isTradein ? STAFF_POPUP_TRADEIN_SETTING_KEYS : STAFF_POPUP_BUYONLY_SETTING_KEYS,
+        busyKey: isTradein ? "popup-tradein" : "popup-buyonly",
+      }
+    );
   }
 
   async function saveSystemSection(keys: string[], busyKey: string, extra?: Record<string, string>) {
@@ -771,7 +809,7 @@ function TcdmAdminConsole({
             <div className="adminx-soft-card">
               <span>Thông báo</span>
               <b>{notifyCount} mục đang cấu hình</b>
-              <p>Marquee, banner cố định và push notify một lần.</p>
+              <p>Marquee, banner cố định, push nóng và popup SweetAlert.</p>
             </div>
             <div className="adminx-soft-card">
               <span>Lock access</span>
@@ -1091,102 +1129,194 @@ function TcdmAdminConsole({
             <div>
               <span className="adminx-eyebrow">System Notify</span>
               <h2>Thông báo hệ thống</h2>
-              <p>Cấu hình nội dung hiển thị trên trang nhân viên và khách hàng.</p>
+              <p>Chỉ áp dụng cho trang nhân viên. Trang khách hàng không nhận push hoặc popup nếu không có yêu cầu riêng.</p>
             </div>
-            <button className="adminx-action-btn" type="button" onClick={() => saveNotifySettings()} disabled={!canWriteSettings || busy === "settings"}>
-              {busy === "settings" ? "Đang lưu..." : "Lưu thông báo"}
+            <button className="adminx-action-btn" type="button" onClick={saveNoticeContent} disabled={!canWriteSettings || busy === "notice-content"}>
+              {busy === "notice-content" ? "Đang lưu..." : "Lưu nội dung trang nhân viên"}
             </button>
           </div>
 
-          <div className="adminx-form-grid">
-            <label>
-              <span>Thông báo marquee</span>
-              <textarea
-                value={settings.MARQUEE_MESSAGE || ""}
-                onChange={(e) => setSetting("MARQUEE_MESSAGE", e.target.value)}
-                placeholder="Nhập nội dung chạy ngang trên banner..."
-              />
-            </label>
-            <div className="adminx-form-field adminx-form-wide adminx-notice-rich-field">
-              <span>Thông báo quan trọng trên trang nhân viên</span>
-              <Editor
-                tinymceScriptSrc="/tinymce/tinymce.min.js"
-                licenseKey="gpl"
-                value={settings.FIXED_BANNER_MESSAGE || ""}
-                onEditorChange={(value) => setSetting("FIXED_BANNER_MESSAGE", value)}
-                init={{
-                  height: 300,
-                  menubar: "edit view insert format tools table help",
-                  branding: true,
-                  promotion: false,
-                  automatic_uploads: true,
-                  paste_data_images: true,
-                  images_reuse_filename: false,
-                  image_title: true,
-                  image_caption: true,
-                  object_resizing: true,
-                  convert_urls: false,
-                  relative_urls: false,
-                  remove_script_host: false,
-                  file_picker_types: "image media file",
-                  images_upload_handler: async (blobInfo, progress) => {
-                    const formData = new FormData();
-                    formData.append("file", blobInfo.blob(), blobInfo.filename());
-                    formData.append("slug", "important-notice");
+          <div className="adminx-notify-stack">
+            <section className="adminx-notify-card">
+              <div className="adminx-notify-card-head">
+                <div>
+                  <h3>Thông báo trang nhân viên</h3>
+                  <p>Marquee và box thông báo quan trọng trong trang tra giá nhân viên.</p>
+                </div>
+                <button type="button" onClick={saveNoticeContent} disabled={!canWriteSettings || busy === "notice-content"}>
+                  {busy === "notice-content" ? "Đang lưu..." : "Lưu nội dung"}
+                </button>
+              </div>
+              <div className="adminx-form-grid">
+                <label>
+                  <span>Thông báo marquee</span>
+                  <textarea
+                    value={settings.MARQUEE_MESSAGE || ""}
+                    onChange={(e) => setSetting("MARQUEE_MESSAGE", e.target.value)}
+                    placeholder="Nhập nội dung chạy ngang trên banner..."
+                  />
+                </label>
+                <div className="adminx-form-field adminx-form-wide adminx-notice-rich-field">
+                  <span>Thông báo quan trọng trên trang nhân viên</span>
+                  <Editor
+                    tinymceScriptSrc="/tinymce/tinymce.min.js"
+                    licenseKey="gpl"
+                    value={settings.FIXED_BANNER_MESSAGE || ""}
+                    onEditorChange={(value) => setSetting("FIXED_BANNER_MESSAGE", value)}
+                    init={{
+                      height: 300,
+                      menubar: "edit view insert format tools table help",
+                      branding: true,
+                      promotion: false,
+                      automatic_uploads: true,
+                      paste_data_images: true,
+                      images_reuse_filename: false,
+                      image_title: true,
+                      image_caption: true,
+                      object_resizing: true,
+                      convert_urls: false,
+                      relative_urls: false,
+                      remove_script_host: false,
+                      file_picker_types: "image media file",
+                      images_upload_handler: async (blobInfo, progress) => {
+                        const formData = new FormData();
+                        formData.append("file", blobInfo.blob(), blobInfo.filename());
+                        formData.append("slug", "important-notice");
 
-                    const res = await fetch("/api/admin/cms-upload", {
-                      method: "POST",
-                      body: formData,
-                      cache: "no-store",
-                    });
+                        const res = await fetch("/api/admin/cms-upload", {
+                          method: "POST",
+                          body: formData,
+                          cache: "no-store",
+                        });
 
-                    const data = await res.json().catch(() => null);
+                        const data = await res.json().catch(() => null);
 
-                    if (!res.ok || !data?.success || !data?.location) {
-                      throw new Error(data?.message || "Upload ảnh thất bại.");
-                    }
+                        if (!res.ok || !data?.success || !data?.location) {
+                          throw new Error(data?.message || "Upload ảnh thất bại.");
+                        }
 
-                    if (typeof progress === "function") progress(100);
-                    return data.location;
-                  },
-                  plugins:
-                    "advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount",
-                  toolbar:
-                    "undo redo | blocks | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table link image media | removeformat code fullscreen help",
-                  content_style:
-                    "body{font-family:Roboto,Arial,sans-serif;font-size:14px;line-height:1.55;color:#0f172a;padding:12px;} img{display:block;max-width:100%!important;height:auto!important;margin:10px auto;border-radius:14px;} table{max-width:100%;border-collapse:collapse;} td,th{border:1px solid #e2e8f0;padding:6px;} p{margin:0 0 8px;} ul,ol{margin:6px 0 8px 20px;padding:0;}",
-                }}
-              />
-              <small className="adminx-field-hint">
-                Nội dung này chỉ hiển thị ở trang nhân viên. Khách hàng sẽ không thấy box thông báo quan trọng.
-              </small>
-            </div>
-            <label>
-              <span>Push notify hiển thị 1 lần</span>
-              <textarea
-                value={settings.PUSH_NOTIFY_MESSAGE || ""}
-                onChange={(e) => setSetting("PUSH_NOTIFY_MESSAGE", e.target.value)}
-                placeholder="Nhập nội dung popup hiển thị một lần..."
-              />
-            </label>
-            <label>
-              <span>Push notify version</span>
-              <input
-                value={settings.PUSH_NOTIFY_VERSION || ""}
-                onChange={(e) => setSetting("PUSH_NOTIFY_VERSION", e.target.value)}
-                placeholder="VD: 20260607-01"
-              />
-            </label>
-          </div>
+                        if (typeof progress === "function") progress(100);
+                        return data.location;
+                      },
+                      plugins:
+                        "advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount",
+                      toolbar:
+                        "undo redo | blocks | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table link image media | removeformat code fullscreen help",
+                      content_style:
+                        "body{font-family:Roboto,Arial,sans-serif;font-size:14px;line-height:1.55;color:#0f172a;padding:12px;} img{display:block;max-width:100%!important;height:auto!important;margin:10px auto;border-radius:14px;} table{max-width:100%;border-collapse:collapse;} td,th{border:1px solid #e2e8f0;padding:6px;} p{margin:0 0 8px;} ul,ol{margin:6px 0 8px 20px;padding:0;}",
+                    }}
+                  />
+                  <small className="adminx-field-hint">
+                    Nội dung này chỉ hiển thị ở trang nhân viên. Khách hàng sẽ không thấy box thông báo quan trọng.
+                  </small>
+                </div>
+              </div>
+            </section>
 
-          <div className="adminx-inline-actions">
-            <button
-              type="button"
-              onClick={() => saveNotifySettings({ PUSH_NOTIFY_VERSION: String(Date.now()) })}
-              disabled={!canWriteSettings || busy === "settings"}
-            >
-              Lưu & phát push mới
-            </button>
+            <section className="adminx-notify-card adminx-hot-push-card">
+              <div className="adminx-notify-card-head">
+                <div>
+                  <h3>Phát thông báo nóng (PUSH)</h3>
+                  <p>Nội dung trượt từ trên xuống, giữ 30 giây rồi tự tắt.</p>
+                </div>
+              </div>
+              <div className="adminx-push-now-row">
+                <input
+                  value={settings.PUSH_NOTIFY_MESSAGE || ""}
+                  onChange={(e) => setSetting("PUSH_NOTIFY_MESSAGE", e.target.value)}
+                  placeholder="Nhập tin nhắn khẩn gửi tới màn hình toàn bộ nhân viên..."
+                />
+                <button type="button" onClick={sendPushNotifyNow} disabled={!canWriteSettings || busy === "push-notify"}>
+                  {busy === "push-notify" ? "Đang gửi..." : "Gửi thông báo ngay"}
+                </button>
+              </div>
+            </section>
+
+            <section className="adminx-notify-card adminx-popup-config-card">
+              <div className="adminx-popup-card-head">
+                <div>
+                  <h3>Popup &quot;Thu Cũ Đổi Mới&quot;</h3>
+                  <p>Hiển thị dạng SweetAlert giữa màn hình khi nhân viên vào luồng Thu cũ đổi mới.</p>
+                </div>
+                <label className="adminx-popup-toggle">
+                  <input
+                    type="checkbox"
+                    checked={isOn(settings.STAFF_POPUP_TRADEIN_ENABLED)}
+                    onChange={(e) => setSetting("STAFF_POPUP_TRADEIN_ENABLED", toFlag(e.target.checked))}
+                  />
+                  <span className="adminx-switch" aria-hidden="true"></span>
+                </label>
+              </div>
+              <label className="adminx-popup-field">
+                <span>Nội dung thông báo (nên ngắn gọn)</span>
+                <textarea
+                  value={settings.STAFF_POPUP_TRADEIN_MESSAGE || ""}
+                  onChange={(e) => setSetting("STAFF_POPUP_TRADEIN_MESSAGE", e.target.value)}
+                  placeholder="VD: Toàn bộ iPhone thu vào sẽ không có trợ giá..."
+                />
+              </label>
+              <label className="adminx-popup-time">
+                <span>Tự tắt sau</span>
+                <input
+                  inputMode="numeric"
+                  value={settings.STAFF_POPUP_TRADEIN_SECONDS || "10"}
+                  onChange={(e) => setSetting("STAFF_POPUP_TRADEIN_SECONDS", e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="10"
+                />
+                <small>Nhập 10 = 10 giây, nhập 10000 = 10 giây theo cấu hình cũ.</small>
+              </label>
+              <button
+                type="button"
+                className="adminx-popup-save"
+                onClick={() => saveStaffPopup("tradein")}
+                disabled={!canWriteSettings || busy === "popup-tradein"}
+              >
+                {busy === "popup-tradein" ? "Đang lưu..." : "Lưu cấu hình"}
+              </button>
+            </section>
+
+            <section className="adminx-notify-card adminx-popup-config-card">
+              <div className="adminx-popup-card-head">
+                <div>
+                  <h3>Popup &quot;Thu Cũ Không Đổi Mới&quot;</h3>
+                  <p>Hiển thị dạng SweetAlert giữa màn hình khi nhân viên vào luồng Chỉ thu cũ.</p>
+                </div>
+                <label className="adminx-popup-toggle">
+                  <input
+                    type="checkbox"
+                    checked={isOn(settings.STAFF_POPUP_BUYONLY_ENABLED)}
+                    onChange={(e) => setSetting("STAFF_POPUP_BUYONLY_ENABLED", toFlag(e.target.checked))}
+                  />
+                  <span className="adminx-switch" aria-hidden="true"></span>
+                </label>
+              </div>
+              <label className="adminx-popup-field">
+                <span>Nội dung thông báo (nên ngắn gọn)</span>
+                <textarea
+                  value={settings.STAFF_POPUP_BUYONLY_MESSAGE || ""}
+                  onChange={(e) => setSetting("STAFF_POPUP_BUYONLY_MESSAGE", e.target.value)}
+                  placeholder="VD: Chương trình OFF đến khi có thông báo mới..."
+                />
+              </label>
+              <label className="adminx-popup-time">
+                <span>Tự tắt sau</span>
+                <input
+                  inputMode="numeric"
+                  value={settings.STAFF_POPUP_BUYONLY_SECONDS || "10"}
+                  onChange={(e) => setSetting("STAFF_POPUP_BUYONLY_SECONDS", e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="10"
+                />
+                <small>Nhập 10 = 10 giây, nhập 10000 = 10 giây theo cấu hình cũ.</small>
+              </label>
+              <button
+                type="button"
+                className="adminx-popup-save"
+                onClick={() => saveStaffPopup("buyonly")}
+                disabled={!canWriteSettings || busy === "popup-buyonly"}
+              >
+                {busy === "popup-buyonly" ? "Đang lưu..." : "Lưu cấu hình"}
+              </button>
+            </section>
           </div>
         </section>
       )}
@@ -1425,6 +1555,58 @@ function TcdmAdminConsole({
                 </button>
               </div>
             </section>
+
+            <section className="adminx-system-card adminx-firewall-card">
+              <div className="adminx-system-card-head">
+                <span>07</span>
+                <div>
+                  <h3>Hệ thống tường lửa IP</h3>
+                  <p>Chặn hoặc chỉ cho phép IP được cấu hình truy cập trang tra giá nhân viên và khách hàng.</p>
+                </div>
+              </div>
+
+              <div className="adminx-firewall-panel">
+                <label>
+                  <span>Blacklist (chặn IP | lý do)</span>
+                  <textarea
+                    value={settings.FIREWALL_BLACKLIST || ""}
+                    onChange={(e) => setSetting("FIREWALL_BLACKLIST", e.target.value)}
+                    placeholder={"42.113.79.11 | Truy cập bất thường\n183.80.38.199 | Spam tra giá"}
+                  />
+                </label>
+                <label>
+                  <span>Whitelist (chỉ cho IP này vào)</span>
+                  <textarea
+                    value={settings.FIREWALL_WHITELIST || ""}
+                    onChange={(e) => setSetting("FIREWALL_WHITELIST", e.target.value)}
+                    placeholder={"Nếu ô này có dữ liệu, toàn bộ IP khác bên ngoài danh sách sẽ bị chặn.\nVD: 113.190.25.10"}
+                  />
+                </label>
+                <label className="adminx-firewall-message">
+                  <span>Nội dung hiển thị khi bị chặn</span>
+                  <input
+                    value={settings.FIREWALL_MESSAGE || ""}
+                    onChange={(e) => setSetting("FIREWALL_MESSAGE", e.target.value)}
+                    placeholder="IP của bạn không được phép truy cập hệ thống tra giá."
+                  />
+                </label>
+              </div>
+
+              <div className="adminx-lock-help">
+                Blacklist chặn đúng IP, có thể ghi kèm lý do bằng dấu |. Whitelist nếu có dữ liệu sẽ chuyển sang chế độ chỉ cho các IP trong danh sách truy cập.
+              </div>
+
+              <div className="adminx-section-actions">
+                <button
+                  className="adminx-section-save"
+                  type="button"
+                  onClick={() => saveSystemSection(FIREWALL_SETTING_KEYS, "firewall-settings")}
+                  disabled={!canWriteSettings || busy === "firewall-settings"}
+                >
+                  {busy === "firewall-settings" ? "Đang lưu..." : "Lưu tường lửa IP"}
+                </button>
+              </div>
+            </section>
           </div>
         </section>
       )}
@@ -1563,6 +1745,11 @@ function TcdmAdminConsole({
                       <span>
                         {item.time} • NV {item.maNV} • {item.action} • {money(item.tongTien)}
                       </span>
+                      <small className="adminx-log-meta">
+                        <em>{item.deviceLabel || "Không rõ"}</em>
+                        <em>{item.ip || "Không rõ IP"}</em>
+                        <em>{item.networkType || "Không rõ mạng"}</em>
+                      </small>
                     </div>
                   ))
                 )}
@@ -2214,6 +2401,163 @@ const ADMINX_STYLE = `
   justify-content: flex-end;
 }
 
+.adminx-notify-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.adminx-notify-card {
+  padding: 18px;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, .06);
+}
+
+.adminx-notify-card-head,
+.adminx-popup-card-head {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.adminx-notify-card-head h3,
+.adminx-popup-card-head h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 16px;
+  line-height: 1.15;
+  font-weight: 1000;
+  letter-spacing: -.02em;
+}
+
+.adminx-notify-card-head p,
+.adminx-popup-card-head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.42;
+  font-weight: 800;
+}
+
+.adminx-hot-push-card {
+  background: linear-gradient(135deg, #ffffff, #f8fbff);
+}
+
+.adminx-push-now-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.adminx-push-now-row input {
+  width: 100%;
+  min-height: 46px;
+  border-radius: 18px;
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  padding: 0 14px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.adminx-push-now-row button,
+.adminx-popup-save,
+.adminx-notify-card-head button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 16px;
+  background: #dbeafe;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.adminx-push-now-row button,
+.adminx-popup-save {
+  width: 100%;
+}
+
+.adminx-popup-config-card {
+  display: grid;
+  gap: 14px;
+}
+
+.adminx-popup-toggle {
+  display: inline-grid;
+  cursor: pointer;
+}
+
+.adminx-popup-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.adminx-popup-toggle input:checked + .adminx-switch {
+  background: #22c55e;
+}
+
+.adminx-popup-toggle input:checked + .adminx-switch::after {
+  transform: translateX(20px);
+}
+
+.adminx-popup-field,
+.adminx-popup-time {
+  display: grid;
+  gap: 8px;
+}
+
+.adminx-popup-field > span,
+.adminx-popup-time > span {
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-popup-field textarea {
+  min-height: 90px;
+  border-radius: 18px;
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  padding: 14px;
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 850;
+  resize: vertical;
+}
+
+.adminx-popup-time {
+  grid-template-columns: auto 120px 1fr;
+  align-items: center;
+}
+
+.adminx-popup-time input {
+  min-height: 44px;
+  border-radius: 16px;
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  padding: 0 14px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.adminx-popup-time small {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 800;
+}
+
 .adminx-section-actions {
   margin-top: 12px;
   display: flex;
@@ -2297,6 +2641,63 @@ const ADMINX_STYLE = `
   font-size: 12px;
   line-height: 1.45;
   font-weight: 850;
+}
+
+.adminx-firewall-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(14, 165, 233, .16), transparent 34%),
+    #ffffff;
+}
+
+.adminx-firewall-panel {
+  padding: 16px;
+  border-radius: 22px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  background: #020617;
+  border: 1px solid #0f172a;
+}
+
+.adminx-firewall-panel label {
+  display: grid;
+  gap: 8px;
+}
+
+.adminx-firewall-panel label > span {
+  color: #94a3b8;
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-firewall-panel textarea,
+.adminx-firewall-panel input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, .28);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, .92);
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 850;
+}
+
+.adminx-firewall-panel textarea {
+  min-height: 118px;
+  padding: 14px;
+  resize: vertical;
+}
+
+.adminx-firewall-panel input {
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+.adminx-firewall-message {
+  grid-column: 1 / -1;
 }
 
 .adminx-toggle-row {
@@ -2450,6 +2851,26 @@ const ADMINX_STYLE = `
   font-weight: 800;
 }
 
+.adminx-log-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.adminx-log-meta em {
+  width: fit-content;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #334155;
+  font-size: 10px;
+  line-height: 1;
+  font-style: normal;
+  font-weight: 900;
+}
+
 .adminx-toast {
   position: fixed;
   left: 50%;
@@ -2495,6 +2916,7 @@ const ADMINX_STYLE = `
   .adminx-staff-summary,
   .adminx-form-grid,
   .adminx-lock-grid,
+  .adminx-firewall-panel,
   .adminx-dashboard-grid {
     grid-template-columns: 1fr;
   }
@@ -2571,6 +2993,15 @@ const ADMINX_STYLE = `
 
   .adminx-panel-head-row {
     display: grid;
+  }
+
+  .adminx-notify-card-head,
+  .adminx-popup-card-head {
+    align-items: start;
+  }
+
+  .adminx-popup-time {
+    grid-template-columns: 1fr;
   }
 
   .adminx-panel h2 {

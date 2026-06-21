@@ -1,4 +1,5 @@
 import { readSheetRange } from "@/lib/sheets";
+import { packQuoteClientMeta, parseQuoteClientMeta } from "@/lib/quote-client-meta";
 import { insertRows, isSupabaseConfigured, selectAllRows } from "@/lib/supabase-rest";
 
 const LOG_SHEET = "Log_search";
@@ -21,6 +22,8 @@ export type QuoteLogRow = {
   khachCanBu: number;
   ip: string;
   userAgent: string;
+  deviceLabel: string;
+  networkType: string;
 };
 
 function clean(value: unknown) {
@@ -33,6 +36,8 @@ function money(value: unknown) {
 }
 
 function mapQuoteLogRow(row: unknown[]): QuoteLogRow {
+  const clientMeta = parseQuoteClientMeta(row[16]);
+
   return {
     time: clean(row[0]),
     action: clean(row[1]),
@@ -50,11 +55,15 @@ function mapQuoteLogRow(row: unknown[]): QuoteLogRow {
     tongTien: money(row[13]),
     khachCanBu: money(row[14]),
     ip: clean(row[15]),
-    userAgent: clean(row[16]),
+    userAgent: clientMeta.userAgent,
+    deviceLabel: clientMeta.deviceLabel,
+    networkType: clientMeta.networkType,
   };
 }
 
 function mapDbQuoteLogRow(row: any): QuoteLogRow {
+  const clientMeta = parseQuoteClientMeta(row.user_agent);
+
   return {
     time: clean(row.time_text),
     action: clean(row.action),
@@ -72,7 +81,9 @@ function mapDbQuoteLogRow(row: any): QuoteLogRow {
     tongTien: money(row.customer_total),
     khachCanBu: money(row.customer_need_pay),
     ip: clean(row.ip),
-    userAgent: clean(row.user_agent),
+    userAgent: clientMeta.userAgent,
+    deviceLabel: clientMeta.deviceLabel,
+    networkType: clientMeta.networkType,
   };
 }
 
@@ -129,7 +140,11 @@ export async function appendQuoteLog(row: QuoteLogRow) {
           customer_total: String(money(row.tongTien)),
           customer_need_pay: String(money(row.khachCanBu)),
           ip: clean(row.ip),
-          user_agent: clean(row.userAgent),
+          user_agent: packQuoteClientMeta({
+            userAgent: row.userAgent,
+            deviceLabel: row.deviceLabel,
+            networkType: row.networkType,
+          }),
         },
       ],
       { returning: "minimal" }

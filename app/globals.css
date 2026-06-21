@@ -28,6 +28,14 @@ body {
   color: var(--text);
 }
 
+body,
+button,
+input,
+select,
+textarea {
+  font-family: "Roboto", Arial, sans-serif;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -1189,9 +1197,10 @@ a {
 }
 
 .result-btn-copy {
-  background: rgba(255, 255, 255, .08);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, .12);
+  background: #ffd400;
+  color: #07111f;
+  border: 1px solid rgba(255, 212, 0, .75);
+  box-shadow: 0 12px 28px rgba(255, 212, 0, .22);
 }
 
 .result-btn-zalo {

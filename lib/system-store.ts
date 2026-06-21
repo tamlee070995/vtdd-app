@@ -15,6 +15,14 @@ export const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
   FIXED_BANNER_MESSAGE: "",
   PUSH_NOTIFY_MESSAGE: "",
   PUSH_NOTIFY_VERSION: "",
+  STAFF_POPUP_TRADEIN_ENABLED: "0",
+  STAFF_POPUP_TRADEIN_MESSAGE: "",
+  STAFF_POPUP_TRADEIN_SECONDS: "10",
+  STAFF_POPUP_TRADEIN_VERSION: "",
+  STAFF_POPUP_BUYONLY_ENABLED: "0",
+  STAFF_POPUP_BUYONLY_MESSAGE: "",
+  STAFF_POPUP_BUYONLY_SECONDS: "10",
+  STAFF_POPUP_BUYONLY_VERSION: "",
   PRICE_EFFECTIVE_FROM: "",
   PRICE_EFFECTIVE_TO: "",
 
@@ -33,6 +41,10 @@ export const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
 
   CUSTOMER_TRADEIN_LOCKED: "0",
   CUSTOMER_BUYONLY_LOCKED: "0",
+
+  FIREWALL_BLACKLIST: "",
+  FIREWALL_WHITELIST: "",
+  FIREWALL_MESSAGE: "IP của bạn không được phép truy cập hệ thống tra giá.",
 
   DATA_VERSION: "1",
   ADMIN_PIN_HASH: "",
@@ -56,6 +68,14 @@ const PUBLIC_SYSTEM_SETTING_KEYS = [
   "FIXED_BANNER_MESSAGE",
   "PUSH_NOTIFY_MESSAGE",
   "PUSH_NOTIFY_VERSION",
+  "STAFF_POPUP_TRADEIN_ENABLED",
+  "STAFF_POPUP_TRADEIN_MESSAGE",
+  "STAFF_POPUP_TRADEIN_SECONDS",
+  "STAFF_POPUP_TRADEIN_VERSION",
+  "STAFF_POPUP_BUYONLY_ENABLED",
+  "STAFF_POPUP_BUYONLY_MESSAGE",
+  "STAFF_POPUP_BUYONLY_SECONDS",
+  "STAFF_POPUP_BUYONLY_VERSION",
   "PRICE_EFFECTIVE_FROM",
   "PRICE_EFFECTIVE_TO",
   "SYSTEM_LOCK_ENABLED",
@@ -497,6 +517,8 @@ export type DashboardLogRow = {
   loai: string;
   tongTien: number;
   ip: string;
+  deviceLabel: string;
+  networkType: string;
 };
 
 export async function getAdminDashboardStats() {
@@ -515,6 +537,8 @@ export async function getAdminDashboardStats() {
     loai: row.loai,
     tongTien: row.tongTien,
     ip: row.ip,
+    deviceLabel: row.deviceLabel,
+    networkType: row.networkType,
   }));
 
   const countMap = new Map<string, number>();

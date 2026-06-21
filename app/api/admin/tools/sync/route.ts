@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
+import { ensureAutoBackupScheduler, getAutoBackupStatus } from "@/lib/auto-backup";
 import { appendAdminAudit } from "@/lib/system-store";
-import { exportSyncTarget, getSyncSummary, importSyncCsv } from "@/lib/data-sync-store";
+import {
+  exportSyncTarget,
+  getDataQualityReport,
+  getSyncSummary,
+  importSyncCsv,
+  previewSyncCsv,
+} from "@/lib/data-sync-store";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const ADMIN_ONLY_EXPORT_TARGETS = new Set(["staff", "system_settings", "admin_audit", "backup"]);
 const ADMIN_ONLY_IMPORT_TARGETS = new Set(["staff"]);
@@ -18,6 +26,7 @@ function noStoreHeaders(extra?: HeadersInit) {
 export async function GET(req: NextRequest) {
   const { admin, response } = await requireAdminApi(req, { action: "tools-report" });
   if (response) return response;
+  ensureAutoBackupScheduler();
 
   try {
     const target = String(req.nextUrl.searchParams.get("target") || "summary").trim();
@@ -28,6 +37,42 @@ export async function GET(req: NextRequest) {
         {
           success: true,
           summary,
+        },
+        { headers: noStoreHeaders() }
+      );
+    }
+
+    if (target === "quality") {
+      if (admin?.permission !== "admin") {
+        return NextResponse.json(
+          { success: false, message: "Chỉ Admin được kiểm tra chất lượng dữ liệu tổng." },
+          { status: 403, headers: noStoreHeaders() }
+        );
+      }
+
+      const quality = await getDataQualityReport();
+      return NextResponse.json(
+        {
+          success: true,
+          quality,
+        },
+        { headers: noStoreHeaders() }
+      );
+    }
+
+    if (target === "backup-status") {
+      if (admin?.permission !== "admin") {
+        return NextResponse.json(
+          { success: false, message: "Chỉ Admin được xem trạng thái backup tự động." },
+          { status: 403, headers: noStoreHeaders() }
+        );
+      }
+
+      const backup = await getAutoBackupStatus();
+      return NextResponse.json(
+        {
+          success: true,
+          backup,
         },
         { headers: noStoreHeaders() }
       );
@@ -51,7 +96,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("ADMIN_SYNC_EXPORT_ERROR:", err?.message || err);
-    err = null;
     return NextResponse.json(
       {
         success: false,
@@ -65,11 +109,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const { admin, response } = await requireAdminApi(req, { action: "tools-report" });
   if (response) return response;
+  ensureAutoBackupScheduler();
 
   try {
     const form = await req.formData();
     const target = String(form.get("target") || "").trim();
     const file = form.get("file");
+    const preview = String(form.get("preview") || "") === "1";
 
     if (ADMIN_ONLY_IMPORT_TARGETS.has(target) && admin?.permission !== "admin") {
       return NextResponse.json(
@@ -86,6 +132,18 @@ export async function POST(req: NextRequest) {
     }
 
     const csvText = await file.text();
+
+    if (preview) {
+      const result = await previewSyncCsv(target, csvText);
+      return NextResponse.json(
+        {
+          success: true,
+          preview: result,
+        },
+        { headers: noStoreHeaders() }
+      );
+    }
+
     const result = await importSyncCsv(target, csvText);
 
     await appendAdminAudit({
@@ -106,7 +164,6 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: any) {
     console.error("ADMIN_SYNC_IMPORT_ERROR:", err?.message || err);
-    err = null;
     return NextResponse.json(
       {
         success: false,

@@ -3,7 +3,9 @@ import {
   deleteRows,
   eq,
   insertRows,
+  isNull,
   isSupabaseConfigured,
+  neq,
   notIsNull,
   selectAllRows,
 } from "@/lib/supabase-rest";
@@ -22,6 +24,22 @@ export type SyncExportTarget =
   | "admin_audit"
   | "quote_logs"
   | "backup";
+
+type PreviewSample = Record<string, string>;
+
+type DataQualityIssue = {
+  label: string;
+  value: number;
+  severity: "ok" | "warn" | "danger";
+  samples?: string[];
+};
+
+type DataQualitySection = {
+  key: string;
+  title: string;
+  total: number;
+  issues: DataQualityIssue[];
+};
 
 const IMPORT_TARGETS = new Set<SyncImportTarget>([
   "products_new",
@@ -78,6 +96,56 @@ function normalizeKey(value: unknown) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ");
+}
+
+function compactKey(value: unknown) {
+  return normalizeKey(value).replace(/\s+/g, "");
+}
+
+function hasAppleKeyword(...values: unknown[]) {
+  const text = values.map(compactKey).join(" ");
+  return text.includes("apple") || text.includes("iphone") || text.includes("ipad");
+}
+
+function getDuplicateSummary<T>(
+  rows: T[],
+  keyer: (row: T) => string,
+  labeler: (row: T) => string
+) {
+  const groups = new Map<string, string[]>();
+
+  rows.forEach((row) => {
+    const key = keyer(row);
+    if (!key) return;
+
+    const list = groups.get(key) || [];
+    list.push(labeler(row));
+    groups.set(key, list);
+  });
+
+  const duplicates = Array.from(groups.values())
+    .filter((items) => items.length > 1)
+    .sort((a, b) => b.length - a.length);
+
+  return {
+    groups: duplicates.length,
+    rows: duplicates.reduce((sum, items) => sum + items.length, 0),
+    samples: duplicates.slice(0, 5).map((items) => `${items[0]} (${items.length})`),
+  };
+}
+
+function makeIssue(
+  label: string,
+  value: number,
+  severity: "ok" | "warn" | "danger",
+  samples?: string[]
+): DataQualityIssue {
+  return {
+    label,
+    value,
+    severity,
+    samples: samples?.filter(Boolean).slice(0, 5),
+  };
 }
 
 function rowHasData(row: string[]) {
@@ -203,6 +271,24 @@ async function insertChunks(
       returning: "minimal",
     });
   }
+}
+
+async function countOldPhoneRowsForReplace() {
+  const [notTabletRows, missingSourceRows] = await Promise.all([
+    countRows("products_old", { source_sheet: neq("Data_Cu_Tablet") }),
+    countRows("products_old", { source_sheet: isNull() }),
+  ]);
+
+  return notTabletRows + missingSourceRows;
+}
+
+async function deleteOldPhoneRowsForReplace() {
+  await deleteRows("products_old", { source_sheet: neq("Data_Cu_Tablet") }, { returning: "minimal" });
+  await deleteRows("products_old", { source_sheet: isNull() }, { returning: "minimal" });
+}
+
+async function deleteOldTabletRowsForReplace() {
+  await deleteRows("products_old", { source_sheet: eq("Data_Cu_Tablet") }, { returning: "minimal" });
 }
 
 function buildNewProductRows(csvText: string) {
@@ -377,6 +463,166 @@ function buildPincodeRequestRows(csvText: string) {
     .filter((row) => row.created_at_text && row.ma_st && row.ma_nv);
 }
 
+function sampleRows(rows: Array<Record<string, unknown>>, fields: string[], limit = 5): PreviewSample[] {
+  return rows.slice(0, limit).map((row) => {
+    const item: PreviewSample = {};
+    fields.forEach((field) => {
+      item[field] = clean(row[field]);
+    });
+    return item;
+  });
+}
+
+function countUniqueBy<T>(rows: T[], keyer: (row: T) => string) {
+  return new Set(rows.map(keyer).filter(Boolean)).size;
+}
+
+function getPreviewLabel(target: SyncImportTarget) {
+  if (target === "products_new") return "Data_Moi";
+  if (target === "products_old_phone") return "Data_Cu";
+  if (target === "products_old_tablet") return "Data_Cu_Tablet";
+  if (target === "staff") return "Data_Staff";
+  if (target === "pmh_codes") return "PMH";
+  return "Data_PincodeAudit";
+}
+
+export async function previewSyncCsv(target: string, csvText: string) {
+  assertDbReady();
+  if (!IMPORT_TARGETS.has(target as SyncImportTarget)) throw new Error("Loại import không hợp lệ.");
+
+  const importTarget = target as SyncImportTarget;
+  const warnings: string[] = [];
+  let rows: Array<Record<string, unknown>> = [];
+  let currentRows = 0;
+  let willInsert = 0;
+  let willUpdate = 0;
+  let willReplace = 0;
+  let willSkip = 0;
+  let mode: "replace" | "upsert" | "append" = "upsert";
+  let samples: PreviewSample[] = [];
+
+  if (importTarget === "products_new") {
+    rows = buildNewProductRows(csvText);
+    currentRows = await countRows("products_new");
+    willReplace = currentRows;
+    willInsert = rows.length;
+    mode = "replace";
+    samples = sampleRows(rows, ["brand", "product_name", "category", "subsidy_ratio", "subsidy_amount"]);
+
+    const duplicate = getDuplicateSummary(
+      rows,
+      (row) => compactKey(row.product_name),
+      (row) => clean(row.product_name)
+    );
+    if (duplicate.groups > 0) warnings.push(`Có ${duplicate.groups} tên máy mới bị trùng: ${duplicate.samples.join(", ")}.`);
+  } else if (importTarget === "products_old_phone" || importTarget === "products_old_tablet") {
+    const sourceSheet = importTarget === "products_old_phone" ? "Data_Cu" : "Data_Cu_Tablet";
+    rows = buildOldProductRows(csvText, sourceSheet);
+    currentRows = importTarget === "products_old_phone"
+      ? await countOldPhoneRowsForReplace()
+      : await countRows("products_old", { source_sheet: eq(sourceSheet) });
+    willReplace = currentRows;
+    willInsert = rows.length;
+    mode = "replace";
+    samples = sampleRows(rows, ["brand", "product_name", "storage", "price_type_1", "price_type_2"]);
+
+    const duplicate = getDuplicateSummary(
+      rows,
+      (row) => [row.source_sheet, compactKey(row.product_name), compactKey(row.storage)].join("|"),
+      (row) => `${clean(row.product_name)} ${clean(row.storage)}`
+    );
+    if (duplicate.groups > 0) warnings.push(`Có ${duplicate.groups} máy cũ/dung lượng bị trùng: ${duplicate.samples.join(", ")}.`);
+  } else if (importTarget === "staff") {
+    rows = dataRowsFromCsv(csvText, "staff")
+      .map(({ row, sourceRow }) => ({
+        ma_nv: cleanCode(row[0]),
+        staff_name: clean(row[1]),
+        ma_st: cleanCode(row[2]),
+        store_name: clean(row[3]),
+        department: clean(row[4]),
+        source_row: sourceRow,
+      }))
+      .filter((row) => row.ma_nv);
+
+    const existingRows = await selectAllRows<any>("staff", { select: "ma_nv" });
+    const existing = new Set(existingRows.map((row) => cleanCode(row.ma_nv)).filter(Boolean));
+    const incoming = new Set<string>();
+    rows.forEach((row) => {
+      const maNV = cleanCode(row.ma_nv);
+      if (!maNV) return;
+      if (existing.has(maNV)) willUpdate += 1;
+      else willInsert += 1;
+      incoming.add(maNV);
+    });
+    currentRows = existingRows.length;
+    mode = "upsert";
+    samples = sampleRows(rows, ["ma_nv", "staff_name", "ma_st", "store_name"]);
+
+    const duplicate = getDuplicateSummary(
+      rows,
+      (row) => cleanCode(row.ma_nv),
+      (row) => `${clean(row.ma_nv)} - ${clean(row.staff_name)}`
+    );
+    if (duplicate.groups > 0) warnings.push(`File có ${duplicate.groups} mã nhân viên bị trùng: ${duplicate.samples.join(", ")}.`);
+    if (incoming.size !== rows.length) willSkip += rows.length - incoming.size;
+  } else if (importTarget === "pmh_codes") {
+    rows = dataRowsFromCsv(csvText, "pmh_codes")
+      .map(({ row, sourceRow }) => ({
+        pincode: clean(row[0]),
+        status: clean(row[1]),
+        menh_gia: clean(row[2]),
+        request_id: clean(row[3]),
+        source_row: sourceRow,
+      }))
+      .filter((row) => row.pincode);
+
+    const existingRows = await selectAllRows<any>("pmh_codes", { select: "pincode" });
+    const existing = new Set(existingRows.map((row) => clean(row.pincode)).filter(Boolean));
+    const incoming = new Set<string>();
+
+    rows.forEach((row) => {
+      const pin = clean(row.pincode);
+      if (!pin) return;
+      if (existing.has(pin) || incoming.has(pin)) willSkip += 1;
+      else willInsert += 1;
+      incoming.add(pin);
+    });
+
+    currentRows = existingRows.length;
+    mode = "append";
+    samples = sampleRows(rows, ["pincode", "status", "menh_gia"]);
+    if (willSkip > 0) warnings.push(`Có ${willSkip} mã PMH trùng sẽ được bỏ qua.`);
+  } else {
+    rows = buildPincodeRequestRows(csvText);
+    const existingRows = await selectAllRows<any>("pincode_requests", { select: "request_id" });
+    const existing = new Set(existingRows.map((row) => clean(row.request_id)).filter(Boolean));
+    rows.forEach((row) => {
+      if (existing.has(clean(row.request_id))) willUpdate += 1;
+      else willInsert += 1;
+    });
+    currentRows = existingRows.length;
+    mode = "upsert";
+    samples = sampleRows(rows, ["request_id", "created_at_text", "ma_st", "ma_nv", "status", "support_type"]);
+  }
+
+  if (rows.length === 0) warnings.push("Không tìm thấy dòng dữ liệu hợp lệ trong file.");
+
+  return {
+    target: importTarget,
+    label: getPreviewLabel(importTarget),
+    mode,
+    currentRows,
+    validRows: rows.length,
+    uniqueRows: countUniqueBy(rows, (row) => clean(row.request_id) || clean(row.pincode) || clean(row.ma_nv) || clean(row.product_name)),
+    willInsert,
+    willUpdate,
+    willReplace,
+    willSkip,
+    warnings,
+    samples,
+  };
+}
+
 export async function importSyncCsv(target: string, csvText: string) {
   assertDbReady();
   if (!IMPORT_TARGETS.has(target as SyncImportTarget)) throw new Error("Loại import không hợp lệ.");
@@ -393,7 +639,11 @@ export async function importSyncCsv(target: string, csvText: string) {
     const sourceSheet = target === "products_old_phone" ? "Data_Cu" : "Data_Cu_Tablet";
     const rows = buildOldProductRows(csvText, sourceSheet);
     if (rows.length === 0) throw new Error(`File ${sourceSheet} không có dòng hợp lệ.`);
-    await deleteRows("products_old", { source_sheet: eq(sourceSheet) }, { returning: "minimal" });
+    if (target === "products_old_phone") {
+      await deleteOldPhoneRowsForReplace();
+    } else {
+      await deleteOldTabletRowsForReplace();
+    }
     await insertChunks("products_old", rows);
     return { target, imported: rows.length, skipped: 0, mode: "replace" };
   }
@@ -659,6 +909,150 @@ async function exportBackupJson() {
   };
 }
 
+export async function getDataQualityReport() {
+  assertDbReady();
+
+  const [productsNew, productsOld, staff, pmhCodes, pincodeRequests] = await Promise.all([
+    selectAllRows<any>("products_new"),
+    selectAllRows<any>("products_old"),
+    selectAllRows<any>("staff"),
+    selectAllRows<any>("pmh_codes"),
+    selectAllRows<any>("pincode_requests"),
+  ]);
+
+  const duplicateNew = getDuplicateSummary(
+    productsNew,
+    (row) => compactKey(row.product_name),
+    (row) => clean(row.product_name)
+  );
+  const duplicateOld = getDuplicateSummary(
+    productsOld,
+    (row) => [clean(row.source_sheet), compactKey(row.product_name), compactKey(row.storage)].join("|"),
+    (row) => `${clean(row.product_name)} ${clean(row.storage)}`
+  );
+  const duplicateStaff = getDuplicateSummary(
+    staff,
+    (row) => cleanCode(row.ma_nv),
+    (row) => `${clean(row.ma_nv)} - ${clean(row.staff_name)}`
+  );
+  const duplicatePmh = getDuplicateSummary(
+    pmhCodes,
+    (row) => clean(row.pincode),
+    (row) => `${clean(row.pincode)} ${clean(row.menh_gia)}`
+  );
+
+  const newMissingCategory = productsNew.filter((row) => !clean(row.category));
+  const newAppleRows = productsNew.filter((row) => hasAppleKeyword(row.brand, row.product_name));
+  const oldMissingPrice = productsOld.filter(
+    (row) =>
+      !clean(row.price_type_1) &&
+      !clean(row.price_type_2) &&
+      !clean(row.price_type_3) &&
+      !clean(row.price_type_4) &&
+      !clean(row.price_type_5) &&
+      !clean(row.price_type_5_plus)
+  );
+  const staffMissingStore = staff.filter((row) => !cleanCode(row.ma_st));
+  const staffNeedSetup = staff.filter((row) => clean(row.need_setup) === "1");
+  const pmhAvailable = pmhCodes.filter((row) => clean(row.status).toLowerCase() !== "used" && !clean(row.request_id));
+  const pmhMissingValue = pmhCodes.filter((row) => !clean(row.menh_gia));
+  const pendingRequests = pincodeRequests.filter((row) => clean(row.status).toLowerCase() === "pending");
+  const requestsMissingImages = pincodeRequests.filter(
+    (row) =>
+      !clean(row.image_link_1) ||
+      !clean(row.image_link_2) ||
+      !clean(row.image_link_3) ||
+      !clean(row.image_link_4) ||
+      !clean(row.image_link_5)
+  );
+
+  const sections: DataQualitySection[] = [
+    {
+      key: "products_new",
+      title: "Data_Moi",
+      total: productsNew.length,
+      issues: [
+        makeIssue("Tên máy mới bị trùng", duplicateNew.groups, duplicateNew.groups > 0 ? "warn" : "ok", duplicateNew.samples),
+        makeIssue(
+          "Thiếu ngành hàng",
+          newMissingCategory.length,
+          newMissingCategory.length > 0 ? "danger" : "ok",
+          newMissingCategory.slice(0, 5).map((row) => clean(row.product_name))
+        ),
+        makeIssue(
+          "Có sản phẩm Apple",
+          newAppleRows.length,
+          newAppleRows.length > 0 ? "warn" : "ok",
+          newAppleRows.slice(0, 5).map((row) => clean(row.product_name))
+        ),
+      ],
+    },
+    {
+      key: "products_old",
+      title: "Data_Cu / Data_Cu_Tablet",
+      total: productsOld.length,
+      issues: [
+        makeIssue("Máy cũ + bộ nhớ bị trùng", duplicateOld.groups, duplicateOld.groups > 0 ? "warn" : "ok", duplicateOld.samples),
+        makeIssue(
+          "Thiếu toàn bộ giá loại máy",
+          oldMissingPrice.length,
+          oldMissingPrice.length > 0 ? "danger" : "ok",
+          oldMissingPrice.slice(0, 5).map((row) => `${clean(row.product_name)} ${clean(row.storage)}`)
+        ),
+      ],
+    },
+    {
+      key: "staff",
+      title: "Data_Staff",
+      total: staff.length,
+      issues: [
+        makeIssue("Mã nhân viên bị trùng", duplicateStaff.groups, duplicateStaff.groups > 0 ? "danger" : "ok", duplicateStaff.samples),
+        makeIssue(
+          "Thiếu mã siêu thị",
+          staffMissingStore.length,
+          staffMissingStore.length > 0 ? "danger" : "ok",
+          staffMissingStore.slice(0, 5).map((row) => `${clean(row.ma_nv)} - ${clean(row.staff_name)}`)
+        ),
+        makeIssue("Tài khoản cần setup", staffNeedSetup.length, staffNeedSetup.length > 0 ? "warn" : "ok"),
+      ],
+    },
+    {
+      key: "pmh_codes",
+      title: "Kho PMH",
+      total: pmhCodes.length,
+      issues: [
+        makeIssue("PMH còn khả dụng", pmhAvailable.length, pmhAvailable.length > 0 ? "ok" : "warn"),
+        makeIssue("Mã PMH bị trùng", duplicatePmh.groups, duplicatePmh.groups > 0 ? "danger" : "ok", duplicatePmh.samples),
+        makeIssue(
+          "PMH thiếu mệnh giá",
+          pmhMissingValue.length,
+          pmhMissingValue.length > 0 ? "warn" : "ok",
+          pmhMissingValue.slice(0, 5).map((row) => clean(row.pincode))
+        ),
+      ],
+    },
+    {
+      key: "pincode_requests",
+      title: "Hồ sơ PMH",
+      total: pincodeRequests.length,
+      issues: [
+        makeIssue("Hồ sơ đang chờ duyệt", pendingRequests.length, pendingRequests.length > 0 ? "warn" : "ok"),
+        makeIssue(
+          "Hồ sơ thiếu ảnh",
+          requestsMissingImages.length,
+          requestsMissingImages.length > 0 ? "warn" : "ok",
+          requestsMissingImages.slice(0, 5).map((row) => `${clean(row.request_id)} - ${clean(row.ma_nv)}`)
+        ),
+      ],
+    },
+  ];
+
+  return {
+    generatedAt: new Date().toISOString(),
+    sections,
+  };
+}
+
 export async function getSyncSummary() {
   assertDbReady();
   const [
@@ -677,7 +1071,7 @@ export async function getSyncSummary() {
     countRows("staff"),
     countRows("stores"),
     countRows("products_new"),
-    countRows("products_old", { source_sheet: eq("Data_Cu") }),
+    countOldPhoneRowsForReplace(),
     countRows("products_old", { source_sheet: eq("Data_Cu_Tablet") }),
     countRows("pmh_codes"),
     countRows("pmh_codes", { status: "neq.Used" }),

@@ -129,6 +129,10 @@ export function neq(value: unknown) {
   return `neq.${encodeFilter(String(value ?? ""))}`;
 }
 
+export function isNull() {
+  return "is.null";
+}
+
 export function notIsNull() {
   return "not.is.null";
 }

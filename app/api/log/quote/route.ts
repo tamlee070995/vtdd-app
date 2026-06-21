@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { detectDeviceLabel, normalizeNetworkType, packQuoteClientMeta } from "@/lib/quote-client-meta";
 import { appendQuoteLog } from "@/lib/quote-log-store";
 import { insertSheetRowAt2Queued } from "@/lib/sheets-write";
 import { getCurrentStaffFromRequest } from "@/lib/staff-auth";
@@ -86,6 +87,9 @@ export async function POST(req: NextRequest) {
       minute: "2-digit",
       second: "2-digit",
     });
+    const userAgent = req.headers.get("user-agent") || "";
+    const deviceLabel = clean(body.clientDevice) || detectDeviceLabel(userAgent);
+    const networkType = normalizeNetworkType(body.networkType);
 
     const logRow = {
       time: now,
@@ -104,7 +108,9 @@ export async function POST(req: NextRequest) {
       tongTien: money(body.tongTien),
       khachCanBu: money(body.khachCanBu),
       ip: getClientIp(req, body),
-      userAgent: req.headers.get("user-agent") || "",
+      userAgent,
+      deviceLabel,
+      networkType,
     };
 
     const wroteDb = await appendQuoteLog(logRow);
@@ -127,7 +133,11 @@ export async function POST(req: NextRequest) {
         logRow.tongTien,
         logRow.khachCanBu,
         logRow.ip,
-        logRow.userAgent,
+        packQuoteClientMeta({
+          userAgent: logRow.userAgent,
+          deviceLabel: logRow.deviceLabel,
+          networkType: logRow.networkType,
+        }),
       ]);
     }
 

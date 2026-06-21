@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { createHash } from "crypto";
 import { eq, insertRows, isSupabaseConfigured, selectAllRows, selectRows, updateRows } from "@/lib/supabase-rest";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -549,6 +550,36 @@ function makeRequestId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function makeStableRequestId(parts: unknown[]) {
+  const raw = parts.map(clean).join("|");
+  const hasData = raw.replace(/\|/g, "").trim();
+  if (!hasData) return "";
+
+  return `req_${createHash("sha1").update(raw).digest("hex").slice(0, 18)}`;
+}
+
+function getDbRequestPublicId(row: any) {
+  const requestId = clean(row.request_id);
+  if (requestId) return requestId;
+
+  const dbId = clean(row.id);
+  if (dbId) return `db:${dbId}`;
+
+  const sourceRow = clean(row.source_row);
+  if (sourceRow) return sourceRow;
+
+  return makeStableRequestId([
+    row.created_at_text,
+    row.ma_st,
+    row.ma_nv,
+    row.imei,
+    row.support_type,
+    row.pincode,
+    row.old_model,
+    row.new_model,
+  ]);
+}
+
 function mapDbStaff(row: any): PincodeStaff {
   return {
     maNV: cleanCode(row.ma_nv),
@@ -559,9 +590,9 @@ function mapDbStaff(row: any): PincodeStaff {
   };
 }
 
-function mapDbRequestRow(row: any, index = 0): PincodeRequest {
-  const requestId = clean(row.request_id) || clean(row.source_row);
-  const rowNumber = sourceRowNumber(row.source_row, index + 2);
+function mapDbRequestRow(row: any): PincodeRequest {
+  const requestId = getDbRequestPublicId(row);
+  const rowNumber = sourceRowNumber(row.source_row, 0);
   const flow = normalizePincodeFlow(row.support_type);
   const done = clean(row.completion_status);
   const status = normalizeStatus(row.status, done);
@@ -648,6 +679,52 @@ function dbRequestPatchFromInput(data: {
     ...(typeof data.supportType !== "undefined" ? { support_type: normalizePincodeFlow(data.supportType) } : {}),
     ...(typeof data.sourceRow !== "undefined" ? { source_row: clean(data.sourceRow) } : {}),
   };
+}
+
+async function updateDbPincodeRequest(requestId: string, patch: Record<string, unknown>) {
+  const id = clean(requestId);
+  if (!id) throw new Error("Thiáº¿u mÃ£ há»“ sÆ¡ PMH Ä‘á»ƒ cáº­p nháº­t.");
+
+  const filters: Array<Record<string, string>> = [];
+
+  if (id.startsWith("db:")) {
+    const dbId = id.slice(3);
+    if (dbId) filters.push({ id: eq(dbId) });
+  } else {
+    filters.push({ request_id: eq(id) });
+    if (/^\d+$/.test(id)) filters.push({ source_row: eq(id) });
+  }
+
+  if (id.startsWith("req_")) {
+    const allRows = await selectAllRows<any>("pincode_requests");
+    const fallback = allRows.find((row) => getDbRequestPublicId(row) === id);
+
+    if (fallback) {
+      const dbId = clean(fallback.id);
+      const fallbackRequestId = clean(fallback.request_id);
+      const sourceRow = clean(fallback.source_row);
+
+      if (dbId) filters.unshift({ id: eq(dbId) });
+      if (fallbackRequestId) filters.push({ request_id: eq(fallbackRequestId) });
+      if (sourceRow) filters.push({ source_row: eq(sourceRow) });
+      if (!dbId && !fallbackRequestId && !sourceRow) {
+        filters.push({
+          created_at_text: eq(clean(fallback.created_at_text)),
+          ma_st: eq(cleanCode(fallback.ma_st)),
+          ma_nv: eq(cleanCode(fallback.ma_nv)),
+          imei: eq(clean(fallback.imei)),
+          support_type: eq(clean(fallback.support_type)),
+        });
+      }
+    }
+  }
+
+  for (const filter of filters) {
+    const rows = await updateRows<any>("pincode_requests", filter, patch);
+    if (Array.isArray(rows) && rows.length > 0) return rows;
+  }
+
+  throw new Error("KhÃ´ng tÃ¬m tháº¥y há»“ sÆ¡ PMH trong Database Ä‘á»ƒ cáº­p nháº­t.");
 }
 
 function isMainRequestRow(row: any[]) {
@@ -921,19 +998,37 @@ export async function getPincodeRequestById(requestId: string) {
 
   if (isSupabaseConfigured()) {
     try {
-      let rows = await selectRows<any>("pincode_requests", {
-        filters: { request_id: eq(id) },
-        limit: 1,
-      });
+      let rows: any[] = [];
 
-      if (rows.length === 0 && id) {
+      if (id.startsWith("db:")) {
+        const dbId = id.slice(3);
+        rows = dbId
+          ? await selectRows<any>("pincode_requests", {
+              filters: { id: eq(dbId) },
+              limit: 1,
+            })
+          : [];
+      } else {
+        rows = await selectRows<any>("pincode_requests", {
+          filters: { request_id: eq(id) },
+          limit: 1,
+        });
+      }
+
+      if (rows.length === 0 && id && !id.startsWith("db:")) {
         rows = await selectRows<any>("pincode_requests", {
           filters: { source_row: eq(id) },
           limit: 1,
         });
       }
 
-      return rows[0] ? mapDbRequestRow(rows[0], 0) : null;
+      if (rows.length === 0 && id.startsWith("req_")) {
+        const allRows = await selectAllRows<any>("pincode_requests");
+        const fallback = allRows.find((row) => getDbRequestPublicId(row) === id);
+        rows = fallback ? [fallback] : [];
+      }
+
+      return rows[0] ? mapDbRequestRow(rows[0]) : null;
     } catch (err: any) {
       console.warn("SUPABASE_PINCODE_REQUEST_ERROR:", err?.message || err);
       throw err;
@@ -1129,9 +1224,8 @@ export async function createPincodeRequest(data: {
       return await enqueuePincodeWrite(async () => {
         if (duplicate) {
           if (duplicate.status === "Rejected_Soft") {
-            await updateRows(
-              "pincode_requests",
-              { request_id: eq(duplicate.requestId) },
+            await updateDbPincodeRequest(
+              duplicate.requestId,
               dbRequestPatchFromInput({
                 maST: staff.maST || inputStore,
                 maNV: staff.maNV,
@@ -1146,8 +1240,7 @@ export async function createPincodeRequest(data: {
                 oldModel: modelCu,
                 newModel: modelMoi,
                 supportType: flow,
-              }),
-              { returning: "minimal" }
+              })
             );
 
             const request = await getPincodeRequestById(duplicate.requestId);
@@ -1474,7 +1567,8 @@ export async function approvePincodeRequest(data: {
           })
           .sort((a, b) => {
             if (!selectedMenhGia && a.value !== b.value) return a.value - b.value;
-            return a.sourceRow - b.sourceRow;
+            if (a.sourceRow !== b.sourceRow) return a.sourceRow - b.sourceRow;
+            return a.pin.localeCompare(b.pin, "vi", { numeric: true });
           });
 
         const selectedPin = candidates[0];
@@ -1502,9 +1596,8 @@ export async function approvePincodeRequest(data: {
           throw new Error("Không giữ được mã PMH, vui lòng thử lại.");
         }
 
-        await updateRows(
-          "pincode_requests",
-          { request_id: eq(request.requestId) },
+        await updateDbPincodeRequest(
+          request.requestId,
           dbRequestPatchFromInput({
             status: "Approve",
             pincode: selectedPin.pin,
@@ -1512,8 +1605,7 @@ export async function approvePincodeRequest(data: {
             adminReviewer: clean(data.admin),
             completionStatus: "",
             menhGia: selectedPin.menhGia,
-          }),
-          { returning: "minimal" }
+          })
         );
 
         return {
@@ -1642,16 +1734,14 @@ export async function rejectPincodeRequest(data: {
         ? `[CHUP_LAI_ANH:${slots.join(",")}]\n${reasonText}`
         : reasonText;
 
-      await updateRows(
-        "pincode_requests",
-        { request_id: eq(request.requestId) },
+      await updateDbPincodeRequest(
+        request.requestId,
         dbRequestPatchFromInput({
           status,
           pincode: "",
           rejectReason: storedReason,
           adminReviewer: clean(data.admin),
-        }),
-        { returning: "minimal" }
+        })
       );
 
       return {
@@ -1720,17 +1810,15 @@ export async function updatePincodeRequestImages(data: {
         throw new Error(`Vui lòng bổ sung đủ ${requiredFileCount} file hồ sơ.`);
       }
 
-      await updateRows(
-        "pincode_requests",
-        { request_id: eq(request.requestId) },
+      await updateDbPincodeRequest(
+        request.requestId,
         dbRequestPatchFromInput({
           imageUrls,
           status: "Pending",
           pincode: "",
           rejectReason: "",
           adminReviewer: "",
-        }),
-        { returning: "minimal" }
+        })
       );
 
       return {
@@ -1785,12 +1873,7 @@ export async function markPincodeCompleted(requestId: string) {
       const request = await getPincodeRequestById(requestId);
       if (!request) throw new Error("Không tìm thấy hồ sơ.");
 
-      await updateRows(
-        "pincode_requests",
-        { request_id: eq(request.requestId) },
-        { completion_status: "Done" },
-        { returning: "minimal" }
-      );
+      await updateDbPincodeRequest(request.requestId, { completion_status: "Done" });
 
       return { success: true };
     });
@@ -1829,12 +1912,7 @@ export async function markPincodeSkipped(requestId: string) {
       const request = await getPincodeRequestById(requestId);
       if (!request) throw new Error("Không tìm thấy hồ sơ.");
 
-      await updateRows(
-        "pincode_requests",
-        { request_id: eq(request.requestId) },
-        { completion_status: "X" },
-        { returning: "minimal" }
-      );
+      await updateDbPincodeRequest(request.requestId, { completion_status: "X" });
 
       return { success: true };
     });

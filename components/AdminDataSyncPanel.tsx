@@ -16,6 +16,51 @@ type Summary = {
   adminAudit: number;
 };
 
+type ImportPreview = {
+  target: string;
+  label: string;
+  mode: "replace" | "upsert" | "append";
+  currentRows: number;
+  validRows: number;
+  uniqueRows: number;
+  willInsert: number;
+  willUpdate: number;
+  willReplace: number;
+  willSkip: number;
+  warnings: string[];
+  samples: Record<string, string>[];
+};
+
+type DataQualityIssue = {
+  label: string;
+  value: number;
+  severity: "ok" | "warn" | "danger";
+  samples?: string[];
+};
+
+type DataQualitySection = {
+  key: string;
+  title: string;
+  total: number;
+  issues: DataQualityIssue[];
+};
+
+type DataQualityReport = {
+  generatedAt: string;
+  sections: DataQualitySection[];
+};
+
+type BackupStatus = {
+  enabled: boolean;
+  schedule: string;
+  fileName: string;
+  exists: boolean;
+  bytes: number;
+  updatedAtVN: string;
+  nextRunAtVN: string;
+  lastError: string;
+};
+
 const EMPTY_SUMMARY: Summary = {
   staff: 0,
   stores: 0,
@@ -69,6 +114,13 @@ function number(value: number) {
   return Number(value || 0).toLocaleString("vi-VN");
 }
 
+function formatBytes(value: number) {
+  const bytes = Number(value || 0);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
 function getFileNameFromResponse(res: Response, target: string) {
   const header = res.headers.get("content-disposition") || "";
   const match = header.match(/filename="?([^"]+)"?/i);
@@ -88,6 +140,9 @@ export default function AdminDataSyncPanel() {
   const [summaryError, setSummaryError] = useState("");
   const [importTarget, setImportTarget] = useState("products_new");
   const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [quality, setQuality] = useState<DataQualityReport | null>(null);
+  const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -125,12 +180,86 @@ export default function AdminDataSyncPanel() {
 
   useEffect(() => {
     loadSummary();
+    loadBackupStatus();
   }, []);
+
+  async function loadBackupStatus() {
+    try {
+      const res = await fetch("/api/admin/tools/sync?target=backup-status", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.success) {
+        setBackupStatus(data.backup || null);
+      }
+    } catch {
+      setBackupStatus(null);
+    }
+  }
+
+  async function loadQuality() {
+    try {
+      setBusy("quality");
+      const res = await fetch("/api/admin/tools/sync?target=quality", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) throw new Error(data?.message || "Khong kiem tra duoc chat luong du lieu.");
+
+      setQuality(data.quality || null);
+      setBusy("");
+      showToast("Da kiem tra chat luong du lieu.");
+    } catch (err: any) {
+      setBusy("");
+      showToast(err?.message || "Khong kiem tra duoc chat luong du lieu.");
+    }
+  }
+
+  async function runPreviewImport() {
+    try {
+      if (!file) {
+        showToast("Chua chon file CSV.");
+        return;
+      }
+
+      setBusy("preview");
+      setPreview(null);
+      const form = new FormData();
+      form.set("target", importTarget);
+      form.set("file", file);
+      form.set("preview", "1");
+
+      const res = await fetch("/api/admin/tools/sync", {
+        method: "POST",
+        cache: "no-store",
+        body: form,
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) throw new Error(data?.message || "Khong xem truoc duoc file import.");
+
+      setPreview(data.preview || null);
+      setBusy("");
+      showToast("Da tao ban xem truoc import.");
+    } catch (err: any) {
+      setBusy("");
+      showToast(err?.message || "Khong xem truoc duoc file import.");
+    }
+  }
 
   async function runImport() {
     try {
       if (!file) {
         showToast("Chưa chọn file CSV.");
+        return;
+      }
+
+      if (!preview || preview.target !== importTarget) {
+        await runPreviewImport();
         return;
       }
 
@@ -150,6 +279,8 @@ export default function AdminDataSyncPanel() {
 
       setBusy("");
       setFile(null);
+      setPreview(null);
+      setQuality(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       showToast(data.message || "Đã import dữ liệu.");
       await loadSummary({ silent: true });
@@ -182,6 +313,7 @@ export default function AdminDataSyncPanel() {
       link.remove();
       window.URL.revokeObjectURL(url);
       setBusy("");
+      if (target === "backup") await loadBackupStatus();
     } catch (err: any) {
       setBusy("");
       showToast(err?.message || "Không export được dữ liệu.");
@@ -197,9 +329,15 @@ export default function AdminDataSyncPanel() {
           <span>Đồng bộ dữ liệu</span>
           <h3>Import / Export CSV</h3>
         </div>
+        <div className="sync-head-actions">
+          <button type="button" onClick={() => loadQuality()} disabled={busy === "quality"}>
+            {busy === "quality" ? "Đang kiểm tra..." : "Kiểm tra dữ liệu"}
+          </button>
         <button type="button" onClick={() => loadSummary()} disabled={busy === "summary"}>
           {busy === "summary" ? "Đang tải..." : "Làm mới"}
         </button>
+      </div>
+
       </div>
 
       {summaryError ? <div className="sync-error">{summaryError}</div> : null}
@@ -224,7 +362,13 @@ export default function AdminDataSyncPanel() {
 
           <label>
             <span>Loại dữ liệu</span>
-            <select value={importTarget} onChange={(event) => setImportTarget(event.target.value)}>
+            <select
+              value={importTarget}
+              onChange={(event) => {
+                setImportTarget(event.target.value);
+                setPreview(null);
+              }}
+            >
               {IMPORT_OPTIONS.map((item) => (
                 <option key={item.key} value={item.key}>{item.label}</option>
               ))}
@@ -237,11 +381,55 @@ export default function AdminDataSyncPanel() {
               ref={fileInputRef}
               type="file"
               accept=".csv,text/csv,.txt"
-              onChange={(event) => setFile(event.target.files?.[0] || null)}
+              onChange={(event) => {
+                setFile(event.target.files?.[0] || null);
+                setPreview(null);
+              }}
             />
           </label>
 
-          <button type="button" onClick={runImport} disabled={busy === "import"}>
+          {preview ? (
+            <div className="sync-preview-card">
+              <div className="sync-preview-head">
+                <span>Xem trước import</span>
+                <b>{preview.label}</b>
+              </div>
+              <div className="sync-preview-metrics">
+                <div><span>Hiện có</span><b>{number(preview.currentRows)}</b></div>
+                <div><span>Dòng hợp lệ</span><b>{number(preview.validRows)}</b></div>
+                <div><span>Thêm mới</span><b>{number(preview.willInsert)}</b></div>
+                <div><span>Cập nhật</span><b>{number(preview.willUpdate)}</b></div>
+                <div><span>Thay thế</span><b>{number(preview.willReplace)}</b></div>
+                <div><span>Bỏ qua</span><b>{number(preview.willSkip)}</b></div>
+              </div>
+              {preview.warnings.length > 0 ? (
+                <div className="sync-preview-warnings">
+                  {preview.warnings.map((item, index) => (
+                    <p key={`${item}-${index}`}>{item}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="sync-preview-ok">File hợp lệ, có thể import.</p>
+              )}
+              {preview.samples.length > 0 ? (
+                <div className="sync-preview-samples">
+                  {preview.samples.map((item, index) => (
+                    <div key={`sample-${index}`}>
+                      {Object.entries(item).map(([key, value]) => (
+                        <span key={key}>{key}: <b>{value || "-"}</b></span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <button type="button" onClick={runPreviewImport} disabled={busy === "preview" || busy === "import"}>
+            {busy === "preview" ? "Đang xem trước..." : "Xem trước import"}
+          </button>
+
+          <button type="button" className="sync-confirm-import" onClick={runImport} disabled={busy === "import" || !preview}>
             {busy === "import" ? "Đang import..." : `Import ${selectedImport.label}`}
           </button>
         </section>
@@ -250,6 +438,21 @@ export default function AdminDataSyncPanel() {
           <div className="sync-box-title">
             <h4>Export dữ liệu</h4>
             <small>CSV mở được bằng Google Sheet</small>
+          </div>
+
+          <div className="sync-auto-backup">
+            <div>
+              <span>Auto backup</span>
+              <b>23:00 mỗi ngày</b>
+            </div>
+            <p>Hệ thống tự ghi đè 1 file duy nhất: <strong>{backupStatus?.fileName || "vtdd-backup.json"}</strong></p>
+            <small>
+              {backupStatus?.exists
+                ? `Lần gần nhất: ${backupStatus.updatedAtVN || "-"} • ${formatBytes(backupStatus.bytes)}`
+                : "Chưa có file backup tự động. File sẽ được tạo lúc 23:00."}
+            </small>
+            <small>Lần kế tiếp: {backupStatus?.nextRunAtVN || "23:00 hôm nay/ngày mai"}</small>
+            {backupStatus?.lastError ? <em>{backupStatus.lastError}</em> : null}
           </div>
 
           <div className="sync-export-grid">
@@ -266,6 +469,43 @@ export default function AdminDataSyncPanel() {
           </div>
         </section>
       </div>
+
+      {quality ? (
+        <section className="sync-quality-panel">
+          <div className="sync-quality-head">
+            <div>
+              <span>Dashboard chất lượng dữ liệu</span>
+              <h4>Rà lỗi trước khi vận hành</h4>
+            </div>
+            <small>{new Date(quality.generatedAt).toLocaleString("vi-VN")}</small>
+          </div>
+
+          <div className="sync-quality-grid">
+            {quality.sections.map((section) => (
+              <article className="sync-quality-card" key={section.key}>
+                <div className="sync-quality-card-head">
+                  <div>
+                    <span>{section.title}</span>
+                    <b>{number(section.total)}</b>
+                  </div>
+                </div>
+
+                <div className="sync-quality-issues">
+                  {section.issues.map((issue) => (
+                    <div className={`sync-quality-issue ${issue.severity}`} key={`${section.key}-${issue.label}`}>
+                      <div>
+                        <span>{issue.label}</span>
+                        {issue.samples?.length ? <small>{issue.samples.join(" | ")}</small> : null}
+                      </div>
+                      <b>{number(issue.value)}</b>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {toast ? <div className="sync-toast">{toast}</div> : null}
     </section>
@@ -287,6 +527,13 @@ const STYLE = `
   justify-content: space-between;
   align-items: start;
   gap: 12px;
+}
+.sync-head-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .sync-head span {
   color: #047857;
@@ -415,6 +662,157 @@ const STYLE = `
 .sync-box > button {
   width: 100%;
 }
+.sync-confirm-import {
+  background: #07111f !important;
+  color: #ffd400 !important;
+}
+.sync-preview-card {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #dbe5ef;
+}
+.sync-preview-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+.sync-preview-head span,
+.sync-quality-head span {
+  color: #0f766e;
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.sync-preview-head b {
+  color: #07111f;
+  font-size: 14px;
+  font-weight: 1000;
+}
+.sync-preview-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.sync-preview-metrics div {
+  padding: 9px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.sync-preview-metrics span {
+  display: block;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+.sync-preview-metrics b {
+  display: block;
+  margin-top: 4px;
+  color: #07111f;
+  font-size: 16px;
+  font-weight: 1000;
+}
+.sync-preview-warnings {
+  display: grid;
+  gap: 6px;
+}
+.sync-preview-warnings p,
+.sync-preview-ok {
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 900;
+}
+.sync-preview-warnings p {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+}
+.sync-preview-ok {
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #047857;
+}
+.sync-preview-samples {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+.sync-preview-samples div {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.sync-preview-samples span {
+  color: #64748b;
+  font-size: 10.5px;
+  line-height: 1.35;
+  font-weight: 850;
+}
+.sync-preview-samples b {
+  color: #07111f;
+}
+.sync-auto-backup {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ecfdf5, #ffffff);
+  border: 1px solid #99f6e4;
+}
+.sync-auto-backup div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+.sync-auto-backup span {
+  color: #0f766e;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.sync-auto-backup b {
+  color: #07111f;
+  font-size: 13px;
+  font-weight: 1000;
+}
+.sync-auto-backup p,
+.sync-auto-backup small,
+.sync-auto-backup em {
+  margin: 0;
+  color: #334155;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 850;
+  font-style: normal;
+}
+.sync-auto-backup strong {
+  color: #0f766e;
+  font-weight: 1000;
+}
+.sync-auto-backup em {
+  padding: 8px 9px;
+  border-radius: 12px;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
 .sync-export-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -430,6 +828,98 @@ const STYLE = `
   grid-column: 1 / -1;
   background: #0f766e;
   color: #fff;
+}
+.sync-quality-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px solid #dbe5ef;
+}
+.sync-quality-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+.sync-quality-head h4 {
+  margin: 5px 0 0;
+  color: #07111f;
+  font-size: 18px;
+  font-weight: 1000;
+}
+.sync-quality-head small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+}
+.sync-quality-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.sync-quality-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+.sync-quality-card-head span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+.sync-quality-card-head b {
+  display: block;
+  margin-top: 4px;
+  color: #07111f;
+  font-size: 22px;
+  font-weight: 1000;
+}
+.sync-quality-issues {
+  display: grid;
+  gap: 7px;
+}
+.sync-quality-issue {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 9px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.sync-quality-issue.warn {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+.sync-quality-issue.danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.sync-quality-issue span {
+  display: block;
+  color: #07111f;
+  font-size: 12px;
+  font-weight: 1000;
+}
+.sync-quality-issue small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 10.5px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+.sync-quality-issue b {
+  color: #07111f;
+  font-size: 15px;
+  font-weight: 1000;
 }
 .sync-toast {
   position: fixed;
@@ -456,11 +946,21 @@ const STYLE = `
   .sync-box-title {
     display: grid;
   }
+  .sync-head-actions {
+    justify-content: stretch;
+  }
+  .sync-head-actions button {
+    width: 100%;
+  }
   .sync-head h3 {
     font-size: 23px;
   }
   .sync-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sync-preview-metrics,
+  .sync-quality-grid {
+    grid-template-columns: 1fr;
   }
   .sync-grid,
   .sync-export-grid {

@@ -31,6 +31,9 @@ yarn-error.log*
 .pnpm-debug.log*
 .codex-run/
 
+# runtime backup files
+/storage/backups/
+
 # env files (can opt-in for committing if needed)
 .env*
 
