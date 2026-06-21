@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
     }
 
     await resetStaffPasswordByOtp(staff.rowNumber, {
+      maNV: staff.maNV,
       passwordHash: hashPassword(newPassword),
     });
 

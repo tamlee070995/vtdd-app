@@ -1983,7 +1983,7 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   const [showProfilePanel, setShowProfilePanel] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [profileCurrentPassword, setProfileCurrentPassword] = useState("");
-  const [profileChangePassword, setProfileChangePassword] = useState(false);
+  const [profileChangePassword, setProfileChangePassword] = useState(forceSetup);
   const [profileNewPassword, setProfileNewPassword] = useState("");
   const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
   const [profileQuestion, setProfileQuestion] = useState("");
@@ -2114,7 +2114,7 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   useEffect(() => {
     if (mustSetup) {
       setShowProfilePanel(true);
-      setProfileChangePassword(false);
+      setProfileChangePassword(true);
     }
   }, [mustSetup]);
 
@@ -3153,7 +3153,7 @@ function renderProfilePanel(modeView: "modal" | "setup") {
                 <b>Đổi mật khẩu đăng nhập</b>
                 <em>
                   {isSetup
-                    ? "Mặc định tắt, bật nếu cần tạo mật khẩu mới."
+                    ? "Mặc định bật trong lần thiết lập đầu tiên."
                     : "Bật nếu muốn thay đổi mật khẩu đăng nhập hiện tại."}
                 </em>
               </div>

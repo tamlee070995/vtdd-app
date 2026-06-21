@@ -87,6 +87,40 @@ function buildPreheader(text: string) {
   `;
 }
 
+function getMailLogoUrl() {
+  const raw = String(
+    process.env.MAIL_LOGO_URL ||
+      process.env.NEXT_PUBLIC_MAIL_LOGO_URL ||
+      ""
+  ).trim();
+
+  if (/^https?:\/\//i.test(raw)) return raw;
+
+  const baseUrl = String(process.env.NEXT_PUBLIC_APP_URL || "").trim().replace(/\/+$/, "");
+  if (!baseUrl) return "";
+
+  const path = raw || "/mwg-logo.png";
+  return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function buildBrandLogo() {
+  const logoUrl = getMailLogoUrl();
+
+  if (logoUrl) {
+    return `
+      <td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;border-radius:18px;background:#ffd400;overflow:hidden;box-shadow:0 10px 24px rgba(0,0,0,.22);">
+        <img src="${escapeHtml(logoUrl)}" width="52" height="52" alt="MWG" style="display:block;width:52px;height:52px;border:0;outline:none;text-decoration:none;object-fit:cover;border-radius:18px;" />
+      </td>
+    `;
+  }
+
+  return `
+    <td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;border-radius:18px;background:#ffd400;color:#07111f;font-family:Roboto,Arial,sans-serif;font-size:12px;line-height:13px;font-weight:900;letter-spacing:-.8px;text-align:center;box-shadow:0 10px 24px rgba(0,0,0,.22);">
+      MWG
+    </td>
+  `;
+}
+
 function buildBrandHeader(statusLabel: string) {
   return `
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -94,9 +128,7 @@ function buildBrandHeader(statusLabel: string) {
         <td align="left" style="padding:0;">
           <table role="presentation" cellspacing="0" cellpadding="0" border="0">
             <tr>
-              <td width="48" height="48" align="center" valign="middle" style="width:48px;height:48px;border-radius:16px;background:#ffd400;color:#07111f;font-family:Roboto,Arial,sans-serif;font-size:15px;line-height:15px;font-weight:900;letter-spacing:-1px;">
-                VT
-              </td>
+              ${buildBrandLogo()}
               <td style="padding-left:13px;">
                 <div style="font-family:Roboto,Arial,sans-serif;color:#ffffff;font-size:17px;line-height:20px;font-weight:900;letter-spacing:-.3px;">
                   Viễn Thông Di Động

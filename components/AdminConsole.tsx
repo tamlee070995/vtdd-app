@@ -362,6 +362,7 @@ function TcdmAdminConsole({
   const firstVisibleTab = visibleTabs[0]?.key || "overview";
   const canManageStaff = canUseAction("staff-manage");
   const canResetStaffSecurity = canUseAction("staff-security");
+  const canResetStaffOtp = canResetStaffSecurity || canManageStaff;
   const canWriteSettings = canUseAction("settings-write");
   const canReloadData = canUseAction("reload-data");
 
@@ -932,7 +933,7 @@ function TcdmAdminConsole({
                       </button>
                       <button
                         type="button"
-                        disabled={!canResetStaffSecurity || isStaffAdminLocked(item) || busy === `RESET_OTP_COUNT-${item.maNV}`}
+                        disabled={!canResetStaffOtp || busy === `RESET_OTP_COUNT-${item.maNV}`}
                         onClick={() => runStaffAction("RESET_OTP_COUNT", item.maNV)}
                       >
                         Reset OTP

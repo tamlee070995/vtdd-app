@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
     const expiresAt = String(Date.now() + OTP_TTL_MS);
 
     await updateStaffResetOtp(staff.rowNumber, {
+      maNV: staff.maNV,
       otpHash: hashPassword(otp),
       expiresAt,
       day: today,

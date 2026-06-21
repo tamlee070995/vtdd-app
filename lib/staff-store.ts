@@ -139,18 +139,26 @@ function mapDbStaffRow(row: any, index: number): StaffRow {
   };
 }
 
-async function updateDbStaffByRowNumber(rowNumber: number, patch: Record<string, unknown>) {
+async function updateDbStaffByRowNumber(rowNumber: number, patch: Record<string, unknown>, maNV?: string) {
   if (!isSupabaseConfigured()) return false;
 
   try {
-    const rows = await updateRows<any>(
+    let rows = await updateRows<any>(
       "staff",
       { source_row: eq(String(rowNumber)) },
       patch
     );
 
+    if ((!Array.isArray(rows) || rows.length === 0) && cleanCode(maNV)) {
+      rows = await updateRows<any>(
+        "staff",
+        { ma_nv: eq(cleanCode(maNV)) },
+        patch
+      );
+    }
+
     if (!Array.isArray(rows) || rows.length === 0) {
-      throw new Error("Không tìm thấy nhân viên trong Supabase để cập nhật.");
+      throw new Error("Không tìm thấy nhân viên trong Database để cập nhật.");
     }
 
     return true;
@@ -319,6 +327,7 @@ export async function getAdminStaffPage(params: {
 export async function updateStaffSecurity(
   rowNumber: number,
   data: {
+    maNV?: string;
     passwordHash: string;
     encryptedQuestion: string;
     answerHash: string;
@@ -332,7 +341,7 @@ export async function updateStaffSecurity(
     security_answer: data.answerHash,
     gmail: data.encryptedGmail,
     ...(data.needSetup === "0" || data.needSetup === "1" ? { need_setup: data.needSetup } : {}),
-  })) {
+  }, data.maNV)) {
     return;
   }
 
@@ -449,14 +458,14 @@ export async function createStandbyAccount(data: {
 
 export async function updateStaffResetOtp(
   rowNumber: number,
-  data: { otpHash: string; expiresAt: string; day: string; count: number }
+  data: { maNV?: string; otpHash: string; expiresAt: string; day: string; count: number }
 ) {
   if (await updateDbStaffByRowNumber(rowNumber, {
     reset_otp_hash: data.otpHash,
     reset_otp_expires: data.expiresAt,
     reset_otp_day: data.day,
     reset_otp_count: String(data.count),
-  })) {
+  }, data.maNV)) {
     return;
   }
 
@@ -473,12 +482,12 @@ export async function updateStaffResetOtp(
   });
 }
 
-export async function resetStaffPasswordByOtp(rowNumber: number, data: { passwordHash: string }) {
+export async function resetStaffPasswordByOtp(rowNumber: number, data: { maNV?: string; passwordHash: string }) {
   if (await updateDbStaffByRowNumber(rowNumber, {
     password_hash: data.passwordHash,
     reset_otp_hash: "",
     reset_otp_expires: "",
-  })) {
+  }, data.maNV)) {
     return;
   }
 
@@ -499,8 +508,8 @@ export async function resetStaffPasswordByOtp(rowNumber: number, data: { passwor
   });
 }
 
-export async function updateStaffNeedSetup(rowNumber: number, needSetup: "0" | "1") {
-  if (await updateDbStaffByRowNumber(rowNumber, { need_setup: needSetup })) {
+export async function updateStaffNeedSetup(rowNumber: number, needSetup: "0" | "1", maNV?: string) {
+  if (await updateDbStaffByRowNumber(rowNumber, { need_setup: needSetup }, maNV)) {
     return;
   }
 
@@ -517,8 +526,8 @@ export async function updateStaffNeedSetup(rowNumber: number, needSetup: "0" | "
   });
 }
 
-export async function updateStaffStatus(rowNumber: number, status: "Active" | "Standby") {
-  if (await updateDbStaffByRowNumber(rowNumber, { status })) {
+export async function updateStaffStatus(rowNumber: number, status: "Active" | "Standby", maNV?: string) {
+  if (await updateDbStaffByRowNumber(rowNumber, { status }, maNV)) {
     return;
   }
 
@@ -592,9 +601,9 @@ export async function deleteStaffAccount(rowNumber: number, maNV: string) {
   });
 }
 
-export async function updateStaffPermission(rowNumber: number, permission: "admin" | "mod" | "") {
+export async function updateStaffPermission(rowNumber: number, permission: "admin" | "mod" | "", maNV?: string) {
   await ensureStaffAdminHeaders();
-  if (await updateDbStaffByRowNumber(rowNumber, { permission: normalizePermission(permission) })) {
+  if (await updateDbStaffByRowNumber(rowNumber, { permission: normalizePermission(permission) }, maNV)) {
     return;
   }
 
@@ -625,6 +634,10 @@ function normalizeModulePermissions(value: any) {
     "action:settings-write",
     "action:reload-data",
     "action:dashboard-view",
+    "action:tools-pmh",
+    "action:tools-coming",
+    "action:tools-report",
+    "action:tools-telegram",
   ]);
 
   return String(value || "")
@@ -636,7 +649,7 @@ function normalizeModulePermissions(value: any) {
 
 export async function updateStaffAdminAccess(
   rowNumber: number,
-  data: { permission: "admin" | "mod" | ""; modules?: string }
+  data: { maNV?: string; permission: "admin" | "mod" | ""; modules?: string }
 ) {
   await ensureStaffAdminHeaders();
   const permission = normalizePermission(data.permission);
@@ -645,7 +658,7 @@ export async function updateStaffAdminAccess(
   if (await updateDbStaffByRowNumber(rowNumber, {
     permission,
     module_permissions: modules,
-  })) {
+  }, data.maNV)) {
     return;
   }
 
@@ -662,7 +675,7 @@ export async function updateStaffAdminAccess(
   });
 }
 
-export async function adminResetStaffSecurity(rowNumber: number, data: { passwordHash: string }) {
+export async function adminResetStaffSecurity(rowNumber: number, data: { maNV?: string; passwordHash: string }) {
   if (await updateDbStaffByRowNumber(rowNumber, {
     password_hash: data.passwordHash,
     security_question: "",
@@ -673,7 +686,7 @@ export async function adminResetStaffSecurity(rowNumber: number, data: { passwor
     reset_otp_day: "",
     reset_otp_count: "0",
     need_setup: "1",
-  })) {
+  }, data.maNV)) {
     return;
   }
 
@@ -694,8 +707,8 @@ export async function adminResetStaffSecurity(rowNumber: number, data: { passwor
   });
 }
 
-export async function adminResetStaffOtpCount(rowNumber: number) {
-  if (await updateDbStaffByRowNumber(rowNumber, { reset_otp_count: "0" })) {
+export async function adminResetStaffOtpCount(rowNumber: number, maNV?: string) {
+  if (await updateDbStaffByRowNumber(rowNumber, { reset_otp_count: "0" }, maNV)) {
     return;
   }
 

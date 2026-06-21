@@ -168,6 +168,7 @@ export async function POST(req: NextRequest) {
     }
 
     await updateStaffSecurity(staff.rowNumber, {
+      maNV: staff.maNV,
       passwordHash,
       encryptedQuestion: encryptText(question),
       answerHash,

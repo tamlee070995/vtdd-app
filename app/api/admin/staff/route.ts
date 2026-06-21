@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
       const permission = normalizePermission(body.permission);
       const modules = permission === "mod" ? normalizeModules(body.modules) : "";
 
-      await updateStaffAdminAccess(target.rowNumber, { permission, modules });
+      await updateStaffAdminAccess(target.rowNumber, { maNV: target.maNV, permission, modules });
 
       const message =
         permission === "admin"
@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
 
       const wasAlreadyActive = String(target.status || "").trim().toLowerCase() === "active";
 
-      await updateStaffStatus(target.rowNumber, "Active");
+      await updateStaffStatus(target.rowNumber, "Active", target.maNV);
 
       const refreshedTarget = (await findStaffByMaNV(maNV)) || target;
       const gmail = getStaffNotificationEmail(refreshedTarget) || getStaffNotificationEmail(target);
@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
       const guard = denyModTouchingAdmin(admin, target);
       if (guard) return guard;
 
-      await updateStaffStatus(target.rowNumber, "Standby");
+      await updateStaffStatus(target.rowNumber, "Standby", target.maNV);
       return NextResponse.json({ success: true, message: `Đã chuyển NV ${target.maNV} về Standby.` });
     }
 
@@ -246,7 +246,7 @@ export async function POST(req: NextRequest) {
 
       const defaultPassword = process.env.DEFAULT_STAFF_PASSWORD || "123123";
       const passwordHash = hashPassword(defaultPassword);
-      await adminResetStaffSecurity(target.rowNumber, { passwordHash });
+      await adminResetStaffSecurity(target.rowNumber, { maNV: target.maNV, passwordHash });
 
       return NextResponse.json({
         success: true,
@@ -255,14 +255,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "RESET_OTP_COUNT") {
-      if (!canRunAction(admin, "staff-security")) {
+      if (!canRunAction(admin, "staff-security") && !canRunAction(admin, "staff-manage")) {
         return NextResponse.json({ success: false, message: "Không có quyền reset OTP nhân viên." }, { status: 403 });
       }
 
-      const guard = denyModTouchingAdmin(admin, target);
-      if (guard) return guard;
-
-      await adminResetStaffOtpCount(target.rowNumber);
+      await adminResetStaffOtpCount(target.rowNumber, target.maNV);
       return NextResponse.json({ success: true, message: `Đã reset số lượt OTP của NV ${target.maNV}.` });
     }
 

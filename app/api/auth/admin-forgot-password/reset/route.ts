@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       return redirectForgot(req, { sent: "1", maNV, error: "OTP không đúng." });
     }
 
-    await resetStaffPasswordByOtp(staff.rowNumber, { passwordHash: hashPassword(password) });
+    await resetStaffPasswordByOtp(staff.rowNumber, { maNV: staff.maNV, passwordHash: hashPassword(password) });
 
     return redirectLogin(req, "Đã đặt lại mật khẩu. Vui lòng đăng nhập lại.");
   } catch (err: any) {
