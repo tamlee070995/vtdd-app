@@ -13,6 +13,7 @@ type StaffTradeInAppProps = {
   maST: string;
   staffName: string;
   forceSetup?: boolean;
+  mustChangePassword?: boolean;
 };
 
 type QuoteHistoryItem = {
@@ -2394,7 +2395,13 @@ function ProfilePasswordInput({
   );
 }
 
-export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = false }: StaffTradeInAppProps) {
+export default function StaffTradeInApp({
+  maNV,
+  maST,
+  staffName,
+  forceSetup = false,
+  mustChangePassword: initialMustChangePassword = false,
+}: StaffTradeInAppProps) {
   const [loading, setLoading] = useState(true);
   const [loadMsg, setLoadMsg] = useState("Đang tải dữ liệu bảng giá.");
   const [dataMoi, setDataMoi] = useState<SheetRow[]>([]);
@@ -2426,10 +2433,11 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   const [lockClockTick, setLockClockTick] = useState(() => Date.now());
 
   const [mustSetup, setMustSetup] = useState(forceSetup);
+  const [mustChangePassword, setMustChangePassword] = useState(initialMustChangePassword);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [profileCurrentPassword, setProfileCurrentPassword] = useState("");
-  const [profileChangePassword, setProfileChangePassword] = useState(forceSetup);
+  const [profileChangePassword, setProfileChangePassword] = useState(initialMustChangePassword);
   const [profileNewPassword, setProfileNewPassword] = useState("");
   const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
   const [profileQuestion, setProfileQuestion] = useState("");
@@ -2593,9 +2601,9 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   useEffect(() => {
     if (mustSetup) {
       setShowProfilePanel(true);
-      setProfileChangePassword(true);
+      setProfileChangePassword(mustChangePassword);
     }
-  }, [mustSetup]);
+  }, [mustSetup, mustChangePassword]);
 
   useEffect(() => {
     if (!showProfilePanel && !mustSetup) return;
@@ -2610,6 +2618,13 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
 
         const question = String(data.profile?.securityQuestion || "").trim();
         const gmail = String(data.profile?.gmail || "").trim();
+        const profileMustChangePassword = Boolean(data.profile?.mustChangePassword);
+
+        setMustChangePassword(profileMustChangePassword);
+
+        if (mustSetup) {
+          setProfileChangePassword(profileMustChangePassword);
+        }
 
         if (question) {
           if (SECURITY_QUESTIONS.includes(question)) {
@@ -3667,6 +3682,7 @@ async function submitProfileUpdate() {
     }
 
     setMustSetup(false);
+    setMustChangePassword(false);
     setShowProfilePanel(false);
     setProfileChangePassword(false);
 
@@ -3687,6 +3703,7 @@ async function submitProfileUpdate() {
 
 function renderProfilePanel(modeView: "modal" | "setup") {
   const isSetup = modeView === "setup" || mustSetup;
+  const showPasswordBlock = !isSetup || mustChangePassword;
 
   const finalQuestionPreview =
     profileQuestion === "custom"
@@ -3744,7 +3761,7 @@ function renderProfilePanel(modeView: "modal" | "setup") {
                 <span>Nhập mật khẩu hiện tại.</span>
               </div>
             </div>
-            <div className={profileChangePassword ? "done" : ""}>
+            <div className={!showPasswordBlock ? "profile-v5-hidden" : profileChangePassword ? "done" : ""}>
               <i>02</i>
               <div>
                 <b>Mật khẩu</b>
@@ -3752,7 +3769,7 @@ function renderProfilePanel(modeView: "modal" | "setup") {
               </div>
             </div>
             <div className={profileGmail || finalQuestionPreview !== "Chưa chọn câu hỏi" ? "done" : ""}>
-              <i>03</i>
+              <i>{showPasswordBlock ? "03" : "02"}</i>
               <div>
                 <b>Khôi phục</b>
                 <span>Gmail và câu hỏi bảo mật.</span>
@@ -3803,13 +3820,15 @@ function renderProfilePanel(modeView: "modal" | "setup") {
             </div>
           </section>
 
-          <section className="profile-v5-block profile-v5-password-block">
+          <section className={`profile-v5-block profile-v5-password-block${showPasswordBlock ? "" : " profile-v5-hidden"}`}>
             <label className="profile-v5-switch">
               <input
                 type="checkbox"
                 checked={profileChangePassword}
+                disabled={isSetup && mustChangePassword}
                 onChange={(e) => {
                   const checked = e.target.checked;
+                  if (isSetup && mustChangePassword && !checked) return;
                   setProfileChangePassword(checked);
                   if (!checked) {
                     setProfileNewPassword("");

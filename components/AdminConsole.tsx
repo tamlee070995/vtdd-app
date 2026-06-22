@@ -3386,6 +3386,531 @@ const ADMINX_ONLINE_STYLE = `
 }
 @media (max-width: 980px) { .adminx-permission-card-v3 { grid-template-columns: 1fr; } }
 
+/* ===== VTDD ADMIN FINAL POLISH - cleaner, denser, calmer ===== */
+.admin-saas-page {
+  background:
+    linear-gradient(90deg, rgba(15,23,42,.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(15,23,42,.035) 1px, transparent 1px),
+    linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
+  background-size: 36px 36px, 36px 36px, auto;
+}
+
+.admin-saas-shell {
+  width: min(100%, 1220px);
+  gap: 12px;
+}
+
+.admin-saas-hero {
+  min-height: 176px;
+  padding: 22px 24px;
+  border-radius: 28px;
+  align-items: flex-start;
+  box-shadow: 0 20px 54px rgba(15, 23, 42, .16);
+}
+
+.admin-saas-hero h1 {
+  margin-top: 22px;
+  font-size: clamp(40px, 5vw, 62px);
+  line-height: .9;
+}
+
+.admin-saas-hero p {
+  max-width: 600px;
+  margin-top: 10px;
+}
+
+.admin-saas-hero-meta {
+  margin-top: 11px;
+}
+
+.admin-saas-hero-meta span,
+.admin-saas-ghost-link,
+.admin-saas-logout {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 10px;
+}
+
+.admin-saas-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: flex-start;
+  max-width: 360px;
+}
+
+.adminx-console {
+  gap: 10px;
+}
+
+.adminx-tabs {
+  position: sticky;
+  top: 8px;
+  z-index: 50;
+  padding: 6px;
+  border-radius: 22px;
+  gap: 6px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 12px 34px rgba(15, 23, 42, .08);
+}
+
+.adminx-tabs button {
+  min-height: 58px;
+  padding: 8px 9px;
+  border-radius: 17px;
+  gap: 8px;
+}
+
+.adminx-tabs button i {
+  width: 31px;
+  height: 31px;
+  border-radius: 11px;
+}
+
+.adminx-tabs button b {
+  font-size: 12.5px;
+}
+
+.adminx-tabs button em {
+  margin-top: 3px;
+  font-size: 10px;
+}
+
+.adminx-panel,
+.admin-cms-module-panel-v5,
+.admin-cms-headline-v5 {
+  border-radius: 24px;
+  box-shadow: 0 14px 38px rgba(15, 23, 42, .065);
+}
+
+.adminx-panel {
+  padding: 16px;
+}
+
+.adminx-panel-head {
+  margin-bottom: 14px;
+}
+
+.adminx-panel h2,
+.admin-cms-headline-v5 h2,
+.admin-cms-module-title-v5 h3,
+.cms-pro-editor-top h2 {
+  letter-spacing: -.045em;
+}
+
+.adminx-panel h2 {
+  margin-top: 8px;
+  font-size: clamp(24px, 2vw, 32px);
+}
+
+.adminx-panel-head p {
+  max-width: 760px;
+}
+
+.adminx-metric-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.adminx-metric-card {
+  min-height: 96px;
+  padding: 13px;
+  border-radius: 18px;
+}
+
+.adminx-metric-card b {
+  margin-top: 8px;
+  font-size: clamp(24px, 2.3vw, 34px);
+}
+
+.adminx-metric-card p {
+  margin-top: 7px;
+  font-size: 11px;
+}
+
+.adminx-online-panel {
+  margin-top: 10px;
+  padding: 13px;
+  border-radius: 20px;
+}
+
+.adminx-overview-grid {
+  gap: 9px;
+}
+
+.adminx-soft-card {
+  min-height: 104px;
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.adminx-staff-summary,
+.adminx-dashboard-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.adminx-filter-bar {
+  margin-top: 12px;
+  grid-template-columns: minmax(0, 1fr) 160px 112px;
+  gap: 8px;
+}
+
+.adminx-filter-bar input,
+.adminx-filter-bar select,
+.adminx-form-grid input,
+.adminx-form-grid textarea,
+.adminx-firewall-panel input,
+.adminx-firewall-panel textarea,
+.adminx-popup-card textarea,
+.adminx-popup-card input,
+.adminx-notify-card input {
+  border-radius: 15px;
+  background: #f8fafc;
+  border-color: #dbe4ef;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75);
+}
+
+.adminx-filter-bar button,
+.adminx-action-btn,
+.adminx-section-save,
+.adminx-staff-actions button,
+.cms-actions button {
+  border-radius: 14px;
+}
+
+.adminx-table-card {
+  margin-top: 10px;
+  border-radius: 20px;
+}
+
+.adminx-table-toolbar {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.adminx-staff-list {
+  gap: 8px;
+  padding: 8px;
+}
+
+.adminx-staff-card {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.adminx-staff-card h3 {
+  margin-top: 7px;
+  font-size: 17px;
+}
+
+.adminx-staff-meta,
+.adminx-staff-flags {
+  margin-top: 7px;
+  gap: 6px;
+}
+
+.adminx-staff-meta span,
+.adminx-staff-flags span {
+  min-height: 28px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+}
+
+.adminx-staff-actions {
+  align-content: center;
+  gap: 7px;
+}
+
+.adminx-staff-actions button {
+  min-height: 40px;
+  font-size: 10.5px;
+}
+
+.adminx-pagination {
+  margin-top: 10px;
+}
+
+.adminx-system-sections {
+  gap: 10px;
+}
+
+.adminx-system-card {
+  padding: 13px;
+  border-radius: 20px;
+  box-shadow: none;
+}
+
+.adminx-system-card-head {
+  margin-bottom: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 9px;
+}
+
+.adminx-system-card-head > span {
+  width: 31px;
+  height: 31px;
+  border-radius: 11px;
+  font-size: 10px;
+}
+
+.adminx-system-card h3 {
+  font-size: 16px;
+}
+
+.adminx-system-card p {
+  font-size: 11.5px;
+}
+
+.adminx-form-grid,
+.adminx-firewall-panel {
+  gap: 9px;
+}
+
+.adminx-lock-grid {
+  margin-top: 10px;
+  gap: 8px;
+}
+
+.adminx-toggle-row {
+  min-height: 60px;
+  padding: 10px;
+  border-radius: 16px;
+}
+
+.adminx-toggle-row p {
+  margin-top: 3px;
+  font-size: 11px;
+}
+
+.adminx-lock-help {
+  margin-top: 8px;
+  padding: 10px 11px;
+  border-radius: 14px;
+  font-size: 11.5px;
+}
+
+.adminx-section-actions {
+  margin-top: 10px;
+}
+
+.adminx-section-save {
+  min-height: 46px;
+}
+
+.adminx-dashboard-grid {
+  gap: 10px;
+}
+
+.adminx-dashboard-card {
+  border-radius: 20px;
+}
+
+.adminx-dashboard-list {
+  max-height: 430px;
+}
+
+.adminx-permission-page,
+.adminx-permission-list-v3 {
+  gap: 10px;
+}
+
+.adminx-permission-card-v3 {
+  padding: 14px;
+  border-radius: 20px;
+  grid-template-columns: minmax(240px, .7fr) minmax(420px, 1.3fr);
+  gap: 12px;
+  box-shadow: none;
+}
+
+.adminx-permission-box-v2 {
+  padding: 12px;
+  border-radius: 18px;
+}
+
+.adminx-role-pills,
+.adminx-module-buttons,
+.adminx-permission-tree-actions {
+  gap: 7px;
+}
+
+.adminx-role-pills button,
+.adminx-module-buttons button,
+.adminx-permission-tree-actions button {
+  min-height: 56px;
+  border-radius: 14px;
+}
+
+.admin-cms-headline-v5 {
+  padding: 18px;
+}
+
+.admin-cms-module-grid-v5 {
+  gap: 8px;
+}
+
+.admin-cms-module-grid-v5 button {
+  min-height: 122px;
+  padding: 14px;
+  border-radius: 20px;
+  gap: 9px;
+}
+
+.admin-cms-module-grid-v5 i,
+.admin-cms-module-title-v5 > span,
+.admin-cms-empty-tools span {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+}
+
+.admin-cms-module-grid-v5 em {
+  margin-top: 5px;
+}
+
+.admin-cms-module-panel-v5 {
+  padding: 18px;
+}
+
+.cms-pro-fields,
+.cms-pro-preview {
+  padding: 14px;
+  border-radius: 20px;
+}
+
+.cms-rich-box-tiny .tox-tinymce {
+  border-radius: 16px !important;
+}
+
+@media (min-width: 1180px) {
+  .adminx-system-sections {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .adminx-system-card.adminx-firewall-card {
+    grid-column: 1 / -1;
+  }
+
+  .adminx-firewall-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .adminx-firewall-message {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 920px) {
+  .admin-saas-hero {
+    min-height: 168px;
+    padding: 18px;
+    border-radius: 24px;
+  }
+
+  .admin-saas-hero h1 {
+    margin-top: 18px;
+    font-size: clamp(36px, 9vw, 48px);
+  }
+
+  .admin-saas-hero-actions {
+    max-width: none;
+    justify-content: flex-start;
+  }
+
+  .adminx-tabs {
+    top: 0;
+    margin-inline: -2px;
+    border-radius: 18px;
+  }
+
+  .adminx-tabs button {
+    min-width: 132px;
+  }
+
+  .adminx-metric-grid,
+  .adminx-staff-summary,
+  .adminx-dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .adminx-filter-bar,
+  .adminx-staff-card,
+  .adminx-permission-card-v3 {
+    grid-template-columns: 1fr;
+  }
+
+  .adminx-staff-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-saas-page {
+    padding: 10px 8px 20px;
+  }
+
+  .admin-saas-shell {
+    gap: 10px;
+  }
+
+  .admin-saas-hero {
+    border-radius: 22px;
+  }
+
+  .admin-saas-hero-meta {
+    display: none;
+  }
+
+  .adminx-panel {
+    padding: 12px;
+    border-radius: 20px;
+  }
+
+  .adminx-panel h2 {
+    font-size: 23px;
+  }
+
+  .adminx-metric-grid,
+  .adminx-staff-summary,
+  .adminx-dashboard-metrics,
+  .adminx-overview-grid,
+  .adminx-lock-grid,
+  .adminx-form-grid,
+  .adminx-firewall-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .adminx-metric-card,
+  .adminx-soft-card {
+    min-height: auto;
+  }
+
+  .adminx-staff-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .adminx-staff-actions button {
+    min-height: 42px;
+  }
+
+  .adminx-role-pills,
+  .adminx-module-buttons,
+  .adminx-permission-tree-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-cms-headline-v5,
+  .admin-cms-module-panel-v5 {
+    padding: 12px;
+    border-radius: 20px;
+  }
+}
+
 `;
 
 
@@ -3971,7 +4496,7 @@ function CmsEditor({
 
 function NoAccessPanel({ moduleTitle }: { moduleTitle: string }) {
   return (
-    <section className="admin-cms-no-access-panel">
+    <section className="admin-cms-no-access-panel" aria-label={moduleTitle}>
       <div>
         <b>Không có quyền truy cập</b>
         <p>Quyền tài khoản: Moderator</p>

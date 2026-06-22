@@ -82,10 +82,6 @@ function createMailer(settings: MailSettings) {
   });
 }
 
-function getMailer() {
-  return createMailer(getMailSettings());
-}
-
 function getMailFrom() {
   return String(process.env.MAIL_FROM || `Viễn Thông Di Động <${process.env.MAIL_USER || ""}>`)
     .trim()
@@ -430,12 +426,6 @@ export async function sendResetOtpMail(params: {
   return report;
 }
 
-function maskEmail(email: string) {
-  const [name, domain] = String(email || "").split("@");
-  if (!name || !domain) return email ? "***" : "";
-  return `${name.slice(0, 2)}***@${domain}`;
-}
-
 function isLikelyConnectionError(err: any) {
   const text = `${err?.code || ""} ${err?.command || ""} ${err?.message || ""}`;
   return /ETIMEDOUT|ECONNRESET|ECONNREFUSED|EHOSTUNREACH|ENOTFOUND|ESOCKET|ECONNECTION|ETLS|Greeting never received|Connection timeout|Timed out|timeout/i.test(text);
@@ -511,101 +501,6 @@ async function sendMailWithFallback(options: any) {
       throw withMailContext(err, primary, fallbackErr);
     }
   }
-}
-
-export function getMailDiagnosticsSnapshot() {
-  try {
-    const settings = getMailSettings();
-
-    return {
-      configured: true,
-      host: settings.host,
-      port: settings.port,
-      secure: settings.secure,
-      user: maskEmail(settings.user),
-      from: getMailFrom(),
-      hasPassword: Boolean(settings.pass),
-      fallback587: String(process.env.MAIL_DISABLE_SMTP_FALLBACK || "").trim().toLowerCase() !== "true",
-    };
-  } catch (err: any) {
-    return {
-      configured: false,
-      error: getPublicMailError(err),
-    };
-  }
-}
-
-export async function verifyMailConnection() {
-  const settings = getMailSettings();
-
-  try {
-    await getMailer().verify();
-    return {
-      success: true,
-      transport: `${settings.host}:${settings.port}${settings.secure ? "/SSL" : "/STARTTLS"}`,
-    };
-  } catch (err: any) {
-    if (!shouldTrySmtpFallback(settings, err)) {
-      throw withMailContext(err, settings);
-    }
-
-    const fallback = getMailSettings({
-      port: 587,
-      secure: false,
-      label: "fallback-587",
-    });
-
-    try {
-      await createMailer(fallback).verify();
-      return {
-        success: true,
-        transport: `${fallback.host}:587/STARTTLS`,
-        fallback: true,
-        primaryError: getPublicMailError(err),
-      };
-    } catch (fallbackErr: any) {
-      throw withMailContext(err, settings, fallbackErr);
-    }
-  }
-}
-
-export async function sendDiagnosticMail(to: string) {
-  const target = String(to || "").trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
-    throw new Error("Email test chưa đúng định dạng.");
-  }
-
-  const smtpUser = String(process.env.MAIL_USER || "").trim();
-  const subject = `VTDD - Test SMTP ${new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}`;
-  const text = [
-    "Đây là email test SMTP từ web chính Viễn Thông Di Động.",
-    `Thời gian: ${new Date().toISOString()}`,
-    `Host: ${getMailDiagnosticsSnapshot().configured ? (getMailDiagnosticsSnapshot() as any).host : "Chưa cấu hình"}`,
-  ].join("\n\n");
-
-  const info = await sendMailWithFallback({
-    from: getMailFrom(),
-    envelope: smtpUser ? { from: smtpUser, to: target } : undefined,
-    to: target,
-    subject,
-    headers: getAutoMailHeaders(),
-    text,
-    html: buildEmailShell({
-      preheader: "Email test SMTP từ web chính Viễn Thông Di Động.",
-      statusLabel: "SMTP Test",
-      eyebrow: "Mail Diagnostics",
-      title: "Test gửi mail thành công",
-      description: "Nếu bạn nhận được email này, web chính đã kết nối được SMTP.",
-      body: buildSuccessBox({
-        title: "SMTP đã gửi email test.",
-        desc: `Người nhận: ${target}`,
-      }),
-    }),
-  });
-
-  const report = buildDeliveryReport(info);
-  ensureRecipientAccepted(report, target);
-  return report;
 }
 
 export async function sendNewStaffAccountMail(params: {

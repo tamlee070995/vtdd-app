@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 const QUESTIONS = [
   "Tên thú cưng đầu tiên của bạn là gì?",
@@ -58,7 +59,7 @@ export default function AdminProfileButton() {
   return (
     <>
       <button type="button" className="admin-profile-top-btn" onClick={() => setOpen(true)}>Cập nhật thông tin</button>
-      {open && (
+      {open ? createPortal(
         <section className="admin-profile-layer">
           <div className="admin-profile-modal">
             <button type="button" className="admin-profile-close" onClick={() => setOpen(false)}>×</button>
@@ -75,8 +76,9 @@ export default function AdminProfileButton() {
             {msg && <div className="admin-profile-msg">{msg}</div>}
             <button type="button" className="admin-profile-save" disabled={saving} onClick={saveProfile}>{saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
           </div>
-        </section>
-      )}
+        </section>,
+        document.body
+      ) : null}
     </>
   );
 }

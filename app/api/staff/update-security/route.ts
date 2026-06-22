@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const gmail = normalizeText(body.gmail).toLowerCase();
 
     // Fix lỗi cũ: client có gửi mật khẩu mới nhưng thiếu flag changePassword thì server không đổi mật khẩu.
-    const changePassword =
+    const requestedChangePassword =
       body.changePassword === true || Boolean(newPassword) || Boolean(confirmPassword);
 
     if (!currentPassword) {
@@ -97,15 +97,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const hasOldPlainPassword = !String(staff.password || "").startsWith("pwd:v1:");
+    const hasOldPlainPassword =
+      Boolean(String(staff.password || "").trim()) &&
+      !String(staff.password || "").startsWith("pwd:v1:");
+    const mustChangePassword =
+      currentStaff.mustChangePassword ||
+      isDefaultPasswordStored(staff.password) ||
+      hasOldPlainPassword;
     const hasSecurityQuestion = Boolean(safeDecrypt(staff.securityQuestion));
     const hasGmail = Boolean(safeDecrypt(staff.gmail));
+    const changePassword = requestedChangePassword || mustChangePassword;
 
     const forceSetup =
       currentStaff.forceSetup ||
       staff.needSetup === "1" ||
-      isDefaultPasswordStored(staff.password) ||
-      hasOldPlainPassword ||
+      mustChangePassword ||
       !hasSecurityQuestion ||
       !hasGmail ||
       !staff.securityAnswer;

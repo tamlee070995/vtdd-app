@@ -63,9 +63,6 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
       }
 
       setSuccessLoading(true);
-
-      // Client navigation giữ nguyên màn hình đăng nhập + overlay cho tới khi trang Admin sẵn sàng,
-      // tránh nháy trắng/chớp màn hình do form POST redirect full-page.
       router.replace(data.redirectTo || "/admin");
       router.refresh();
     } catch {
@@ -76,44 +73,64 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
   }
 
   return (
-    <main className="admin-login-premium-page admin-login-no-flash-page">
-      <section className="admin-login-premium-shell">
-        <aside className="admin-login-premium-hero">
-          <div className="admin-login-hero-brand">
-            <div className="admin-login-logo-mark">
+    <main className="admin-auth-page">
+      <section className="admin-auth-shell">
+        <aside className="admin-auth-hero" aria-label="Trung tâm quản trị">
+          <div className="admin-auth-brand">
+            <span className="admin-auth-logo">
               <img src="/mwg-logo.svg" alt="MWG" />
-            </div>
-            <div>
-              <strong>Viễn Thông Di Động</strong>
-              <small>ENTERPRISE ACCESS</small>
-            </div>
+            </span>
+            <span>
+              <b>Viễn Thông Di Động</b>
+              <small>Admin Command Center</small>
+            </span>
           </div>
 
-          <div className="admin-login-hero-content">
+          <div className="admin-auth-copy">
+            <span>MODULE CONTROL</span>
             <h1>
-              Đăng nhập
-              <b>quản trị</b>
+              Quản trị vận hành
+              <b>TCDM</b>
             </h1>
-            <p>Quyền quản trị trang Ngành hàng Viễn Thông Di Động.</p>
+            <p>
+              Dành riêng cho Admin và Mod được phân quyền. Mọi thao tác đều được
+              ghi nhận để bảo vệ dữ liệu nhân viên.
+            </p>
+          </div>
+
+          <div className="admin-auth-metrics" aria-hidden="true">
+            <div>
+              <b>RBAC</b>
+              <span>Phân quyền module</span>
+            </div>
+            <div>
+              <b>LOG</b>
+              <span>Theo dõi thao tác</span>
+            </div>
+            <div>
+              <b>OTP</b>
+              <span>Bảo mật tài khoản</span>
+            </div>
           </div>
         </aside>
 
-        <section className="admin-login-premium-panel">
-          <div className="admin-login-panel-head">
+        <section className="admin-auth-panel">
+          <div className="admin-auth-panel-head">
+            <span>ADMIN</span>
             <div>
-              <h2>Viễn Thông Di Động</h2>
-              <p>ADMIN CMS CONSOLE</p>
+              <h2>Đăng nhập quản trị</h2>
+              <p>Kiểm tra quyền truy cập trước khi mở dashboard.</p>
             </div>
           </div>
 
-          <form className="admin-login-premium-form" onSubmit={handleSubmit} noValidate>
-            <label htmlFor="admin-maNV">Mã nhân viên</label>
+          <form className="admin-auth-form" onSubmit={handleSubmit} noValidate>
+            <label htmlFor="admin-maNV">Mã nhân viên quản trị</label>
             <input
               id="admin-maNV"
               name="maNV"
               type="text"
               inputMode="numeric"
-              placeholder="Ví dụ: 123123"
+              placeholder="VD: 36964"
               autoComplete="username"
               value={maNV}
               onChange={(e) => setMaNV(e.target.value)}
@@ -135,21 +152,26 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
             />
 
             {error ? (
-              <div className="admin-error-banner" role="alert">
-                ⚠️ {error}
+              <div className="admin-auth-error" role="alert">
+                <b>Không thể xác thực</b>
+                <span>{error}</span>
               </div>
             ) : null}
 
             <button type="submit" disabled={loading || successLoading}>
-              {successLoading ? "ĐANG MỞ ADMIN..." : loading ? "ĐANG XÁC THỰC..." : "ĐĂNG NHẬP ADMIN"}
+              {successLoading
+                ? "Đang mở admin..."
+                : loading
+                  ? "Đang xác thực..."
+                  : "Đăng nhập Admin"}
             </button>
 
-            <div className="admin-login-actions-v2">
+            <div className="admin-auth-actions">
               <Link href="/admin/forgot-password" aria-disabled={loading || successLoading}>
-                Quên mật khẩu Admin?
+                Quên mật khẩu Admin
               </Link>
               <Link href="/" aria-disabled={loading || successLoading}>
-                Quay về trang chủ
+                Trang chủ
               </Link>
             </div>
           </form>
@@ -157,82 +179,14 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
       </section>
 
       {successLoading ? (
-        <div className="admin-login-handoff-layer" aria-live="polite" aria-busy="true">
-          <div className="admin-login-handoff-card">
+        <div className="admin-auth-handoff-layer" aria-live="polite" aria-busy="true">
+          <div className="admin-auth-handoff-card">
             <i />
             <b>Đăng nhập thành công</b>
             <p>Đang mở trung tâm quản trị, vui lòng chờ...</p>
           </div>
         </div>
       ) : null}
-
-      <style>{`
-        .admin-login-no-flash-page {
-          isolation: isolate;
-        }
-
-        .admin-login-premium-form button:disabled,
-        .admin-login-premium-form input:disabled {
-          opacity: .72;
-          cursor: wait;
-        }
-
-        .admin-login-handoff-layer {
-          position: fixed;
-          inset: 0;
-          z-index: 999999;
-          padding: 16px;
-          display: grid;
-          place-items: center;
-          background:
-            radial-gradient(circle at 50% 18%, rgba(255, 212, 0, .26), transparent 34%),
-            rgba(2, 6, 23, .76);
-          backdrop-filter: blur(18px);
-          -webkit-backdrop-filter: blur(18px);
-        }
-
-        .admin-login-handoff-card {
-          width: min(100%, 360px);
-          padding: 24px 20px;
-          border-radius: 28px;
-          text-align: center;
-          background: #ffffff;
-          border: 1px solid rgba(226, 232, 240, .95);
-          box-shadow: 0 32px 90px rgba(0, 0, 0, .30);
-        }
-
-        .admin-login-handoff-card i {
-          width: 54px;
-          height: 54px;
-          margin: 0 auto 15px;
-          display: block;
-          border-radius: 999px;
-          border: 5px solid #e2e8f0;
-          border-top-color: #ffd400;
-          animation: adminLoginSpin .75s linear infinite;
-        }
-
-        .admin-login-handoff-card b {
-          display: block;
-          color: #0f172a;
-          font-size: 18px;
-          line-height: 1.1;
-          font-weight: 950;
-          letter-spacing: -.035em;
-        }
-
-        .admin-login-handoff-card p {
-          margin-top: 8px;
-          color: #64748b;
-          font-size: 13px;
-          line-height: 1.45;
-          font-weight: 800;
-        }
-
-        @keyframes adminLoginSpin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </main>
   );
 }

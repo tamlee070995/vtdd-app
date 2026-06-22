@@ -27,6 +27,7 @@ export default async function StaffPage() {
       maST={currentStaff.maST}
       staffName={currentStaff.staffName}
       forceSetup={currentStaff.forceSetup}
+      mustChangePassword={currentStaff.mustChangePassword}
     />
   );
 }

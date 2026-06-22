@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
         department: currentStaff.department,
         securityQuestion: currentStaff.securityQuestion,
         gmail: currentStaff.gmail,
+        forceSetup: currentStaff.forceSetup,
+        mustChangePassword: currentStaff.mustChangePassword,
       },
     });
   } catch (err: any) {

@@ -26,6 +26,11 @@ function checkPasswordRule(password: string) {
   return "";
 }
 
+function hasAdminPermission(value: any) {
+  const permission = String(value || "").trim().toLowerCase();
+  return permission === "admin" || permission === "mod" || permission === "moderator";
+}
+
 function parseOtpExpiresMs(value: any) {
   const raw = String(value || "").trim();
   if (!raw) return 0;
@@ -59,6 +64,20 @@ export async function POST(req: NextRequest) {
     const staff = await findStaffByMaNV(maNV);
     if (!staff || !staff.resetOtpHash) {
       return redirectForgot(req, { sent: "1", maNV, error: "Không tìm thấy OTP hợp lệ." });
+    }
+
+    if (String(staff.status || "").trim().toLowerCase() !== "active") {
+      return redirectForgot(req, {
+        maNV,
+        error: "Tài khoản Admin/Mod chưa Active hoặc đã bị khóa.",
+      });
+    }
+
+    if (!hasAdminPermission(staff.permission)) {
+      return redirectForgot(req, {
+        maNV,
+        error: "Quên mật khẩu Admin chỉ áp dụng cho tài khoản Admin hoặc Mod.",
+      });
     }
 
     const expiresAt = parseOtpExpiresMs(staff.resetOtpExpires);

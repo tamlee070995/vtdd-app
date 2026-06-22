@@ -11,51 +11,68 @@ export default async function LoginPage({ searchParams }: PageProps) {
   const error = typeof params?.error === "string" ? params.error : "";
 
   return (
-    <main className="login-page-v2">
-      <section className="login-card-v2">
-        <div className="login-brand-v2">
-          <div className="brand-mark">
-            <img src="/mwg-logo.svg" alt="MWG" />
+    <main className="staff-auth-page">
+      <section className="staff-auth-shell">
+        <header className="staff-auth-topbar">
+          <Link className="staff-auth-brand" href="/">
+            <span className="staff-auth-logo">
+              <img src="/mwg-logo.svg" alt="MWG" />
+            </span>
+            <span>
+              <b>Viễn Thông Di Động</b>
+              <small>Staff Portal</small>
+            </span>
+          </Link>
+
+          <Link className="staff-auth-home" href="/">
+            Trang chủ
+          </Link>
+        </header>
+
+        <section className="staff-auth-hero" aria-label="Đăng nhập nhân viên">
+          <div className="staff-auth-hero-copy">
+            <span className="staff-auth-kicker">EMPLOYEE ACCESS</span>
+            <h1>
+              Tra cứu nhanh,
+              <span>vào ca gọn hơn.</span>
+            </h1>
+            <p>
+              Đăng nhập bằng mã nhân viên để tra bảng giá TCDM, xem lịch sử báo giá
+              và thao tác các công cụ nội bộ.
+            </p>
           </div>
 
-          <div>
-            <div className="brand-title">Viễn Thông Di Động</div>
-            <div className="brand-subtitle">Staff Secure Login</div>
+          <div className="staff-auth-signal" aria-hidden="true">
+            <i />
+            <span>Hệ thống sẵn sàng</span>
           </div>
-        </div>
-
-        <section className="login-hero-v2">
-          <div className="hero-kicker">EMPLOYEE ACCOUNT</div>
-
-          <h1>
-            ĐĂNG NHẬP
-            <span>NHÂN VIÊN</span>
-          </h1>
-
-          <p>
-            Sử dụng tài khoản nội bộ gồm mã nhân viên và mật khẩu đã được cấp trên hệ thống.
-          </p>
         </section>
 
         <form
-          className="login-form-v2"
+          className="staff-auth-form"
           action="/api/auth/staff-login"
           method="POST"
           noValidate
         >
-          <label htmlFor="maNV">Mã nhân viên</label>
+          <div className="staff-auth-form-head">
+            <span>01</span>
+            <div>
+              <h2>Đăng nhập nhân viên</h2>
+              <p>Dành cho tài khoản đã được duyệt sử dụng.</p>
+            </div>
+          </div>
 
+          <label htmlFor="maNV">Mã nhân viên</label>
           <input
             id="maNV"
             name="maNV"
             type="text"
             inputMode="numeric"
-            placeholder="VD: NV12345"
+            placeholder="VD: 36964"
             autoComplete="username"
           />
 
           <label htmlFor="password">Mật khẩu</label>
-
           <input
             id="password"
             name="password"
@@ -65,24 +82,24 @@ export default async function LoginPage({ searchParams }: PageProps) {
           />
 
           {error ? (
-            <div className="staff-error-banner" role="alert">
-              ⚠️ {error}
+            <div className="staff-auth-error" role="alert">
+              <b>Không đăng nhập được</b>
+              <span>{error}</span>
             </div>
           ) : null}
 
-          <button type="submit">
-            ĐĂNG NHẬP
-          </button>
+          <button type="submit">Vào trang tra cứu</button>
 
-          <div className="login-extra-actions">
-            <Link href="/register">Tạo tài khoản mới</Link>
-            <Link href="/forgot-password">Quên mật khẩu?</Link>
+          <div className="staff-auth-actions">
+            <Link href="/register">Tạo tài khoản</Link>
+            <Link href="/forgot-password">Quên mật khẩu</Link>
           </div>
-
-          <Link className="login-back-v2" href="/">
-            QUAY VỀ TRANG CHỦ
-          </Link>
         </form>
+
+        <footer className="staff-auth-footer">
+          <span>VTDD Internal</span>
+          <span>Secure Staff Login</span>
+        </footer>
       </section>
     </main>
   );

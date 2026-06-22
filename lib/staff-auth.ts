@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { createSignedSessionToken, verifySignedSessionToken } from "@/lib/auth-session";
-import { decryptText } from "@/lib/staff-security";
+import { decryptText, isDefaultPasswordStored } from "@/lib/staff-security";
 import { findStaffByMaNV, type StaffRow } from "@/lib/staff-store";
 
 export const STAFF_SESSION_COOKIE = "vtdd_staff_session";
@@ -34,6 +34,7 @@ export type CurrentStaffSession = {
   gmail: string;
   securityQuestion: string;
   forceSetup: boolean;
+  mustChangePassword: boolean;
   staff: StaffRow;
 };
 
@@ -55,8 +56,18 @@ export function shouldForceStaffSetup(staff: StaffRow, gmail: string, securityQu
 
   return (
     needSetupByFlag ||
-    needSetupByMissingSecurity
+    needSetupByMissingSecurity ||
+    shouldForceStaffPasswordChange(staff)
   );
+}
+
+function hasOldPlainPassword(staff: StaffRow) {
+  const raw = String(staff.password || "").trim();
+  return Boolean(raw) && !raw.startsWith("pwd:v1:");
+}
+
+export function shouldForceStaffPasswordChange(staff: StaffRow) {
+  return isDefaultPasswordStored(staff.password) || hasOldPlainPassword(staff);
 }
 
 function clearCookie(res: NextResponse, name: string) {
@@ -129,6 +140,7 @@ async function buildCurrentStaff(maNV: string) {
     gmail,
     securityQuestion,
     forceSetup: shouldForceStaffSetup(staff, gmail, securityQuestion),
+    mustChangePassword: shouldForceStaffPasswordChange(staff),
     staff,
   };
 }
