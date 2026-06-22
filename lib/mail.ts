@@ -54,6 +54,13 @@ function getMailFrom() {
   return process.env.MAIL_FROM || `Viễn Thông Di Động <${process.env.MAIL_USER || ""}>`;
 }
 
+function getAutoMailHeaders() {
+  return {
+    "Auto-Submitted": "auto-generated",
+    "X-Auto-Response-Suppress": "All",
+  };
+}
+
 function normalizeMailList(value: unknown) {
   if (!Array.isArray(value)) return [];
 
@@ -372,11 +379,10 @@ export async function sendResetOtpMail(params: {
 
   const info = await transporter.sendMail({
     from: getMailFrom(),
-    sender: smtpUser || undefined,
-    replyTo: smtpUser || undefined,
     envelope: smtpUser ? { from: smtpUser, to: params.to } : undefined,
     to: params.to,
     subject: "Viễn Thông Di Động - Mã xác thực đặt lại mật khẩu",
+    headers: getAutoMailHeaders(),
     text,
     html,
   });
@@ -396,7 +402,7 @@ export async function sendNewStaffAccountMail(params: {
 }) {
   const transporter = getMailer();
   const smtpUser = String(process.env.MAIL_USER || "").trim();
-  const to = params.to || process.env.ADMIN_NOTIFY_EMAIL || "tamlee070995@gmail.com";
+  const to = params.to || process.env.NEW_STAFF_NOTIFY_EMAIL || "tamlee070995@gmail.com";
 
   if (!to) {
     throw new Error("Thiếu email nhận thông báo tài khoản mới.");
@@ -437,11 +443,10 @@ export async function sendNewStaffAccountMail(params: {
 
   const info = await transporter.sendMail({
     from: getMailFrom(),
-    sender: smtpUser || undefined,
-    replyTo: smtpUser || undefined,
     envelope: smtpUser ? { from: smtpUser, to } : undefined,
     to,
     subject: `Viễn Thông Di Động - Tài khoản mới chờ duyệt: ${params.maNV}`,
+    headers: getAutoMailHeaders(),
     text,
     html,
   });
@@ -500,12 +505,11 @@ export async function sendStaffActivatedMail(params: {
 
   const info = await transporter.sendMail({
     from: getMailFrom(),
-    sender: smtpUser || undefined,
-    replyTo: smtpUser || undefined,
     envelope: smtpUser ? { from: smtpUser, to: params.to } : undefined,
     to: params.to,
     text,
     subject: "Viễn Thông Di Động - Tài khoản đã được kích hoạt",
+    headers: getAutoMailHeaders(),
     html,
   });
 
@@ -530,6 +534,7 @@ export async function sendAdminLoginFailedAlertMail(params: {
   }
 
   const transporter = getMailer();
+  const smtpUser = String(process.env.MAIL_USER || "").trim();
   const adminUrl = safeUrl(params.adminUrl);
   const attemptedMaNV = params.attemptedMaNV || "Không rõ";
   const ip = params.ip || "Không xác định";
@@ -573,8 +578,10 @@ export async function sendAdminLoginFailedAlertMail(params: {
 
   const info = await transporter.sendMail({
     from: getMailFrom(),
+    envelope: smtpUser ? { from: smtpUser, to: recipients } : undefined,
     to: recipients.join(", "),
     subject: `Viễn Thông Di Động - Cảnh báo đăng nhập Admin sai: ${attemptedMaNV}`,
+    headers: getAutoMailHeaders(),
     text,
     html,
   });

@@ -8,8 +8,10 @@ export const runtime = "nodejs";
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const MAX_OTP_PER_DAY = 3;
-const GENERIC_OTP_SENT_MESSAGE =
-  "Nếu mã nhân viên hợp lệ và đã cấu hình Gmail bảo mật, hệ thống sẽ gửi OTP trong ít phút.";
+const STAFF_GMAIL_MISMATCH_MESSAGE =
+  "Mã nhân viên và Gmail không khớp với tài khoản đã đăng ký.";
+const STAFF_INACTIVE_MESSAGE =
+  "Tài khoản chưa Active hoặc đã bị khóa. Vui lòng liên hệ Admin.";
 
 function makeOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -57,8 +59,21 @@ function safeDecrypt(value: any) {
   }
 }
 
-function secondsLeft(expiresAt: string) {
-  const exp = Number(expiresAt || 0);
+function parseOtpExpiresMs(value: any) {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
+
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function secondsLeft(expiresAt: string, otpHash: string) {
+  if (!String(otpHash || "").trim()) return 0;
+
+  const exp = parseOtpExpiresMs(expiresAt);
   if (!exp) return 0;
   return Math.max(0, Math.ceil((exp - Date.now()) / 1000));
 }
@@ -79,21 +94,36 @@ export async function POST(req: NextRequest) {
     const staff = await findStaffByMaNV(maNV);
 
     if (!staff) {
-      return NextResponse.json({ success: true, message: GENERIC_OTP_SENT_MESSAGE });
+      return NextResponse.json(
+        { success: false, message: STAFF_GMAIL_MISMATCH_MESSAGE },
+        { status: 400 }
+      );
     }
 
-    if (staff.status.toLowerCase() === "standby") {
-      return NextResponse.json({ success: true, message: GENERIC_OTP_SENT_MESSAGE });
+    if (String(staff.status || "").trim().toLowerCase() !== "active") {
+      return NextResponse.json(
+        { success: false, message: STAFF_INACTIVE_MESSAGE },
+        { status: 403 }
+      );
     }
 
-    const retryAfterSec = secondsLeft(staff.resetOtpExpires);
+    const gmail = normalizeEmail(safeDecrypt(staff.gmail));
+
+    if (!gmail || gmail !== gmailInput) {
+      return NextResponse.json(
+        { success: false, message: STAFF_GMAIL_MISMATCH_MESSAGE },
+        { status: 400 }
+      );
+    }
+
+    const retryAfterSec = secondsLeft(staff.resetOtpExpires, staff.resetOtpHash);
 
     if (retryAfterSec > 0) {
       return NextResponse.json(
         {
           success: false,
           retryAfterSec,
-          message: `Mã OTP cũ vẫn còn hiệu lực. Vui lòng chờ ${retryAfterSec} giây để gửi lại mã mới.`,
+          message: `Mã OTP cũ vẫn còn hiệu lực. Vui lòng chờ khoảng ${Math.ceil(retryAfterSec / 60)} phút để gửi lại mã mới.`,
         },
         { status: 429 }
       );
@@ -113,14 +143,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const gmail = normalizeEmail(safeDecrypt(staff.gmail));
-
-    if (!gmail || gmail !== gmailInput) {
-      return NextResponse.json({ success: true, message: GENERIC_OTP_SENT_MESSAGE });
-    }
-
     const otp = makeOtp();
-    const expiresAt = String(Date.now() + OTP_TTL_MS);
+    const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
 
     await updateStaffResetOtp(staff.rowNumber, {
       maNV: staff.maNV,

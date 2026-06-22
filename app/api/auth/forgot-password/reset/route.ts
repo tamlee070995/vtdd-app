@@ -3,6 +3,18 @@ import { findStaffByMaNV, resetStaffPasswordByOtp } from "@/lib/staff-store";
 import { getPasswordRuleError, hashPassword, normalizeCode, normalizeText, verifyPassword } from "@/lib/staff-security";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+function parseOtpExpiresMs(value: any) {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
+
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,7 +71,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const expiresAt = Number(staff.resetOtpExpires || 0);
+    const expiresAt = parseOtpExpiresMs(staff.resetOtpExpires);
 
     if (!expiresAt || Date.now() > expiresAt) {
       return NextResponse.json(

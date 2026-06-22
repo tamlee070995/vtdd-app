@@ -3,6 +3,7 @@ import { findStaffByMaNV, resetStaffPasswordByOtp } from "@/lib/staff-store";
 import { hashPassword, normalizeCode, verifyPassword } from "@/lib/staff-security";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function redirectForgot(req: NextRequest, params: Record<string, string>) {
   const url = new URL("/admin/forgot-password", req.url);
@@ -23,6 +24,17 @@ function checkPasswordRule(password: string) {
   if (!/[0-9]/.test(password)) return "Mật khẩu phải có ít nhất 1 số.";
   if (!/[!@#]/.test(password)) return "Mật khẩu phải có ký tự đặc biệt ! @ #.";
   return "";
+}
+
+function parseOtpExpiresMs(value: any) {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
+
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export async function POST(req: NextRequest) {
@@ -49,7 +61,9 @@ export async function POST(req: NextRequest) {
       return redirectForgot(req, { sent: "1", maNV, error: "Không tìm thấy OTP hợp lệ." });
     }
 
-    if (staff.resetOtpExpires && Date.now() > new Date(staff.resetOtpExpires).getTime()) {
+    const expiresAt = parseOtpExpiresMs(staff.resetOtpExpires);
+
+    if (!expiresAt || Date.now() > expiresAt) {
       return redirectForgot(req, { sent: "1", maNV, error: "OTP đã hết hạn. Vui lòng gửi lại mã mới." });
     }
 

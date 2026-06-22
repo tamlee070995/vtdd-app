@@ -8,8 +8,12 @@ export const runtime = "nodejs";
 
 const OTP_EXPIRES_MINUTES = 10;
 const OTP_MAX_PER_DAY = 3;
-const GENERIC_ADMIN_OTP_MESSAGE =
-  "Nếu tài khoản quản trị hợp lệ và đã cấu hình Gmail khôi phục, hệ thống sẽ gửi OTP trong ít phút.";
+const ADMIN_GMAIL_MISMATCH_MESSAGE =
+  "Mã nhân viên Admin và Gmail không khớp với tài khoản đã đăng ký.";
+const ADMIN_INACTIVE_MESSAGE =
+  "Tài khoản Admin chưa Active hoặc đã bị khóa.";
+const ADMIN_PERMISSION_MESSAGE =
+  "Tài khoản này không thuộc đội ngũ quản trị.";
 
 function redirectBack(req: NextRequest, params: Record<string, string>) {
   const url = new URL("/admin/forgot-password", req.url);
@@ -42,6 +46,17 @@ function createOtpCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+function parseOtpExpiresMs(value: any) {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
+
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function todayKey() {
   return new Date().toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
 }
@@ -59,21 +74,21 @@ export async function POST(req: NextRequest) {
     const staff = await findStaffByMaNV(maNV);
 
     if (!staff) {
-      return redirectBack(req, { sent: "1", maNV, success: GENERIC_ADMIN_OTP_MESSAGE });
+      return redirectBack(req, { maNV, error: ADMIN_GMAIL_MISMATCH_MESSAGE });
     }
 
     if (String(staff.status || "").trim().toLowerCase() !== "active") {
-      return redirectBack(req, { sent: "1", maNV, success: GENERIC_ADMIN_OTP_MESSAGE });
+      return redirectBack(req, { maNV, error: ADMIN_INACTIVE_MESSAGE });
     }
 
     if (!hasAdminPermission(staff.permission)) {
-      return redirectBack(req, { sent: "1", maNV, success: GENERIC_ADMIN_OTP_MESSAGE });
+      return redirectBack(req, { maNV, error: ADMIN_PERMISSION_MESSAGE });
     }
 
     const gmail = normalizeEmail(safeDecrypt(staff.gmail));
 
     if (!gmail || gmail !== gmailInput) {
-      return redirectBack(req, { sent: "1", maNV, success: GENERIC_ADMIN_OTP_MESSAGE });
+      return redirectBack(req, { maNV, error: ADMIN_GMAIL_MISMATCH_MESSAGE });
     }
 
     const today = todayKey();
@@ -84,7 +99,7 @@ export async function POST(req: NextRequest) {
       return redirectBack(req, { error: "Tài khoản đã gửi OTP tối đa 3 lần trong ngày." });
     }
 
-    const oldExpires = staff.resetOtpExpires ? new Date(staff.resetOtpExpires).getTime() : 0;
+    const oldExpires = parseOtpExpiresMs(staff.resetOtpExpires);
     if (staff.resetOtpHash && oldExpires && oldExpires > Date.now()) {
       const retryAfterSec = Math.ceil((oldExpires - Date.now()) / 1000);
       return redirectBack(req, {
