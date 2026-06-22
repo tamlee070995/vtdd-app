@@ -6,6 +6,7 @@ import PasswordInput from "@/components/PasswordInput";
 
 export default function ForgotPasswordPage() {
   const [maNV, setMaNV] = useState("");
+  const [gmail, setGmail] = useState("");
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -32,9 +33,10 @@ export default function ForgotPasswordPage() {
 
   async function requestOtp() {
     const nv = maNV.trim();
+    const email = gmail.trim().toLowerCase();
 
-    if (!nv) {
-      showMsg("error", "Vui lòng nhập mã nhân viên.");
+    if (!nv || !email) {
+      showMsg("error", "Vui lòng nhập mã nhân viên và Gmail đã đăng ký.");
       return;
     }
 
@@ -49,7 +51,7 @@ export default function ForgotPasswordPage() {
           "Cache-Control": "no-store",
         },
         cache: "no-store",
-        body: JSON.stringify({ maNV: nv }),
+        body: JSON.stringify({ maNV: nv, gmail: email }),
       });
 
       const data = await res.json();
@@ -152,6 +154,16 @@ export default function ForgotPasswordPage() {
             value={maNV}
             onChange={(e) => setMaNV(e.target.value)}
             placeholder="VD: NV001"
+            disabled={step === "reset"}
+          />
+
+          <label>Gmail đã đăng ký</label>
+          <input
+            type="email"
+            value={gmail}
+            onChange={(e) => setGmail(e.target.value)}
+            placeholder="ten@gmail.com"
+            autoComplete="email"
             disabled={step === "reset"}
           />
 

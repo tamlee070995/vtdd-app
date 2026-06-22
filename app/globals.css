@@ -10495,3 +10495,22 @@ main article img {
 .product-picker-suggest button:active {
   transform: scale(.96);
 }
+
+/* =========================================================
+   IOS MOBILE INPUT ZOOM FIX
+   Safari iOS tu dong zoom khi form control nho hon 16px.
+========================================================= */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (max-width: 820px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
+}

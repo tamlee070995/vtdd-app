@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendResetOtpMail } from "@/lib/mail";
 import { findStaffByMaNV, updateStaffResetOtp } from "@/lib/staff-store";
-import { decryptText, hashPassword, normalizeCode } from "@/lib/staff-security";
+import { decryptText, hashPassword, normalizeCode, normalizeText } from "@/lib/staff-security";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const MAX_OTP_PER_DAY = 3;
@@ -39,6 +40,23 @@ function maskEmail(email: string) {
   return `${head}${"*".repeat(Math.max(3, name.length - 4))}${tail}@${domain}`;
 }
 
+function normalizeEmail(value: any) {
+  const email = normalizeText(value).toLowerCase().replace(/^mailto:/i, "");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "";
+  return email;
+}
+
+function safeDecrypt(value: any) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  try {
+    return decryptText(raw) || raw;
+  } catch {
+    return raw;
+  }
+}
+
 function secondsLeft(expiresAt: string) {
   const exp = Number(expiresAt || 0);
   if (!exp) return 0;
@@ -49,10 +67,11 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const maNV = normalizeCode(body.maNV);
+    const gmailInput = normalizeEmail(body.gmail);
 
-    if (!maNV) {
+    if (!maNV || !gmailInput) {
       return NextResponse.json(
-        { success: false, message: "Vui lòng nhập mã nhân viên." },
+        { success: false, message: "Vui lòng nhập mã nhân viên và Gmail đã đăng ký." },
         { status: 400 }
       );
     }
@@ -94,9 +113,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const gmail = decryptText(staff.gmail);
+    const gmail = normalizeEmail(safeDecrypt(staff.gmail));
 
-    if (!gmail) {
+    if (!gmail || gmail !== gmailInput) {
       return NextResponse.json({ success: true, message: GENERIC_OTP_SENT_MESSAGE });
     }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { detectDeviceLabel, normalizeNetworkType, packQuoteClientMeta } from "@/lib/quote-client-meta";
+import { detectDeviceLabel, normalizeNetworkTypeForDevice, packQuoteClientMeta } from "@/lib/quote-client-meta";
 import { appendQuoteLog } from "@/lib/quote-log-store";
 import { insertSheetRowAt2Queued } from "@/lib/sheets-write";
 import { getCurrentStaffFromRequest } from "@/lib/staff-auth";
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     });
     const userAgent = req.headers.get("user-agent") || "";
     const deviceLabel = clean(body.clientDevice) || detectDeviceLabel(userAgent);
-    const networkType = normalizeNetworkType(body.networkType);
+    const networkType = normalizeNetworkTypeForDevice(deviceLabel, body.networkType);
 
     const logRow = {
       time: now,

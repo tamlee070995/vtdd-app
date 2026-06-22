@@ -14,6 +14,7 @@ import { decryptText, hashPassword, normalizeCode } from "@/lib/staff-security";
 import { sendStaffActivatedMail } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function normalizePermission(value: any): "admin" | "mod" | "" {
   const v = String(value || "").trim().toLowerCase();

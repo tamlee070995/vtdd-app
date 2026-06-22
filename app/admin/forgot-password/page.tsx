@@ -43,6 +43,10 @@ export default async function AdminForgotPasswordPage({
                 <span>Mã nhân viên</span>
                 <input name="maNV" placeholder="Ví dụ: 123123" autoComplete="username" />
               </label>
+              <label>
+                <span>Gmail đã đăng ký</span>
+                <input name="gmail" type="email" placeholder="ten@gmail.com" autoComplete="email" />
+              </label>
               <button type="submit">Gửi mã xác thực</button>
             </form>
           ) : (

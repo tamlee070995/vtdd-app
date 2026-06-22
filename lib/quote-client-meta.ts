@@ -34,10 +34,39 @@ export function normalizeNetworkType(value: unknown) {
   return raw;
 }
 
+function stripVietnamese(value: unknown) {
+  return clean(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
+}
+
+export function normalizeNetworkTypeForDevice(deviceLabel: unknown, networkType: unknown) {
+  const device = stripVietnamese(deviceLabel);
+  const normalizedNetwork = normalizeNetworkType(networkType);
+  const network = clean(normalizedNetwork).toLowerCase();
+  const isDesktop =
+    device.includes("may tinh") ||
+    device.includes("desktop") ||
+    device.includes("windows") ||
+    device.includes("macintosh") ||
+    device.includes("linux");
+
+  if (!isDesktop) return normalizedNetwork;
+
+  if (network.includes("wifi") || network.includes("wi-fi")) return "WiFi";
+  if (network.includes("lan") || network.includes("ethernet")) return "LAN";
+  if (["2g", "3g", "4g", "5g", "4g/5g"].includes(network)) return "WiFi/LAN";
+
+  return normalizedNetwork || "WiFi/LAN";
+}
+
 export function packQuoteClientMeta(meta: Partial<QuoteClientMeta>) {
   const userAgent = clean(meta.userAgent);
   const deviceLabel = clean(meta.deviceLabel) || detectDeviceLabel(userAgent);
-  const networkType = normalizeNetworkType(meta.networkType);
+  const networkType = normalizeNetworkTypeForDevice(deviceLabel, meta.networkType);
 
   return JSON.stringify({
     ua: userAgent,
@@ -64,7 +93,10 @@ export function parseQuoteClientMeta(rawValue: unknown): QuoteClientMeta {
     return {
       userAgent,
       deviceLabel: clean(parsed?.device || parsed?.deviceLabel) || detectDeviceLabel(userAgent),
-      networkType: normalizeNetworkType(parsed?.network || parsed?.networkType),
+      networkType: normalizeNetworkTypeForDevice(
+        clean(parsed?.device || parsed?.deviceLabel) || detectDeviceLabel(userAgent),
+        parsed?.network || parsed?.networkType
+      ),
     };
   } catch {
     const parts = raw.split("|").map((item) => item.trim()).filter(Boolean);
@@ -72,7 +104,10 @@ export function parseQuoteClientMeta(rawValue: unknown): QuoteClientMeta {
     if (parts.length >= 3) {
       return {
         deviceLabel: clean(parts[0]) || detectDeviceLabel(parts.slice(2).join("|")),
-        networkType: normalizeNetworkType(parts[1]),
+        networkType: normalizeNetworkTypeForDevice(
+          clean(parts[0]) || detectDeviceLabel(parts.slice(2).join("|")),
+          parts[1]
+        ),
         userAgent: parts.slice(2).join("|"),
       };
     }

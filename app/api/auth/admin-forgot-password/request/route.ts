@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findStaffByMaNV, updateStaffResetOtp } from "@/lib/staff-store";
-import { decryptText, hashPassword, normalizeCode } from "@/lib/staff-security";
+import { decryptText, hashPassword, normalizeCode, normalizeText } from "@/lib/staff-security";
 import { sendResetOtpMail } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const OTP_EXPIRES_MINUTES = 10;
 const OTP_MAX_PER_DAY = 3;
@@ -31,6 +32,12 @@ function safeDecrypt(value: string) {
   }
 }
 
+function normalizeEmail(value: any) {
+  const email = normalizeText(value).toLowerCase().replace(/^mailto:/i, "");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "";
+  return email;
+}
+
 function createOtpCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
@@ -43,9 +50,10 @@ export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
     const maNV = normalizeCode(form.get("maNV"));
+    const gmailInput = normalizeEmail(form.get("gmail"));
 
-    if (!maNV) {
-      return redirectBack(req, { error: "Vui lòng nhập mã nhân viên." });
+    if (!maNV || !gmailInput) {
+      return redirectBack(req, { error: "Vui lòng nhập mã nhân viên và Gmail đã đăng ký." });
     }
 
     const staff = await findStaffByMaNV(maNV);
@@ -62,9 +70,9 @@ export async function POST(req: NextRequest) {
       return redirectBack(req, { sent: "1", maNV, success: GENERIC_ADMIN_OTP_MESSAGE });
     }
 
-    const gmail = safeDecrypt(staff.gmail);
+    const gmail = normalizeEmail(safeDecrypt(staff.gmail));
 
-    if (!gmail) {
+    if (!gmail || gmail !== gmailInput) {
       return redirectBack(req, { sent: "1", maNV, success: GENERIC_ADMIN_OTP_MESSAGE });
     }
 

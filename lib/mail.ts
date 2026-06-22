@@ -1,10 +1,19 @@
 import nodemailer from "nodemailer";
 
-function getMailer() {
-  const host = String(process.env.MAIL_HOST || "")
-    .trim()
+function normalizeMailHost(value: unknown) {
+  let raw = String(value || "").trim();
+  const markdownUrl = raw.match(/\]\((https?:\/\/[^)]+)\)/i)?.[1];
+  if (markdownUrl) raw = markdownUrl;
+
+  return raw
+    .replace(/^['"]|['"]$/g, "")
     .replace(/^https?:\/\//i, "")
-    .replace(/\/+$/, "");
+    .replace(/\/.*$/g, "")
+    .trim();
+}
+
+function getMailer() {
+  const host = normalizeMailHost(process.env.MAIL_HOST);
   const port = Number(process.env.MAIL_PORT || 465);
   const secure =
     String(process.env.MAIL_SECURE ?? (port === 465 ? "true" : "false"))
@@ -17,10 +26,23 @@ function getMailer() {
     throw new Error("Thiếu MAIL_HOST, MAIL_USER hoặc MAIL_PASS trong .env.local");
   }
 
+  const rejectUnauthorized =
+    String(process.env.MAIL_TLS_REJECT_UNAUTHORIZED || "true")
+      .trim()
+      .toLowerCase() !== "false";
+
   return nodemailer.createTransport({
     host,
     port,
     secure,
+    name: process.env.MAIL_EHLO_NAME || "vienthongdidong.com",
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
+    tls: {
+      servername: host,
+      rejectUnauthorized,
+    },
     auth: {
       user,
       pass,
@@ -308,6 +330,7 @@ export async function sendResetOtpMail(params: {
   otp: string;
 }) {
   const transporter = getMailer();
+  const smtpUser = String(process.env.MAIL_USER || "").trim();
   const staffName = params.staffName || "Nhân viên";
   const otp = String(params.otp || "").trim();
 
@@ -349,13 +372,19 @@ export async function sendResetOtpMail(params: {
 
   const info = await transporter.sendMail({
     from: getMailFrom(),
+    sender: smtpUser || undefined,
+    replyTo: smtpUser || undefined,
+    envelope: smtpUser ? { from: smtpUser, to: params.to } : undefined,
     to: params.to,
     subject: "Viễn Thông Di Động - Mã xác thực đặt lại mật khẩu",
     text,
     html,
   });
 
-  return buildDeliveryReport(info);
+  const report = buildDeliveryReport(info);
+  ensureRecipientAccepted(report, params.to);
+
+  return report;
 }
 
 export async function sendNewStaffAccountMail(params: {
@@ -366,6 +395,7 @@ export async function sendNewStaffAccountMail(params: {
   adminUrl: string;
 }) {
   const transporter = getMailer();
+  const smtpUser = String(process.env.MAIL_USER || "").trim();
   const to = params.to || process.env.ADMIN_NOTIFY_EMAIL || "tamlee070995@gmail.com";
 
   if (!to) {
@@ -407,13 +437,19 @@ export async function sendNewStaffAccountMail(params: {
 
   const info = await transporter.sendMail({
     from: getMailFrom(),
+    sender: smtpUser || undefined,
+    replyTo: smtpUser || undefined,
+    envelope: smtpUser ? { from: smtpUser, to } : undefined,
     to,
     subject: `Viễn Thông Di Động - Tài khoản mới chờ duyệt: ${params.maNV}`,
     text,
     html,
   });
 
-  return buildDeliveryReport(info);
+  const report = buildDeliveryReport(info);
+  ensureRecipientAccepted(report, to);
+
+  return report;
 }
 
 export async function sendStaffActivatedMail(params: {
@@ -475,6 +511,78 @@ export async function sendStaffActivatedMail(params: {
 
   const report = buildDeliveryReport(info);
   ensureRecipientAccepted(report, params.to);
+
+  return report;
+}
+
+export async function sendAdminLoginFailedAlertMail(params: {
+  to: string[];
+  attemptedMaNV: string;
+  reason: string;
+  ip: string;
+  userAgent: string;
+  failCount: number;
+  adminUrl: string;
+}) {
+  const recipients = normalizeMailList(params.to);
+  if (recipients.length === 0) {
+    throw new Error("Thiếu email Admin nhận cảnh báo đăng nhập.");
+  }
+
+  const transporter = getMailer();
+  const adminUrl = safeUrl(params.adminUrl);
+  const attemptedMaNV = params.attemptedMaNV || "Không rõ";
+  const ip = params.ip || "Không xác định";
+  const userAgent = params.userAgent || "Không xác định";
+
+  const html = buildEmailShell({
+    preheader: `Cảnh báo ${params.failCount} lần đăng nhập Admin thất bại cho mã ${attemptedMaNV}.`,
+    statusLabel: "Security Alert",
+    eyebrow: "Admin Login Warning",
+    title: "Có dấu hiệu đăng nhập Admin sai nhiều lần",
+    description: `Hệ thống ghi nhận mã nhân viên <b style="color:#ffd400;">${escapeHtml(attemptedMaNV)}</b> đăng nhập Admin thất bại từ <b style="color:#ffd400;">${escapeHtml(params.failCount)}</b> lần trở lên. Vui lòng kiểm tra và cân nhắc chặn IP nếu có dấu hiệu spam.`,
+    body: `
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="border-radius:22px;border:1px solid #fee2e2;background:#fff7f7;overflow:hidden;">
+        ${buildInfoRows([
+          { label: "Mã nhân viên nhập", value: attemptedMaNV },
+          { label: "Số lần sai", value: `${params.failCount}`, accent: true },
+          { label: "Lý do lần gần nhất", value: params.reason || "Đăng nhập không hợp lệ" },
+          { label: "IP", value: ip },
+          { label: "Thiết bị / trình duyệt", value: userAgent },
+        ])}
+      </table>
+
+      ${buildActionButton("Mở trang Admin để kiểm tra", adminUrl)}
+
+      ${buildWarningBox({
+        title: "Gợi ý xử lý",
+        desc: "Nếu IP lạ hoặc thử nhiều mã nhân viên khác nhau, hãy thêm IP vào danh sách chặn trong mục hệ thống tường lửa.",
+      })}
+    `,
+  });
+
+  const text = [
+    "Cảnh báo đăng nhập Admin sai nhiều lần.",
+    `Mã nhân viên nhập: ${attemptedMaNV}`,
+    `Số lần sai: ${params.failCount}`,
+    `Lý do: ${params.reason || "Đăng nhập không hợp lệ"}`,
+    `IP: ${ip}`,
+    `Thiết bị / trình duyệt: ${userAgent}`,
+    `Admin: ${adminUrl}`,
+  ].join("\n\n");
+
+  const info = await transporter.sendMail({
+    from: getMailFrom(),
+    to: recipients.join(", "),
+    subject: `Viễn Thông Di Động - Cảnh báo đăng nhập Admin sai: ${attemptedMaNV}`,
+    text,
+    html,
+  });
+
+  const report = buildDeliveryReport(info);
+  if (report.accepted.length === 0) {
+    throw new Error(`SMTP chưa xác nhận người nhận cảnh báo Admin. ${report.response}`.trim());
+  }
 
   return report;
 }

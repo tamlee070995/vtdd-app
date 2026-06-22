@@ -2,6 +2,7 @@ import { getSystemText, settingEnabled, type SystemSettingsRecord } from "@/lib/
 import type { PincodeFlow, PincodeRequest } from "@/lib/pincode-store";
 
 export type TelegramToolKey = PincodeFlow;
+export type TelegramReviewAction = "approved" | "rejected_soft" | "rejected_hard";
 
 type TelegramConfig = {
   enabled: boolean;
@@ -19,6 +20,8 @@ const TELEGRAM_TOOL_META: Record<TelegramToolKey, { prefix: string; label: strin
     label: "Máy ngoài danh sách",
   },
 };
+
+const TELEGRAM_GROUP_TAG_ALL = "@all";
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -38,6 +41,27 @@ function normalizeBotToken(value: unknown) {
 
 function getAppUrl() {
   return clean(process.env.NEXT_PUBLIC_APP_URL).replace(/\/+$/, "");
+}
+
+function getReviewUrl(request: PincodeRequest) {
+  const appUrl = getAppUrl();
+  return appUrl ? `${appUrl}/admin/tools/pincode/${encodeURIComponent(request.requestId)}` : "";
+}
+
+function requestSummaryLines(request: PincodeRequest) {
+  const meta = getTelegramToolMeta(request.flow);
+
+  return [
+    `Công cụ: <b>${escapeHtml(meta.label)}</b>`,
+    `Mã hồ sơ: <code>${escapeHtml(request.requestId)}</code>`,
+    `Thời gian: <b>${escapeHtml(request.createdAt)}</b>`,
+    `ST/NV: <b>${escapeHtml(request.maST)}</b> / <b>${escapeHtml(request.maNV)}</b>`,
+    request.staffName ? `Nhân viên: <b>${escapeHtml(request.staffName)}</b>` : "",
+    request.storeName ? `Siêu thị: <b>${escapeHtml(request.storeName)}</b>` : "",
+    `IMEI/SN: <code>${escapeHtml(request.imei)}</code>`,
+    `Máy cũ: <b>${escapeHtml(request.modelCu)}</b>`,
+    `Máy mới: <b>${escapeHtml(request.modelMoi)}</b>`,
+  ].filter(Boolean);
 }
 
 export function getTelegramToolMeta(tool: TelegramToolKey) {
@@ -99,32 +123,63 @@ export async function sendTelegramTest(settings: SystemSettingsRecord, tool: Tel
   );
 }
 
-export async function notifyPincodeRequestTelegram(
-  settings: SystemSettingsRecord,
-  request: PincodeRequest
-) {
-  const meta = getTelegramToolMeta(request.flow);
+export async function notifyPincodeRequestTelegram(settings: SystemSettingsRecord, request: PincodeRequest) {
   const config = getTelegramConfig(settings, request.flow);
 
   if (!config.enabled) {
     return { skipped: true, message: "Telegram chưa bật cho tool này." };
   }
 
-  const appUrl = getAppUrl();
-  const reviewUrl = appUrl
-    ? `${appUrl}/admin/tools/pincode/${encodeURIComponent(request.requestId)}`
-    : "";
+  const reviewUrl = getReviewUrl(request);
+  const message = [
+    `${TELEGRAM_GROUP_TAG_ALL} 🟡 <b>Hồ sơ PMH mới chờ duyệt</b>`,
+    ...requestSummaryLines(request),
+    reviewUrl ? `Kiểm duyệt: ${escapeHtml(reviewUrl)}` : "",
+  ].filter(Boolean).join("\n");
+
+  return sendTelegramMessage(config, message);
+}
+
+export async function notifyPincodeReviewTelegram(
+  settings: SystemSettingsRecord,
+  request: PincodeRequest,
+  data: {
+    action: TelegramReviewAction;
+    admin: string;
+    pinCode?: string;
+    menhGia?: string;
+    reason?: string;
+    imageSlots?: string[];
+  }
+) {
+  const config = getTelegramConfig(settings, request.flow);
+
+  if (!config.enabled) {
+    return { skipped: true, message: "Telegram chưa bật cho tool này." };
+  }
+
+  const actionMeta =
+    data.action === "approved"
+      ? { icon: "✅", title: "Hồ sơ PMH đã được duyệt" }
+      : data.action === "rejected_soft"
+        ? { icon: "🟠", title: "Hồ sơ PMH yêu cầu chụp lại" }
+        : { icon: "🔴", title: "Hồ sơ PMH đã bị từ chối" };
+  const slotText = Array.isArray(data.imageSlots) && data.imageSlots.length ? data.imageSlots.join(", ") : "";
 
   const message = [
-    "🟡 <b>Hồ sơ PMH mới chờ duyệt</b>",
-    `Công cụ: <b>${escapeHtml(meta.label)}</b>`,
-    `Mã hồ sơ: <code>${escapeHtml(request.requestId)}</code>`,
-    `Thời gian: <b>${escapeHtml(request.createdAt)}</b>`,
-    `ST/NV: <b>${escapeHtml(request.maST)}</b> / <b>${escapeHtml(request.maNV)}</b>`,
-    `IMEI/SN: <code>${escapeHtml(request.imei)}</code>`,
-    `Máy cũ: <b>${escapeHtml(request.modelCu)}</b>`,
-    `Máy mới: <b>${escapeHtml(request.modelMoi)}</b>`,
-    reviewUrl ? `Kiểm duyệt: ${escapeHtml(reviewUrl)}` : "",
+    `${actionMeta.icon} <b>${actionMeta.title}</b>`,
+    ...requestSummaryLines(request),
+    `Admin/Mod xử lý: <b>${escapeHtml(data.admin)}</b>`,
+    data.action === "approved" && (data.pinCode || request.pinCode)
+      ? `PMH cấp: <code>${escapeHtml(data.pinCode || request.pinCode)}</code>`
+      : "",
+    data.action === "approved" && (data.menhGia || request.menhGia)
+      ? `Mệnh giá: <b>${escapeHtml(data.menhGia || request.menhGia)}</b>`
+      : "",
+    data.action !== "approved" && slotText ? `Ảnh cần chụp lại: <b>${escapeHtml(slotText)}</b>` : "",
+    data.action !== "approved" && (data.reason || request.reason)
+      ? `Nội dung: <b>${escapeHtml(data.reason || request.reason)}</b>`
+      : "",
   ].filter(Boolean).join("\n");
 
   return sendTelegramMessage(config, message);

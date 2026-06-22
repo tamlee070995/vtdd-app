@@ -87,6 +87,8 @@ const EMPTY_NOTIFY: NotifySettings = {
 
 const STAFF_PRICE_CACHE_KEY = "vtdd_staff_price_cache_v2";
 const STAFF_PRICE_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
+const STAFF_PUSH_FORCE_SECONDS = 10;
+const STAFF_PUSH_AUTO_CLOSE_MS = 30000;
 
 const SYSTEM_UI_CSS = `
 .vtdd-system-marquee {
@@ -273,23 +275,49 @@ const SYSTEM_UI_CSS = `
   left: 0;
   right: 0;
   z-index: 999999;
-  padding: max(12px, env(safe-area-inset-top)) 12px 0;
+  padding: max(10px, env(safe-area-inset-top)) 12px 0;
   display: flex;
   justify-content: center;
   pointer-events: none;
 }
 
 .vtdd-push-card {
-  width: min(calc(100% - 16px), 520px);
-  padding: 14px;
-  border-radius: 0 0 24px 24px;
+  position: relative;
+  width: min(calc(100% - 14px), 620px);
+  padding: 16px;
+  overflow: hidden;
+  border-radius: 0 0 30px 30px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .28), transparent 38%),
-    linear-gradient(135deg, #0f172a, #020617);
-  border: 1px solid rgba(255, 212, 0, .32);
-  box-shadow: 0 22px 62px rgba(15, 23, 42, .26);
+    radial-gradient(circle at 94% 8%, rgba(255, 212, 0, .55), transparent 32%),
+    linear-gradient(135deg, #020617 0%, #0f172a 56%, #111827 100%);
+  border: 1px solid rgba(255, 212, 0, .46);
+  border-top: 0;
+  box-shadow: 0 28px 90px rgba(15, 23, 42, .34), 0 0 0 9999px rgba(15, 23, 42, .12);
   pointer-events: auto;
   animation: vtddPushSlideDown .34s ease-out both, vtddPushSlideUp .34s ease-in 29.6s forwards;
+}
+
+.vtdd-push-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #ffd400, #ffffff, #ffd400);
+}
+
+.vtdd-push-card::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 42px;
+  height: 42px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 50%, #ffd400 0 27%, transparent 28%),
+    rgba(255, 255, 255, .12);
+  border: 1px solid rgba(255, 255, 255, .16);
+  box-shadow: 0 12px 28px rgba(255, 212, 0, .12);
 }
 
 .vtdd-push-card span {
@@ -307,25 +335,56 @@ const SYSTEM_UI_CSS = `
 }
 
 .vtdd-push-card h2 {
+  width: calc(100% - 52px);
   margin-top: 10px;
   color: #ffffff;
-  font-size: 20px;
+  font-size: clamp(22px, 5vw, 28px);
   line-height: 1.05;
-  font-weight: 900;
+  font-weight: 1000;
   letter-spacing: -.045em;
 }
 
 .vtdd-push-card p {
-  margin-top: 8px;
-  color: rgba(255,255,255,.82);
-  font-size: 13px;
+  margin-top: 10px;
+  padding: 12px 13px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .10);
+  border: 1px solid rgba(255, 255, 255, .14);
+  color: rgba(255,255,255,.90);
+  font-size: 14px;
   line-height: 1.5;
-  font-weight: 800;
+  font-weight: 850;
+}
+
+.vtdd-push-lock {
+  width: fit-content;
+  min-width: 76px;
+  min-height: 42px;
+  margin-top: 12px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 18px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 212, 0, .14);
+  border: 1px solid rgba(255, 212, 0, .36);
+  color: #fff7c2;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .02em;
+}
+
+.vtdd-push-lock b {
+  color: #ffd400;
+  font-size: 22px;
+  font-weight: 1000;
 }
 
 .vtdd-push-card button {
   width: 100%;
-  min-height: 42px;
+  min-height: 46px;
   margin-top: 12px;
   border: 0;
   border-radius: 18px;
@@ -335,19 +394,178 @@ const SYSTEM_UI_CSS = `
   font-weight: 900;
   letter-spacing: .06em;
   text-transform: uppercase;
+  box-shadow: 0 14px 30px rgba(255, 212, 0, .22);
+  animation: vtddPushButtonIn .22s ease-out both;
 }
 
 .vtdd-staff-notify-popup {
-  border-radius: 28px !important;
-  border: 1px solid rgba(226, 232, 240, .95) !important;
-  box-shadow: 0 28px 88px rgba(15, 23, 42, .20) !important;
+  width: min(calc(100vw - 34px), 386px) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 30px !important;
+  border: 1px solid rgba(226, 232, 240, .92) !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, .26) !important;
+  font-family: Roboto, Arial, sans-serif !important;
+}
+
+.vtdd-staff-notify-html {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.vtdd-staff-popup-card {
+  position: relative;
+  padding: 24px 20px 12px;
+  text-align: center;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .22), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #ffffff 56%, #f8fafc 100%);
+}
+
+.vtdd-staff-popup-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 5px;
+  background: linear-gradient(90deg, #020617, #ffd400, #020617);
+}
+
+.vtdd-staff-popup-mark {
+  width: 66px;
+  height: 66px;
+  margin: 4px auto 12px;
+  border-radius: 24px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 72% 22%, rgba(255, 212, 0, .48), transparent 34%),
+    #020617;
+  border: 1px solid rgba(255, 212, 0, .42);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, .18);
+}
+
+.vtdd-staff-popup-mark span {
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: #ffd400;
+  color: #07111f;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .07em;
+}
+
+.vtdd-staff-popup-kicker {
+  width: fit-content;
+  margin: 0 auto 10px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #07111f;
+  color: #ffd400;
+  font-size: 9.5px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.vtdd-staff-popup-card h2 {
+  margin: 0 auto;
+  max-width: 280px;
+  color: #111827;
+  font-size: 22px;
+  line-height: 1.12;
+  font-weight: 1000;
+  letter-spacing: -.04em;
+}
+
+.vtdd-staff-popup-message {
+  margin: 14px auto 0;
+  padding: 13px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, .86);
+  background: rgba(248, 250, 252, .92);
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.42;
+  font-weight: 750;
+}
+
+.vtdd-staff-popup-message p {
+  margin: 0;
+}
+
+.vtdd-staff-popup-message p + p {
+  margin-top: 7px;
+}
+
+.vtdd-staff-popup-timer {
+  width: fit-content;
+  margin: 12px auto 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #fffbea;
+  border: 1px solid rgba(234, 179, 8, .34);
+  color: #854d0e;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.vtdd-staff-popup-timer b {
+  color: #07111f;
+  font-weight: 1000;
+}
+
+.vtdd-staff-notify-popup .swal2-actions {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 2px 20px 18px !important;
+  background: #f8fafc !important;
 }
 
 .vtdd-staff-notify-confirm {
+  min-width: 142px !important;
+  min-height: 44px !important;
+  margin: 0 auto !important;
+  padding: 0 20px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 0 !important;
+  background: linear-gradient(135deg, #ffd400, #facc15) !important;
   color: #111827 !important;
+  font-size: 12px !important;
   font-weight: 1000 !important;
-  border-radius: 14px !important;
-  box-shadow: none !important;
+  letter-spacing: .04em !important;
+  border-radius: 999px !important;
+  box-shadow: 0 12px 26px rgba(234, 179, 8, .22) !important;
+}
+
+.vtdd-staff-notify-popup .swal2-timer-progress-bar-container {
+  height: 4px !important;
+  background: rgba(15, 23, 42, .08) !important;
+}
+
+.vtdd-staff-notify-popup .swal2-timer-progress-bar {
+  height: 4px !important;
+  background: linear-gradient(90deg, #ffd400, #020617) !important;
+}
+
+@media (max-width: 430px) {
+  .vtdd-staff-popup-card {
+    padding: 22px 16px 10px;
+  }
+
+  .vtdd-staff-popup-card h2 {
+    font-size: 21px;
+  }
+
+  .vtdd-staff-popup-message {
+    font-size: 13.5px;
+  }
 }
 
 @keyframes vtddPushSlideDown {
@@ -358,6 +576,11 @@ const SYSTEM_UI_CSS = `
 @keyframes vtddPushSlideUp {
   from { opacity: 1; transform: translateY(0); }
   to { opacity: 0; transform: translateY(-120%); }
+}
+
+@keyframes vtddPushButtonIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 /* STAFF ONLY - nổi bật thông báo hệ thống và tự xuống hàng */
 .vtdd-system-banner-featured {
@@ -1456,6 +1679,28 @@ function getImportantNoticeHtml(message: string) {
   return sanitizeHtml(lines.map((line) => `<p>${escapeSystemNoticeHtml(line)}</p>`).join(""));
 }
 
+function getStaffPopupNoticeHtml(kind: "tradein" | "buyonly", message: string, autoCloseSeconds: number) {
+  const isTradein = kind === "tradein";
+  const raw = String(message || "").trim();
+  const lines = formatSystemMessageLines(raw);
+  const safeBody = lines.length
+    ? lines.map((line) => `<p>${escapeSystemNoticeHtml(line)}</p>`).join("")
+    : `<p>${escapeSystemNoticeHtml(raw)}</p>`;
+  const seconds = Math.max(1, Math.ceil(Number(autoCloseSeconds) || 10));
+
+  return sanitizeHtml(`
+    <div class="vtdd-staff-popup-card">
+      <div class="vtdd-staff-popup-mark">
+        <span>${isTradein ? "TCDM" : "CHỈ THU"}</span>
+      </div>
+      <div class="vtdd-staff-popup-kicker">${isTradein ? "Thu cũ đổi mới" : "Chỉ thu cũ"}</div>
+      <h2>${isTradein ? "Thông báo Thu Cũ Đổi Mới" : "Thông báo Chỉ Thu Cũ"}</h2>
+      <div class="vtdd-staff-popup-message">${safeBody}</div>
+      <div class="vtdd-staff-popup-timer">Tự tắt sau <b class="vtdd-staff-popup-countdown">${seconds}</b> giây</div>
+    </div>
+  `);
+}
+
 const QUOTE_TOOLS_CSS = `
 .vtdd-data-reload-layer {
   position: fixed;
@@ -2158,6 +2403,8 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({});
   const [notifySettings, setNotifySettings] = useState<NotifySettings>(EMPTY_NOTIFY);
   const [showSystemPush, setShowSystemPush] = useState(false);
+  const [pushCanDismiss, setPushCanDismiss] = useState(false);
+  const [pushForceLeft, setPushForceLeft] = useState(STAFF_PUSH_FORCE_SECONDS);
   const shownStaffPopupKeysRef = useRef<Set<string>>(new Set());
 
   const [mode, setMode] = useState<"tradein" | "buyonly">("tradein");
@@ -2600,9 +2847,34 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
       }
 
       setShowSystemPush(false);
-    }, 30000);
+    }, STAFF_PUSH_AUTO_CLOSE_MS);
 
     return () => window.clearTimeout(timer);
+  }, [showSystemPush, notifySettings.pushMessage, notifySettings.pushVersion]);
+
+  useEffect(() => {
+    if (!showSystemPush || !notifySettings.pushMessage) {
+      setPushCanDismiss(false);
+      setPushForceLeft(STAFF_PUSH_FORCE_SECONDS);
+      return;
+    }
+
+    setPushCanDismiss(false);
+    setPushForceLeft(STAFF_PUSH_FORCE_SECONDS);
+
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+      const left = Math.max(0, STAFF_PUSH_FORCE_SECONDS - elapsedSeconds);
+      setPushForceLeft(left);
+
+      if (left <= 0) {
+        setPushCanDismiss(true);
+        window.clearInterval(interval);
+      }
+    }, 250);
+
+    return () => window.clearInterval(interval);
   }, [showSystemPush, notifySettings.pushMessage, notifySettings.pushVersion]);
 
   useEffect(() => {
@@ -2628,19 +2900,32 @@ export default function StaffTradeInApp({ maNV, maST, staffName, forceSetup = fa
 
     if (shownStaffPopupKeysRef.current.has(popupKey)) return;
     shownStaffPopupKeysRef.current.add(popupKey);
+    const autoCloseMs = popupAutoCloseMs(seconds);
+    let countdownTimer: number | undefined;
+    const updateCountdown = () => {
+      const node = Swal.getPopup()?.querySelector<HTMLElement>(".vtdd-staff-popup-countdown");
+      if (!node) return;
+      const left = Swal.getTimerLeft();
+      node.textContent = String(Math.max(0, Math.ceil(Number(left || 0) / 1000)));
+    };
 
     void Swal.fire({
-      title: isTradein ? "Thông báo Thu Cũ Đổi Mới" : "Thông báo Thu Cũ Không Đổi Mới",
-      text: message,
-      icon: "info",
+      html: getStaffPopupNoticeHtml(isTradein ? "tradein" : "buyonly", message, Math.ceil(autoCloseMs / 1000)),
       confirmButtonText: "Đồng ý",
-      confirmButtonColor: "#ffd400",
-      color: "#0f172a",
-      timer: popupAutoCloseMs(seconds),
+      buttonsStyling: false,
+      timer: autoCloseMs,
       timerProgressBar: true,
       allowOutsideClick: true,
+      didOpen: () => {
+        updateCountdown();
+        countdownTimer = window.setInterval(updateCountdown, 250);
+      },
+      willClose: () => {
+        if (countdownTimer) window.clearInterval(countdownTimer);
+      },
       customClass: {
         popup: "vtdd-staff-notify-popup",
+        htmlContainer: "vtdd-staff-notify-html",
         confirmButton: "vtdd-staff-notify-confirm",
       },
     });
@@ -3080,12 +3365,23 @@ function getClientDeviceMeta() {
   else if (uaLower.includes("windows") || uaLower.includes("macintosh") || uaLower.includes("linux")) clientDevice = "Máy tính";
 
   let networkType = "Không rõ";
-  if (type.includes("wifi") || type.includes("ethernet")) networkType = "WiFi";
+  const isDesktop = uaLower.includes("windows") || uaLower.includes("macintosh") || uaLower.includes("linux");
+  if (isDesktop) {
+    if (type.includes("wifi")) networkType = "WiFi";
+    else if (type.includes("ethernet")) networkType = "LAN";
+    else networkType = "WiFi/LAN";
+  } else if (type.includes("wifi") || type.includes("ethernet")) networkType = "WiFi";
   else if (type.includes("cell")) networkType = effectiveType ? effectiveType.toUpperCase() : "4G/5G";
   else if (effectiveType.includes("5g")) networkType = "5G";
   else if (effectiveType.includes("4g")) networkType = "4G";
   else if (effectiveType.includes("3g")) networkType = "3G";
   else if (effectiveType.includes("2g")) networkType = "2G";
+
+  if (uaLower.includes("windows") || uaLower.includes("macintosh") || uaLower.includes("linux")) {
+    if (type.includes("ethernet")) networkType = "LAN";
+    else if (type.includes("wifi")) networkType = "WiFi";
+    else networkType = "WiFi/LAN";
+  }
 
   return { clientDevice, networkType };
 }
@@ -3695,7 +3991,13 @@ function renderPushNotify() {
         <span>Thông báo mới</span>
         <h2>Thông báo từ Admin</h2>
         <p>{notifySettings.pushMessage}</p>
-        <button type="button" onClick={closeSystemPush}>ĐÃ HIỂU</button>
+        {pushCanDismiss ? (
+          <button type="button" onClick={closeSystemPush}>ĐÃ HIỂU</button>
+        ) : (
+          <div className="vtdd-push-lock">
+            <b>{pushForceLeft}</b>s
+          </div>
+        )}
       </div>
     </section>
   );
@@ -4116,11 +4418,6 @@ function renderSystemLock() {
                     <span>
                       {item.time} · {item.action} · {formatMoney(item.tongTien)}
                     </span>
-                    <small className="quote-history-meta">
-                      <em>{item.deviceLabel || "Không rõ"}</em>
-                      <em>{item.ip || "Không rõ IP"}</em>
-                      <em>{item.networkType || "Không rõ mạng"}</em>
-                    </small>
                   </div>
                   <button type="button" onClick={() => applyHistoryItem(item)}>
                     Dùng lại

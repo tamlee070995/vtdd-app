@@ -18,15 +18,9 @@ type StickerText = {
 
 const TEMPLATES: StickerTemplate[] = [
   { id: "classic-red", name: "01 - Trợ giá đỏ", styleClass: "classicRed" },
-  { id: "bolt", name: "02 - Tia sét", styleClass: "bolt" },
-  { id: "ticket", name: "03 - Vé trợ giá", styleClass: "ticket" },
-  { id: "bubble", name: "04 - Bong bóng", styleClass: "bubble" },
-  { id: "shield", name: "05 - Khiên giá", styleClass: "shield" },
-  { id: "tag", name: "06 - Tag dán máy", styleClass: "tag" },
-  { id: "capsule", name: "07 - Capsule", styleClass: "capsule" },
-  { id: "corner", name: "08 - Góc trợ giá", styleClass: "corner" },
-  { id: "flag", name: "09 - Cờ nổi", styleClass: "flag" },
-  { id: "stamp", name: "10 - Tem sale", styleClass: "stamp" },
+  { id: "ticket", name: "02 - Vé trợ giá", styleClass: "ticket" },
+  { id: "bubble", name: "03 - Bong bóng", styleClass: "bubble" },
+  { id: "tag", name: "04 - Tag dán máy", styleClass: "tag" },
 ];
 
 const DEFAULT_TEXT: StickerText = {
