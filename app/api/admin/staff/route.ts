@@ -11,7 +11,7 @@ import {
   updateStaffStatus,
 } from "@/lib/staff-store";
 import { decryptText, hashPassword, normalizeCode } from "@/lib/staff-security";
-import { sendStaffActivatedMail } from "@/lib/mail";
+import { getPublicMailError, sendStaffActivatedMail } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -217,7 +217,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           success: true,
           mailSent: false,
-          message: `Đã Active tài khoản NV ${target.maNV}, nhưng chưa gửi được Gmail thông báo. Kiểm tra SMTP/DNS mail rồi bấm gửi lại.`,
+          message: `Đã Active tài khoản NV ${target.maNV}, nhưng chưa gửi được Gmail thông báo. ${getPublicMailError(mailErr)}`,
         });
       }
     }

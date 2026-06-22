@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendResetOtpMail } from "@/lib/mail";
+import { getPublicMailError, sendResetOtpMail } from "@/lib/mail";
 import { findStaffByMaNV, updateStaffResetOtp } from "@/lib/staff-store";
 import { decryptText, hashPassword, normalizeCode, normalizeText } from "@/lib/staff-security";
 
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        message: "Không gửi được mã xác thực.",
+        message: `Không gửi được mã xác thực. ${getPublicMailError(err)}`,
       },
       { status: 500 }
     );

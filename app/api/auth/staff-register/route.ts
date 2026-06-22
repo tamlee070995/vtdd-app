@@ -8,7 +8,7 @@ import {
   normalizeText,
 } from "@/lib/staff-security";
 import { verifyCaptchaAnswer } from "@/lib/captcha";
-import { sendNewStaffAccountMail } from "@/lib/mail";
+import { getPublicMailError, sendNewStaffAccountMail } from "@/lib/mail";
 import {
   checkRegisterRateLimit,
   checkRegisterTrap,
@@ -272,6 +272,11 @@ export async function POST(req: NextRequest) {
       console.log("SEND_NEW_STAFF_ACCOUNT_MAIL_OK", { maNV });
     } catch (mailErr) {
       console.error("SEND_NEW_STAFF_ACCOUNT_MAIL_ERROR", mailErr);
+      return redirectRegister(
+        req,
+        "success",
+        `Đã tạo tài khoản chờ duyệt, nhưng chưa gửi được mail báo Admin. ${getPublicMailError(mailErr)}`
+      );
     }
 
     return redirectRegister(

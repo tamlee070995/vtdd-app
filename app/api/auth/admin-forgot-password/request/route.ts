@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findStaffByMaNV, updateStaffResetOtp } from "@/lib/staff-store";
 import { decryptText, hashPassword, normalizeCode, normalizeText } from "@/lib/staff-security";
-import { sendResetOtpMail } from "@/lib/mail";
+import { getPublicMailError, sendResetOtpMail } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -135,6 +135,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("ADMIN_FORGOT_OTP_ERROR:", err?.message || err);
-    return redirectBack(req, { error: "Không gửi được OTP. Vui lòng thử lại sau." });
+    return redirectBack(req, { error: `Không gửi được OTP. ${getPublicMailError(err)}` });
   }
 }

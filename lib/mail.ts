@@ -1,5 +1,16 @@
 import nodemailer from "nodemailer";
 
+type MailSettings = {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  rejectUnauthorized: boolean;
+  name: string;
+  label: string;
+};
+
 function normalizeMailHost(value: unknown) {
   let raw = String(value || "").trim();
   const markdownUrl = raw.match(/\]\((https?:\/\/[^)]+)\)/i)?.[1];
@@ -12,18 +23,24 @@ function normalizeMailHost(value: unknown) {
     .trim();
 }
 
-function getMailer() {
+function getMailSettings(overrides: Partial<MailSettings> = {}): MailSettings {
   const host = normalizeMailHost(process.env.MAIL_HOST);
   const port = Number(process.env.MAIL_PORT || 465);
   const secure =
     String(process.env.MAIL_SECURE ?? (port === 465 ? "true" : "false"))
       .trim()
       .toLowerCase() !== "false";
-  const user = process.env.MAIL_USER;
-  const pass = process.env.MAIL_PASS;
+  const user = String(process.env.MAIL_USER || "").trim();
+  const pass = String(process.env.MAIL_PASS || "").trim();
 
   if (!host || !user || !pass) {
-    throw new Error("Thiếu MAIL_HOST, MAIL_USER hoặc MAIL_PASS trong .env.local");
+    const missing = [
+      !host ? "MAIL_HOST" : "",
+      !user ? "MAIL_USER" : "",
+      !pass ? "MAIL_PASS" : "",
+    ].filter(Boolean);
+
+    throw new Error(`Thiếu biến môi trường mail: ${missing.join(", ")}.`);
   }
 
   const rejectUnauthorized =
@@ -31,27 +48,48 @@ function getMailer() {
       .trim()
       .toLowerCase() !== "false";
 
-  return nodemailer.createTransport({
+  return {
     host,
     port,
     secure,
-    name: process.env.MAIL_EHLO_NAME || "vienthongdidong.com",
+    user,
+    pass,
+    rejectUnauthorized,
+    name: String(process.env.MAIL_EHLO_NAME || "vienthongdidong.com").trim(),
+    label: "primary",
+    ...overrides,
+  };
+}
+
+function createMailer(settings: MailSettings) {
+  return nodemailer.createTransport({
+    host: settings.host,
+    port: settings.port,
+    secure: settings.secure,
+    name: settings.name,
+    requireTLS: !settings.secure,
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 30000,
     tls: {
-      servername: host,
-      rejectUnauthorized,
+      servername: settings.host,
+      rejectUnauthorized: settings.rejectUnauthorized,
     },
     auth: {
-      user,
-      pass,
+      user: settings.user,
+      pass: settings.pass,
     },
   });
 }
 
+function getMailer() {
+  return createMailer(getMailSettings());
+}
+
 function getMailFrom() {
-  return process.env.MAIL_FROM || `Viễn Thông Di Động <${process.env.MAIL_USER || ""}>`;
+  return String(process.env.MAIL_FROM || `Viễn Thông Di Động <${process.env.MAIL_USER || ""}>`)
+    .trim()
+    .replace(/^['"]|['"]$/g, "");
 }
 
 function getAutoMailHeaders() {
@@ -336,7 +374,6 @@ export async function sendResetOtpMail(params: {
   maNV: string;
   otp: string;
 }) {
-  const transporter = getMailer();
   const smtpUser = String(process.env.MAIL_USER || "").trim();
   const staffName = params.staffName || "Nhân viên";
   const otp = String(params.otp || "").trim();
@@ -377,7 +414,7 @@ export async function sendResetOtpMail(params: {
     "Email tự động từ hệ thống Viễn Thông Di Động.",
   ].join("\n\n");
 
-  const info = await transporter.sendMail({
+  const info = await sendMailWithFallback({
     from: getMailFrom(),
     envelope: smtpUser ? { from: smtpUser, to: params.to } : undefined,
     to: params.to,
@@ -393,6 +430,184 @@ export async function sendResetOtpMail(params: {
   return report;
 }
 
+function maskEmail(email: string) {
+  const [name, domain] = String(email || "").split("@");
+  if (!name || !domain) return email ? "***" : "";
+  return `${name.slice(0, 2)}***@${domain}`;
+}
+
+function isLikelyConnectionError(err: any) {
+  const text = `${err?.code || ""} ${err?.command || ""} ${err?.message || ""}`;
+  return /ETIMEDOUT|ECONNRESET|ECONNREFUSED|EHOSTUNREACH|ENOTFOUND|ESOCKET|ECONNECTION|ETLS|Greeting never received|Connection timeout|Timed out|timeout/i.test(text);
+}
+
+function shouldTrySmtpFallback(settings: MailSettings, err: any) {
+  const disabled = String(process.env.MAIL_DISABLE_SMTP_FALLBACK || "")
+    .trim()
+    .toLowerCase() === "true";
+
+  if (disabled) return false;
+  if (settings.port === 587 && settings.secure === false) return false;
+  return isLikelyConnectionError(err);
+}
+
+export function getPublicMailError(err: any) {
+  const raw = String(err?.message || err || "").trim();
+  const code = String(err?.code || err?.cause?.code || "").trim();
+  const text = `${code} ${raw}`;
+
+  if (/Thiếu biến môi trường mail/i.test(raw)) return raw;
+  if (/EAUTH|Invalid login|Authentication failed|535|534/i.test(text)) {
+    return "SMTP đăng nhập thất bại. Kiểm tra MAIL_USER và MAIL_PASS trên môi trường web chính.";
+  }
+  if (/ENOTFOUND|EAI_AGAIN/i.test(text)) {
+    return "Server web chính không phân giải được MAIL_HOST. Kiểm tra MAIL_HOST/DNS.";
+  }
+  if (/ETIMEDOUT|ECONNREFUSED|EHOSTUNREACH|ESOCKET|ECONNECTION|Greeting never received|Connection timeout|Timed out|timeout/i.test(text)) {
+    return "Server web chính không kết nối được SMTP. Khả năng cao hosting đang chặn cổng SMTP 465/587 hoặc mail server chặn IP hosting.";
+  }
+  if (/certificate|self signed|TLS|SSL/i.test(text)) {
+    return "Lỗi TLS/SSL khi kết nối SMTP. Kiểm tra MAIL_HOST, MAIL_PORT, MAIL_SECURE hoặc chứng chỉ mail server.";
+  }
+  if (/SPF|DKIM|DMARC|550-5\.7|blocked|unauthenticated/i.test(text)) {
+    return "Mail bị chặn do xác thực tên miền SPF/DKIM/DMARC. Cần kiểm tra DNS mail của vienthongdidong.com.";
+  }
+
+  return raw || "Không xác định được lỗi SMTP.";
+}
+
+function withMailContext(err: any, settings: MailSettings, fallbackErr?: any) {
+  const detail = fallbackErr
+    ? `${getPublicMailError(err)} Fallback 587 cũng lỗi: ${getPublicMailError(fallbackErr)}`
+    : getPublicMailError(err);
+  const wrapped = new Error(
+    `[SMTP ${settings.host}:${settings.port}${settings.secure ? "/SSL" : "/STARTTLS"}] ${detail}`
+  );
+
+  (wrapped as any).code = err?.code || fallbackErr?.code;
+  (wrapped as any).cause = fallbackErr || err;
+  return wrapped;
+}
+
+async function sendMailWithFallback(options: any) {
+  const primary = getMailSettings();
+
+  try {
+    return await createMailer(primary).sendMail(options);
+  } catch (err: any) {
+    if (!shouldTrySmtpFallback(primary, err)) {
+      throw withMailContext(err, primary);
+    }
+
+    const fallback = getMailSettings({
+      port: 587,
+      secure: false,
+      label: "fallback-587",
+    });
+
+    try {
+      return await createMailer(fallback).sendMail(options);
+    } catch (fallbackErr: any) {
+      throw withMailContext(err, primary, fallbackErr);
+    }
+  }
+}
+
+export function getMailDiagnosticsSnapshot() {
+  try {
+    const settings = getMailSettings();
+
+    return {
+      configured: true,
+      host: settings.host,
+      port: settings.port,
+      secure: settings.secure,
+      user: maskEmail(settings.user),
+      from: getMailFrom(),
+      hasPassword: Boolean(settings.pass),
+      fallback587: String(process.env.MAIL_DISABLE_SMTP_FALLBACK || "").trim().toLowerCase() !== "true",
+    };
+  } catch (err: any) {
+    return {
+      configured: false,
+      error: getPublicMailError(err),
+    };
+  }
+}
+
+export async function verifyMailConnection() {
+  const settings = getMailSettings();
+
+  try {
+    await getMailer().verify();
+    return {
+      success: true,
+      transport: `${settings.host}:${settings.port}${settings.secure ? "/SSL" : "/STARTTLS"}`,
+    };
+  } catch (err: any) {
+    if (!shouldTrySmtpFallback(settings, err)) {
+      throw withMailContext(err, settings);
+    }
+
+    const fallback = getMailSettings({
+      port: 587,
+      secure: false,
+      label: "fallback-587",
+    });
+
+    try {
+      await createMailer(fallback).verify();
+      return {
+        success: true,
+        transport: `${fallback.host}:587/STARTTLS`,
+        fallback: true,
+        primaryError: getPublicMailError(err),
+      };
+    } catch (fallbackErr: any) {
+      throw withMailContext(err, settings, fallbackErr);
+    }
+  }
+}
+
+export async function sendDiagnosticMail(to: string) {
+  const target = String(to || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+    throw new Error("Email test chưa đúng định dạng.");
+  }
+
+  const smtpUser = String(process.env.MAIL_USER || "").trim();
+  const subject = `VTDD - Test SMTP ${new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}`;
+  const text = [
+    "Đây là email test SMTP từ web chính Viễn Thông Di Động.",
+    `Thời gian: ${new Date().toISOString()}`,
+    `Host: ${getMailDiagnosticsSnapshot().configured ? (getMailDiagnosticsSnapshot() as any).host : "Chưa cấu hình"}`,
+  ].join("\n\n");
+
+  const info = await sendMailWithFallback({
+    from: getMailFrom(),
+    envelope: smtpUser ? { from: smtpUser, to: target } : undefined,
+    to: target,
+    subject,
+    headers: getAutoMailHeaders(),
+    text,
+    html: buildEmailShell({
+      preheader: "Email test SMTP từ web chính Viễn Thông Di Động.",
+      statusLabel: "SMTP Test",
+      eyebrow: "Mail Diagnostics",
+      title: "Test gửi mail thành công",
+      description: "Nếu bạn nhận được email này, web chính đã kết nối được SMTP.",
+      body: buildSuccessBox({
+        title: "SMTP đã gửi email test.",
+        desc: `Người nhận: ${target}`,
+      }),
+    }),
+  });
+
+  const report = buildDeliveryReport(info);
+  ensureRecipientAccepted(report, target);
+  return report;
+}
+
 export async function sendNewStaffAccountMail(params: {
   to?: string;
   maNV: string;
@@ -400,7 +615,6 @@ export async function sendNewStaffAccountMail(params: {
   gmail: string;
   adminUrl: string;
 }) {
-  const transporter = getMailer();
   const smtpUser = String(process.env.MAIL_USER || "").trim();
   const to = params.to || process.env.NEW_STAFF_NOTIFY_EMAIL || "tamlee070995@gmail.com";
 
@@ -441,7 +655,7 @@ export async function sendNewStaffAccountMail(params: {
     `Mở Admin: ${adminUrl}`,
   ].join("\n\n");
 
-  const info = await transporter.sendMail({
+  const info = await sendMailWithFallback({
     from: getMailFrom(),
     envelope: smtpUser ? { from: smtpUser, to } : undefined,
     to,
@@ -463,7 +677,6 @@ export async function sendStaffActivatedMail(params: {
   maNV: string;
   loginUrl: string;
 }) {
-  const transporter = getMailer();
   const smtpUser = String(process.env.MAIL_USER || "").trim();
   const staffName = params.staffName || "Nhân viên";
   const loginUrl = safeUrl(params.loginUrl);
@@ -503,7 +716,7 @@ export async function sendStaffActivatedMail(params: {
     `,
   });
 
-  const info = await transporter.sendMail({
+  const info = await sendMailWithFallback({
     from: getMailFrom(),
     envelope: smtpUser ? { from: smtpUser, to: params.to } : undefined,
     to: params.to,
@@ -533,7 +746,6 @@ export async function sendAdminLoginFailedAlertMail(params: {
     throw new Error("Thiếu email Admin nhận cảnh báo đăng nhập.");
   }
 
-  const transporter = getMailer();
   const smtpUser = String(process.env.MAIL_USER || "").trim();
   const adminUrl = safeUrl(params.adminUrl);
   const attemptedMaNV = params.attemptedMaNV || "Không rõ";
@@ -576,7 +788,7 @@ export async function sendAdminLoginFailedAlertMail(params: {
     `Admin: ${adminUrl}`,
   ].join("\n\n");
 
-  const info = await transporter.sendMail({
+  const info = await sendMailWithFallback({
     from: getMailFrom(),
     envelope: smtpUser ? { from: smtpUser, to: recipients } : undefined,
     to: recipients.join(", "),
