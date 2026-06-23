@@ -10880,6 +10880,19 @@ main article img {
   transform: translateY(1px);
 }
 
+.staff-auth-form button:disabled,
+.admin-auth-form button:disabled {
+  cursor: wait;
+  opacity: .78;
+  box-shadow: none;
+}
+
+.staff-auth-form input:disabled,
+.admin-auth-form input:disabled {
+  cursor: wait;
+  color: #64748b;
+}
+
 .staff-auth-actions,
 .admin-auth-actions {
   display: grid;

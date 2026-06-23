@@ -1,4 +1,5 @@
 import Link from "next/link";
+import StaffLoginForm from "@/components/StaffLoginForm";
 
 type PageProps = {
   searchParams?: Promise<{ error?: string }> | { error?: string };
@@ -48,53 +49,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
           </div>
         </section>
 
-        <form
-          className="staff-auth-form"
-          action="/api/auth/staff-login"
-          method="POST"
-          noValidate
-        >
-          <div className="staff-auth-form-head">
-            <span>01</span>
-            <div>
-              <h2>Đăng nhập nhân viên</h2>
-              <p>Dành cho tài khoản đã được duyệt sử dụng.</p>
-            </div>
-          </div>
-
-          <label htmlFor="maNV">Mã nhân viên</label>
-          <input
-            id="maNV"
-            name="maNV"
-            type="text"
-            inputMode="text"
-            placeholder="NV12345"
-            autoComplete="username"
-          />
-
-          <label htmlFor="password">Mật khẩu</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            placeholder="Nhập mật khẩu"
-            autoComplete="current-password"
-          />
-
-          {error ? (
-            <div className="staff-auth-error" role="alert">
-              <b>Không đăng nhập được</b>
-              <span>{error}</span>
-            </div>
-          ) : null}
-
-          <button type="submit">Vào trang tra cứu</button>
-
-          <div className="staff-auth-actions">
-            <Link href="/register">Tạo tài khoản</Link>
-            <Link href="/forgot-password">Quên mật khẩu</Link>
-          </div>
-        </form>
+        <StaffLoginForm initialError={error} />
 
         <footer className="staff-auth-footer">
           <span>VTDD Internal</span>

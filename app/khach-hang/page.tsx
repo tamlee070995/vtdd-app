@@ -2035,15 +2035,7 @@ export default function CustomerPage() {
   }
 
   function renderSystemNotices() {
-    return (
-      <>
-        {notifySettings.marquee ? (
-          <div className="vtdd-system-marquee">
-            <span>{notifySettings.marquee}</span>
-          </div>
-        ) : null}
-      </>
-    );
+    return null;
   }
 
   function renderHeroEffectivePill() {
