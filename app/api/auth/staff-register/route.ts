@@ -103,9 +103,10 @@ function safeDecryptGmail(value: string) {
 
   try {
     const decrypted = decryptText(raw);
-    return decrypted || raw;
+    if (decrypted) return decrypted;
+    return raw.startsWith("enc:v1:") ? "" : raw;
   } catch {
-    return raw;
+    return raw.startsWith("enc:v1:") ? "" : raw;
   }
 }
 

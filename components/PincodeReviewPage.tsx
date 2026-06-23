@@ -22,6 +22,8 @@ type PincodeRequest = {
   menhGia: string;
   reason: string;
   admin: string;
+  claimedBy?: string;
+  claimedAt?: string;
   imageUrls: string[];
 };
 
@@ -165,7 +167,8 @@ export default function PincodeReviewPage({ request, pmhStats, adminName }: Prop
     }
   }
 
-  const disabled = Boolean(busy || done || request.status !== "Pending");
+  const claimedByOther = Boolean(request.claimedBy && request.claimedBy !== adminName);
+  const disabled = Boolean(busy || done || request.status !== "Pending" || claimedByOther);
   const rejectBusy = busy === "soft" || busy === "hard";
   const rejectButtonText = rejectBusy
     ? actionMode === "soft"
@@ -222,6 +225,8 @@ export default function PincodeReviewPage({ request, pmhStats, adminName }: Prop
             <span>Kiểm duyệt yêu cầu</span>
             <h1>{request.flowLabel}</h1>
             <p>Admin: {adminName}</p>
+            {request.claimedBy ? <p>Đang xử lý: {request.claimedBy}{request.claimedAt ? ` · ${request.claimedAt}` : ""}</p> : null}
+            {claimedByOther ? <p>Hồ sơ này đã được người khác nhận xử lý.</p> : null}
           </div>
           <b className={`review-status ${request.status}`}>{statusText(request.status)}</b>
         </header>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOnlineStats } from "@/lib/online-store";
+import { getOnlineSessions, getOnlineStats } from "@/lib/online-store";
 import { requireAdminApi } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       online: getOnlineStats(),
+      sessions: getOnlineSessions(),
     });
   } catch (err: any) {
     return NextResponse.json(

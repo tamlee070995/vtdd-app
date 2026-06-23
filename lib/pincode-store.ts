@@ -45,6 +45,9 @@ const STAFF_CACHE_TTL_MS = 5 * 60 * 1000;
 const MODEL_CACHE_TTL_MS = 10 * 60 * 1000;
 const REQUEST_CACHE_TTL_MS = 5 * 1000;
 const PMH_STATS_CACHE_TTL_MS = 20 * 1000;
+const PMH_DUPLICATE_WINDOW_MS = 30 * 60 * 1000;
+const PMH_REOPEN_WINDOW_MS = 5 * 60 * 1000;
+const PMH_CLAIM_PREFIX = "[CLAIM:";
 
 type ReadCacheEntry = {
   expiresAt: number;
@@ -100,6 +103,96 @@ function nowVN() {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function parseVietnamDateMs(value: unknown) {
+  const raw = clean(value).replace(/^'/, "");
+  if (!raw) return 0;
+
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (iso) {
+    return Date.UTC(
+      Number(iso[1]),
+      Number(iso[2]) - 1,
+      Number(iso[3]),
+      Number(iso[4]) - 7,
+      Number(iso[5]),
+      Number(iso[6] || 0)
+    );
+  }
+
+  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (slash) {
+    const first = Number(slash[1]);
+    const second = Number(slash[2]);
+    const day = first > 12 ? first : second;
+    const month = first > 12 ? second : first;
+    return Date.UTC(
+      Number(slash[3]),
+      month - 1,
+      day,
+      Number(slash[4]) - 7,
+      Number(slash[5]),
+      Number(slash[6] || 0)
+    );
+  }
+
+  const parsed = new Date(raw.includes("T") ? raw : raw.replace(" ", "T")).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatIsoVN(ms: number) {
+  if (!ms) return "";
+  return new Date(ms).toLocaleString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function parseClaimMarker(value: unknown) {
+  const raw = clean(value);
+  if (!raw.startsWith(PMH_CLAIM_PREFIX)) return { admin: raw, claimedBy: "", claimedAt: "" };
+
+  const marker = raw.match(/^\[CLAIM:([^|\]]+)(?:\|([^\]]+))?\]/);
+  return {
+    admin: "",
+    claimedBy: clean(marker?.[1]),
+    claimedAt: clean(marker?.[2]),
+  };
+}
+
+function makeClaimMarker(admin: string) {
+  return `${PMH_CLAIM_PREFIX}${clean(admin) || "Admin"}|${new Date().toISOString()}]`;
+}
+
+function enrichPincodeRequest(
+  request: Omit<PincodeRequest, "claimedBy" | "claimedAt" | "ageMinutes" | "slaLevel" | "canReopen" | "reopenUntil">
+): PincodeRequest {
+  const claim = parseClaimMarker(request.admin);
+  const createdMs = parseVietnamDateMs(request.createdAt);
+  const now = Date.now();
+  const ageMinutes = request.status === "Pending" && createdMs ? Math.max(0, Math.floor((now - createdMs) / 60000)) : 0;
+  const closedMs = parseVietnamDateMs(request.updatedAt || request.completedAt || request.createdAt);
+  const reopenUntilMs =
+    (request.status === "Rejected_Hard" || request.status === "Rejected_Soft") && closedMs
+      ? closedMs + PMH_REOPEN_WINDOW_MS
+      : 0;
+
+  return {
+    ...request,
+    admin: claim.admin,
+    claimedBy: claim.claimedBy,
+    claimedAt: claim.claimedAt ? formatIsoVN(parseVietnamDateMs(claim.claimedAt) || Date.parse(claim.claimedAt)) : "",
+    ageMinutes,
+    slaLevel: ageMinutes >= 10 ? "danger" : ageMinutes >= 5 ? "warn" : "ok",
+    canReopen: Boolean(reopenUntilMs && reopenUntilMs >= now),
+    reopenUntil: reopenUntilMs ? formatIsoVN(reopenUntilMs) : "",
+  };
 }
 
 function getColumnLetter(columnNumber: number) {
@@ -358,6 +451,12 @@ export type PincodeRequest = {
   menhGia: string;
   reason: string;
   admin: string;
+  claimedBy: string;
+  claimedAt: string;
+  ageMinutes: number;
+  slaLevel: "ok" | "warn" | "danger";
+  canReopen: boolean;
+  reopenUntil: string;
   doneStatus: string;
   updatedAt: string;
   completedAt: string;
@@ -515,7 +614,7 @@ function mapRequestRow(row: any[], index: number): PincodeRequest {
   const done = clean(row[14]);
   const status = normalizeStatus(row[10], done);
 
-  return {
+  return enrichPincodeRequest({
     requestId: String(rowNumber),
     rowNumber,
     createdAt: clean(row[0]),
@@ -536,9 +635,9 @@ function mapRequestRow(row: any[], index: number): PincodeRequest {
     admin: clean(row[13]),
     doneStatus: done,
     updatedAt: "",
-    completedAt: done.toLowerCase() === "done" ? clean(row[0]) : "",
+    completedAt: done.toLowerCase() === "done" ? clean(row[0]) : clean(row[0]),
     imageUrls: normalizeImageList(row),
-  };
+  });
 }
 
 function sourceRowNumber(value: unknown, fallback = 0) {
@@ -597,7 +696,7 @@ function mapDbRequestRow(row: any): PincodeRequest {
   const done = clean(row.completion_status);
   const status = normalizeStatus(row.status, done);
 
-  return {
+  return enrichPincodeRequest({
     requestId,
     rowNumber,
     createdAt: clean(row.created_at_text),
@@ -617,8 +716,8 @@ function mapDbRequestRow(row: any): PincodeRequest {
     reason: clean(row.reject_reason),
     admin: clean(row.admin_reviewer),
     doneStatus: done,
-    updatedAt: "",
-    completedAt: done.toLowerCase() === "done" ? clean(row.created_at_text) : "",
+    updatedAt: clean(row.updated_at || row.updated_at_text || row.created_at_text),
+    completedAt: done.toLowerCase() === "done" ? clean(row.updated_at || row.created_at_text) : clean(row.updated_at || row.created_at_text),
     imageUrls: [
       row.image_link_1,
       row.image_link_2,
@@ -627,7 +726,7 @@ function mapDbRequestRow(row: any): PincodeRequest {
       row.image_link_5,
       row.image_link_6,
     ].map(clean).filter(Boolean),
-  };
+  });
 }
 
 function sortDbRequests(a: PincodeRequest, b: PincodeRequest) {
@@ -1136,17 +1235,24 @@ export async function getPincodeAdminDashboard() {
   };
 }
 
-async function findActiveDuplicate(imei: string, flow: PincodeFlow) {
+async function findActiveDuplicate(imei: string, flow: PincodeFlow, maST?: string, maNV?: string) {
   const targetImei = clean(imei).toUpperCase();
+  const targetStore = cleanCode(maST);
+  const targetStaff = cleanCode(maNV);
   if (!targetImei) return null;
 
   const requests = await getPincodeRequests(1000);
+  const now = Date.now();
 
   return (
     requests.find((item) => {
       if (item.flow !== flow) return false;
       if (item.imei.toUpperCase() !== targetImei) return false;
+      if (targetStore && item.maST !== targetStore) return false;
+      if (targetStaff && item.maNV !== targetStaff) return false;
       if (item.status === "Rejected_Hard") return false;
+      const createdMs = parseVietnamDateMs(item.createdAt);
+      if (createdMs && now - createdMs > PMH_DUPLICATE_WINDOW_MS && item.status !== "Approved") return false;
       return true;
     }) || null
   );
@@ -1217,7 +1323,7 @@ export async function createPincodeRequest(data: {
   }
 
   const timestamp = nowVN();
-  const duplicate = await findActiveDuplicate(imei, flow);
+  const duplicate = await findActiveDuplicate(imei, flow, staff.maST || inputStore, staff.maNV);
 
   if (isSupabaseConfigured()) {
     try {
@@ -1790,6 +1896,135 @@ export async function rejectPincodeRequest(data: {
     return {
       success: true,
       message: data.soft ? "Đã yêu cầu nhân viên cập nhật lại hồ sơ." : "Đã từ chối cấp PMH.",
+    };
+  });
+}
+
+export async function claimPincodeRequest(data: {
+  requestId: string;
+  admin: string;
+}) {
+  if (isSupabaseConfigured()) {
+    return enqueuePincodeWrite(async () => {
+      const request = await getPincodeRequestById(data.requestId);
+      if (!request) throw new Error("Khong tim thay ho so can nhan xu ly.");
+      if (request.status !== "Pending") throw new Error("Ho so nay da duoc xu ly.");
+      if (request.claimedBy && request.claimedBy !== clean(data.admin)) {
+        throw new Error(`Ho so da duoc ${request.claimedBy} nhan xu ly.`);
+      }
+
+      await updateDbPincodeRequest(
+        request.requestId,
+        dbRequestPatchFromInput({
+          adminReviewer: makeClaimMarker(data.admin),
+        })
+      );
+
+      return {
+        success: true,
+        request: await getPincodeRequestById(data.requestId),
+        message: "Da nhan xu ly ho so.",
+      };
+    });
+  }
+
+  await ensurePincodeSheets();
+
+  return enqueuePincodeWrite(async () => {
+    const request = await getPincodeRequestById(data.requestId);
+    if (!request) throw new Error("Khong tim thay ho so can nhan xu ly.");
+    if (request.status !== "Pending") throw new Error("Ho so nay da duoc xu ly.");
+    if (request.claimedBy && request.claimedBy !== clean(data.admin)) {
+      throw new Error(`Ho so da duoc ${request.claimedBy} nhan xu ly.`);
+    }
+
+    const sheets = await getSheetsClient();
+    const spreadsheetId = getSpreadsheetId();
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${REQUEST_SHEET}!N${request.rowNumber}:N${request.rowNumber}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[makeClaimMarker(data.admin)]] },
+    });
+    invalidateReadCache(REQUEST_SHEET);
+
+    return {
+      success: true,
+      request: await getPincodeRequestById(data.requestId),
+      message: "Da nhan xu ly ho so.",
+    };
+  });
+}
+
+export async function reopenRejectedPincodeRequest(data: {
+  requestId: string;
+  admin: string;
+}) {
+  if (isSupabaseConfigured()) {
+    return enqueuePincodeWrite(async () => {
+      const request = await getPincodeRequestById(data.requestId);
+      if (!request) throw new Error("Khong tim thay ho so can mo lai.");
+      if (request.status !== "Rejected_Hard" && request.status !== "Rejected_Soft") {
+        throw new Error("Chi mo lai duoc ho so da bi tu choi hoac yeu cau chup lai.");
+      }
+      if (!request.canReopen) {
+        throw new Error("Da qua 5 phut, ho so nay can tao yeu cau moi.");
+      }
+
+      await updateDbPincodeRequest(
+        request.requestId,
+        dbRequestPatchFromInput({
+          status: "Pending",
+          pincode: "",
+          rejectReason: "",
+          adminReviewer: "",
+          completionStatus: "",
+          menhGia: "",
+        })
+      );
+
+      return {
+        success: true,
+        request: await getPincodeRequestById(data.requestId),
+        message: "Da mo lai ho so ve trang thai cho duyet.",
+      };
+    });
+  }
+
+  await ensurePincodeSheets();
+
+  return enqueuePincodeWrite(async () => {
+    const request = await getPincodeRequestById(data.requestId);
+    if (!request) throw new Error("Khong tim thay ho so can mo lai.");
+    if (request.status !== "Rejected_Hard" && request.status !== "Rejected_Soft") {
+      throw new Error("Chi mo lai duoc ho so da bi tu choi hoac yeu cau chup lai.");
+    }
+    if (!request.canReopen) {
+      throw new Error("Da qua 5 phut, ho so nay can tao yeu cau moi.");
+    }
+
+    const sheets = await getSheetsClient();
+    const spreadsheetId = getSpreadsheetId();
+
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: "USER_ENTERED",
+        data: [
+          {
+            range: `${REQUEST_SHEET}!K${request.rowNumber}:P${request.rowNumber}`,
+            values: [["Pending", "", "", "", "", ""]],
+          },
+        ],
+      },
+    });
+    invalidateReadCache(REQUEST_SHEET);
+
+    return {
+      success: true,
+      request: await getPincodeRequestById(data.requestId),
+      message: "Da mo lai ho so ve trang thai cho duyet.",
     };
   });
 }

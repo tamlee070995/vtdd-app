@@ -66,6 +66,7 @@ type AdminDashboard = {
 type AdminRole = "admin" | "mod";
 type AdminActionKey =
   | "staff-manage"
+  | "staff-delete"
   | "staff-security"
   | "settings-write"
   | "reload-data"
@@ -92,6 +93,38 @@ type OnlineStats = {
   updatedAt: string;
 };
 
+type OnlineSession = {
+  page: string;
+  visitorId: string;
+  lastSeenAt: string;
+  ip: string;
+  path: string;
+  device: string;
+  userAgent: string;
+};
+
+type OpsHealth = {
+  generatedAt: string;
+  supabase?: { ok: boolean; message: string; latencyMs?: number };
+  mail?: { ok: boolean; message: string };
+  telegram?: { ok: boolean; message: string };
+  backup?: any;
+  sync?: any;
+  quality?: any;
+  recentErrors?: OpsErrorLog[];
+};
+
+type OpsErrorLog = {
+  id: string;
+  time: string;
+  actor: string;
+  page: string;
+  module: string;
+  message: string;
+  ip: string;
+  severity: string;
+};
+
 const EMPTY_ONLINE_STATS: OnlineStats = {
   total: 0,
   home: 0,
@@ -116,6 +149,14 @@ type TabKey = "overview" | "staff" | "permission" | "notify" | "system" | "dashb
 type ToastState = {
   type: "success" | "error";
   text: string;
+} | null;
+
+type ConfirmDialogState = {
+  title: string;
+  message: string;
+  confirmText?: string;
+  danger?: boolean;
+  onConfirm: () => void | Promise<void>;
 } | null;
 
 const EMPTY_SUMMARY: StaffSummary = {
@@ -153,6 +194,7 @@ const ADMIN_ACTION_PREFIX = "action:";
 
 const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
   { key: "staff-manage", label: "Quản lý nhân viên", desc: "Xem danh sách, Active và Standby tài khoản." },
+  { key: "staff-delete", label: "Xóa nhân viên", desc: "Xóa tài khoản nhân viên khỏi hệ thống." },
   { key: "staff-security", label: "Reset bảo mật", desc: "Reset OTP, mật khẩu và thiết lập bảo mật." },
   { key: "settings-write", label: "Lưu cấu hình", desc: "Lưu thông báo, lock web và ngày áp dụng." },
   { key: "reload-data", label: "Reload data", desc: "Tăng Data version để nhân viên nhận dữ liệu mới." },
@@ -253,6 +295,20 @@ function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("vi-VN");
 }
 
+function maskIpAddress(value: string, fullAccess: boolean) {
+  const ip = String(value || "").trim();
+  if (!ip || fullAccess) return ip || "—";
+
+  if (ip.includes(":")) {
+    const parts = ip.split(":").filter(Boolean);
+    return parts.length > 2 ? `${parts[0]}:${parts[1]}:****` : "****";
+  }
+
+  const parts = ip.split(".");
+  if (parts.length === 4) return `${parts[0]}.${parts[1]}.***.***`;
+  return "****";
+}
+
 function toDatetimeLocalInput(value: any) {
   const raw = String(value || "").trim().replace(/^'/, "");
   if (!raw) return "";
@@ -335,10 +391,19 @@ function TcdmAdminConsole({
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState<ToastState>(null);
   const [onlineStats, setOnlineStats] = useState<OnlineStats>(EMPTY_ONLINE_STATS);
+  const [onlineSessions, setOnlineSessions] = useState<OnlineSession[]>([]);
   const [onlineLoading, setOnlineLoading] = useState(false);
+  const [opsHealth, setOpsHealth] = useState<OpsHealth | null>(null);
+  const [opsErrors, setOpsErrors] = useState<OpsErrorLog[]>([]);
+  const [opsErrorModule, setOpsErrorModule] = useState("");
+  const [opsErrorFrom, setOpsErrorFrom] = useState("");
+  const [opsErrorTo, setOpsErrorTo] = useState("");
+  const [opsLoading, setOpsLoading] = useState(false);
+  const [commandInput, setCommandInput] = useState("");
   const [dashboardData, setDashboardData] = useState<AdminDashboard>(EMPTY_DASHBOARD);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
 
   const [staff, setStaff] = useState<AdminStaff[]>([]);
   const [staffMeta, setStaffMeta] = useState<StaffMeta>({
@@ -368,7 +433,9 @@ function TcdmAdminConsole({
     if (isFullAdmin) return true;
     if (item.key === "overview") return true;
     if (item.key === "permission") return false;
-    if (item.key === "staff") return canUseAction("staff-manage");
+    if (item.key === "staff") {
+      return canUseAction("staff-manage") || canUseAction("staff-security") || canUseAction("staff-delete");
+    }
     if (item.key === "notify") return canUseAction("settings-write");
     if (item.key === "system") return canUseAction("settings-write") || canUseAction("reload-data");
     if (item.key === "dashboard") return canUseAction("dashboard-view");
@@ -377,6 +444,7 @@ function TcdmAdminConsole({
   const activeTabAllowed = visibleTabs.some((item) => item.key === tab);
   const firstVisibleTab = visibleTabs[0]?.key || "overview";
   const canManageStaff = canUseAction("staff-manage");
+  const canDeleteStaff = canUseAction("staff-delete");
   const canResetStaffSecurity = canUseAction("staff-security");
   const canResetStaffOtp = canResetStaffSecurity || canManageStaff;
   const canWriteSettings = canUseAction("settings-write");
@@ -412,6 +480,16 @@ function TcdmAdminConsole({
   function showToast(type: "success" | "error", text: string) {
     setToast({ type, text });
     window.setTimeout(() => setToast(null), 2800);
+  }
+
+  function openConfirmDialog(dialog: NonNullable<ConfirmDialogState>) {
+    setConfirmDialog(dialog);
+  }
+
+  async function runConfirmDialogAction() {
+    const action = confirmDialog?.onConfirm;
+    setConfirmDialog(null);
+    await action?.();
   }
 
   async function postJSON(url: string, body: any) {
@@ -452,9 +530,71 @@ function TcdmAdminConsole({
       }
 
       setOnlineStats(data.online || EMPTY_ONLINE_STATS);
+      setOnlineSessions(Array.isArray(data.sessions) ? data.sessions : []);
       setOnlineLoading(false);
     } catch {
       setOnlineLoading(false);
+    }
+  }
+
+  async function loadOpsHealth(options?: { silent?: boolean }) {
+    if (!canUseAction("dashboard-view")) return;
+
+    try {
+      if (!options?.silent) setOpsLoading(true);
+
+      const res = await fetch("/api/admin/ops", {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Không tải được trạng thái hệ thống.");
+      }
+
+      setOpsHealth(data.health || null);
+      setOpsErrors(Array.isArray(data.health?.recentErrors) ? data.health.recentErrors : []);
+      setOpsLoading(false);
+    } catch (err: any) {
+      setOpsLoading(false);
+      if (!options?.silent) showToast("error", getErrorMessage(err));
+    }
+  }
+
+  async function loadOpsErrors() {
+    if (!canUseAction("dashboard-view")) return;
+
+    try {
+      setOpsLoading(true);
+      const params = new URLSearchParams({
+        mode: "errors",
+        limit: "120",
+      });
+      if (opsErrorModule.trim()) params.set("module", opsErrorModule.trim());
+      if (opsErrorFrom) params.set("from", opsErrorFrom);
+      if (opsErrorTo) params.set("to", opsErrorTo);
+
+      const res = await fetch(`/api/admin/ops?${params.toString()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Không tải được nhật ký lỗi.");
+      }
+
+      setOpsErrors(Array.isArray(data.errors) ? data.errors : []);
+      setOpsLoading(false);
+    } catch (err: any) {
+      setOpsLoading(false);
+      showToast("error", getErrorMessage(err));
     }
   }
 
@@ -528,6 +668,7 @@ function TcdmAdminConsole({
 
   useEffect(() => {
     loadOnlineStats({ silent: true });
+    loadOpsHealth({ silent: true });
 
     const timer = window.setInterval(() => {
       loadOnlineStats({ silent: true });
@@ -535,6 +676,35 @@ function TcdmAdminConsole({
 
     return () => window.clearInterval(timer);
   }, []);
+
+  function runCommandSearch() {
+    const raw = commandInput.trim();
+    const q = raw.toLowerCase();
+    if (!q) return;
+
+    const routeMap: Array<{ match: RegExp; tab: TabKey; action?: () => void }> = [
+      { match: /(nhan|nhân|staff|nv|active|standby|otp|reset|delete|xoa|xóa)/i, tab: "staff" },
+      { match: /(quyen|quyền|permission|mod|admin)/i, tab: "permission" },
+      { match: /(thong bao|thông báo|notify|push|popup|banner)/i, tab: "notify" },
+      { match: /(khoa|khóa|lock|reload|firewall|ip|tuong lua|tường lửa)/i, tab: "system" },
+      { match: /(dashboard|log|health|loi|lỗi|online|session|backup)/i, tab: "dashboard", action: () => loadDashboard({ silent: true }) },
+    ];
+
+    const found = routeMap.find((item) => item.match.test(q));
+    if (found && visibleTabs.some((item) => item.key === found.tab)) {
+      setTab(found.tab);
+      found.action?.();
+      showToast("success", `Đã mở nhanh mục phù hợp cho "${raw}".`);
+      return;
+    }
+
+    if (/pmh|pincode|telegram|import|export|tool|cong cu|công cụ/i.test(q)) {
+      showToast("success", "Module công cụ hỗ trợ nằm ở thẻ số 05 bên ngoài khu vực quản trị TCDM.");
+      return;
+    }
+
+    showToast("error", "Chưa tìm thấy chức năng phù hợp hoặc tài khoản chưa được cấp quyền.");
+  }
 
   useEffect(() => {
     if (activeTabAllowed) return;
@@ -744,6 +914,18 @@ function TcdmAdminConsole({
         ))}
       </nav>
 
+      <div className="adminx-command-search">
+        <input
+          value={commandInput}
+          onChange={(e) => setCommandInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") runCommandSearch();
+          }}
+          placeholder="Tìm nhanh: NV12345, PMH, backup, khóa trang, log lỗi..."
+        />
+        <button type="button" onClick={runCommandSearch}>Tìm chức năng</button>
+      </div>
+
       {tab === "overview" && (
         <section className="adminx-panel">
           <div className="adminx-panel-head">
@@ -804,6 +986,103 @@ function TcdmAdminConsole({
               </div>
             </div>
           </div>
+
+          {canUseAction("dashboard-view") && (
+            <div className="adminx-ops-panel">
+              <div className="adminx-ops-head">
+                <div>
+                  <span>System Health</span>
+                  <h3>Trạng thái vận hành</h3>
+                  <p>Supabase, mail, Telegram, backup, log lỗi và phiên đang hoạt động.</p>
+                </div>
+                <button type="button" onClick={() => loadOpsHealth()} disabled={opsLoading}>
+                  {opsLoading ? "Đang kiểm tra..." : "Kiểm tra hệ thống"}
+                </button>
+              </div>
+
+              <div className="adminx-health-grid">
+                {[
+                  { label: "Supabase", item: opsHealth?.supabase },
+                  { label: "Mail", item: opsHealth?.mail },
+                  { label: "Telegram", item: opsHealth?.telegram },
+                ].map((entry) => (
+                  <div key={entry.label} className={entry.item?.ok ? "ok" : "warn"}>
+                    <span>{entry.label}</span>
+                    <b>{entry.item?.ok ? "OK" : "Cần kiểm tra"}</b>
+                    <p>{entry.item?.message || "Chưa tải trạng thái."}</p>
+                  </div>
+                ))}
+                <div className={opsHealth?.backup?.lastError ? "warn" : opsHealth?.backup?.exists ? "ok" : "warn"}>
+                  <span>Backup</span>
+                  <b>{opsHealth?.backup?.exists ? "Đã có file" : "Chưa có file"}</b>
+                  <p>{opsHealth?.backup?.updatedAtVN || opsHealth?.backup?.nextRunAtVN || "Tự chạy lúc 23:00 mỗi ngày."}</p>
+                </div>
+              </div>
+
+              <div className="adminx-ops-grid">
+                <article>
+                  <h4>Log lỗi gần nhất</h4>
+                  <div className="adminx-error-filter">
+                    <input
+                      value={opsErrorModule}
+                      onChange={(e) => setOpsErrorModule(e.target.value)}
+                      placeholder="Module: admin-pincode, frontend..."
+                    />
+                    <input type="date" value={opsErrorFrom} onChange={(e) => setOpsErrorFrom(e.target.value)} />
+                    <input type="date" value={opsErrorTo} onChange={(e) => setOpsErrorTo(e.target.value)} />
+                    <button type="button" onClick={loadOpsErrors} disabled={opsLoading}>Lọc</button>
+                  </div>
+                  <div className="adminx-ops-list">
+                    {opsErrors.length ? (
+                      opsErrors.slice(0, 8).map((item) => (
+                        <div key={item.id || `${item.time}-${item.message}`}>
+                          <b>{item.module || "system"}</b>
+                          <span>{item.time || "—"} • {item.actor || "system"} • {maskIpAddress(item.ip, isFullAdmin)}</span>
+                          <p>{item.message || "Không rõ lỗi"}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p>Chưa có lỗi mới.</p>
+                    )}
+                  </div>
+                </article>
+
+                <article>
+                  <h4>Lịch sử backup</h4>
+                  <div className="adminx-ops-list">
+                    {opsHealth?.backup?.history?.length ? (
+                      opsHealth.backup.history.slice(0, 7).map((item: any) => (
+                        <div key={item.dailyFileName || item.createdAt}>
+                          <b>{item.dailyFileName || item.fileName}</b>
+                          <span>{item.createdAtVN || item.createdAt || "—"} • {formatNumber(Number(item.bytes || 0))} bytes</span>
+                          <p>{item.trigger === "schedule" ? "Backup tự động" : "Backup thủ công"}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p>Chưa có lịch sử backup. Hệ thống sẽ giữ 7 bản gần nhất.</p>
+                    )}
+                  </div>
+                </article>
+
+                <article>
+                  <h4>Phiên đang online</h4>
+                  <div className="adminx-ops-list">
+                    {onlineSessions.length ? (
+                      onlineSessions.slice(0, 8).map((item) => (
+                        <div key={item.visitorId}>
+                          <b>{item.page || "unknown"} • {item.device || "Thiết bị"}</b>
+                          <span>{maskIpAddress(item.ip, isFullAdmin)} • {item.lastSeenAt || "—"}</span>
+                          <p>{item.path || "/"}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p>Chưa có phiên online chi tiết.</p>
+                    )}
+                  </div>
+                </article>
+              </div>
+            </div>
+          )}
 
           <div className="adminx-overview-grid">
             <div className="adminx-soft-card">
@@ -934,15 +1213,26 @@ function TcdmAdminConsole({
 
                     </div>
 
+                    {isStaffAdminLocked(item) ? (
+                      <div className="adminx-staff-viewonly">
+                        <b>Chỉ xem</b>
+                        <span>Tài khoản Admin chỉ cho phép quyền Admin thao tác.</span>
+                      </div>
+                    ) : (
                     <div className="adminx-staff-actions">
                       <button
                         type="button"
                         className="primary"
-                        disabled={!canManageStaff || isStaffAdminLocked(item) || busy === `ACTIVE-${item.maNV}`}
+                        disabled={!canManageStaff || busy === `ACTIVE-${item.maNV}`}
                         onClick={() => {
                           if (item.status === "Active") {
-                            const ok = window.confirm(`Gửi lại Gmail thông báo tài khoản đã Active cho NV ${item.maNV}?`);
-                            if (!ok) return;
+                            openConfirmDialog({
+                              title: "Gửi lại Gmail Active",
+                              message: `Gửi lại Gmail thông báo tài khoản đã Active cho NV ${item.maNV}?`,
+                              confirmText: "Gửi mail",
+                              onConfirm: () => runStaffAction("ACTIVE", item.maNV),
+                            });
+                            return;
                           }
 
                           runStaffAction("ACTIVE", item.maNV);
@@ -952,19 +1242,22 @@ function TcdmAdminConsole({
                       </button>
                       <button
                         type="button"
-                        disabled={!canManageStaff || isStaffAdminLocked(item) || busy === `STANDBY-${item.maNV}` || item.status === "Standby"}
+                        disabled={!canManageStaff || busy === `STANDBY-${item.maNV}` || item.status === "Standby"}
                         onClick={() => runStaffAction("STANDBY", item.maNV)}
                       >
                         Standby
                       </button>
                       <button
                         type="button"
-                        disabled={!canResetStaffSecurity || isStaffAdminLocked(item) || busy === `RESET_SECURITY-${item.maNV}`}
+                        disabled={!canResetStaffSecurity || busy === `RESET_SECURITY-${item.maNV}`}
                         onClick={() => {
-                          const ok = window.confirm(
-                            `Reset tài khoản ${item.maNV}: mật khẩu về 123123, xóa bảo mật/Gmail, NEED_SETUP=1 và OTP count=0?`
-                          );
-                          if (ok) runStaffAction("RESET_SECURITY", item.maNV);
+                          openConfirmDialog({
+                            title: "Reset bảo mật",
+                            message: `Reset tài khoản ${item.maNV}: mật khẩu về 123123, xóa bảo mật/Gmail, NEED_SETUP=1 và OTP count=0?`,
+                            confirmText: "Reset",
+                            danger: true,
+                            onConfirm: () => runStaffAction("RESET_SECURITY", item.maNV),
+                          });
                         }}
                       >
                         Reset bảo mật
@@ -979,17 +1272,21 @@ function TcdmAdminConsole({
                       <button
                         type="button"
                         className="danger"
-                        disabled={!canManageStaff || isStaffAdminLocked(item) || busy === `DELETE-${item.maNV}`}
+                        disabled={!canDeleteStaff || busy === `DELETE-${item.maNV}`}
                         onClick={() => {
-                          const ok = window.confirm(
-                            `Xóa tài khoản ${item.maNV} - ${item.staffName || "nhân viên này"}? Thao tác này không thể hoàn tác.`
-                          );
-                          if (ok) runStaffAction("DELETE", item.maNV);
+                          openConfirmDialog({
+                            title: "Xóa nhân viên",
+                            message: `Xóa tài khoản ${item.maNV} - ${item.staffName || "nhân viên này"}? Thao tác này không thể hoàn tác.`,
+                            confirmText: "Xóa",
+                            danger: true,
+                            onConfirm: () => runStaffAction("DELETE", item.maNV),
+                          });
                         }}
                       >
                         Xóa nhân viên
                       </button>
                     </div>
+                    )}
                   </article>
                 ))
               )}
@@ -1747,7 +2044,7 @@ function TcdmAdminConsole({
                       </span>
                       <small className="adminx-log-meta">
                         <em>{item.deviceLabel || "Không rõ"}</em>
-                        <em>{item.ip || "Không rõ IP"}</em>
+                        <em>{maskIpAddress(item.ip, isFullAdmin)}</em>
                         <em>{item.networkType || "Không rõ mạng"}</em>
                       </small>
                     </div>
@@ -1757,6 +2054,28 @@ function TcdmAdminConsole({
             </div>
           </div>
         </section>
+      )}
+
+      {confirmDialog && (
+        <div className="adminx-confirm-layer" role="alertdialog" aria-modal="true" aria-labelledby="adminConfirmTitle">
+          <div className="adminx-confirm-card">
+            <span>{confirmDialog.danger ? "Cần xác nhận" : "Xác nhận thao tác"}</span>
+            <h3 id="adminConfirmTitle">{confirmDialog.title}</h3>
+            <p>{confirmDialog.message}</p>
+            <div>
+              <button type="button" className="ghost" onClick={() => setConfirmDialog(null)}>
+                Hủy
+              </button>
+              <button
+                type="button"
+                className={confirmDialog.danger ? "danger" : "primary"}
+                onClick={runConfirmDialogAction}
+              >
+                {confirmDialog.confirmText || "Xác nhận"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {toast && <div className={toast.type === "success" ? "adminx-toast success" : "adminx-toast error"}>{toast.text}</div>}
@@ -2318,6 +2637,30 @@ const ADMINX_STYLE = `
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   align-content: center;
+}
+
+.adminx-staff-viewonly {
+  min-height: 86px;
+  padding: 13px;
+  border-radius: 18px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+}
+
+.adminx-staff-viewonly b {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.adminx-staff-viewonly span {
+  color: #64748b;
+  font-size: 11.5px;
+  line-height: 1.35;
+  font-weight: 850;
 }
 
 .adminx-empty-state {
@@ -2895,6 +3238,92 @@ const ADMINX_STYLE = `
   background: #dc2626;
 }
 
+.adminx-confirm-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, .56);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.adminx-confirm-card {
+  width: min(100%, 440px);
+  padding: 22px;
+  border-radius: 26px;
+  border: 1px solid rgba(226, 232, 240, .95);
+  background: #ffffff;
+  box-shadow: 0 28px 90px rgba(15, 23, 42, .32);
+}
+
+.adminx-confirm-card > span {
+  display: inline-flex;
+  width: fit-content;
+  padding: 8px 11px;
+  border-radius: 999px;
+  background: #020617;
+  color: #ffd400;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-confirm-card h3 {
+  margin: 16px 0 0;
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1.08;
+  font-weight: 1000;
+  letter-spacing: -.04em;
+}
+
+.adminx-confirm-card p {
+  margin: 10px 0 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 850;
+}
+
+.adminx-confirm-card div {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: .8fr 1fr;
+  gap: 10px;
+}
+
+.adminx-confirm-card button {
+  min-height: 48px;
+  border-radius: 16px;
+  border: 0;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.adminx-confirm-card button.ghost {
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.adminx-confirm-card button.primary {
+  background: #ffd400;
+  color: #020617;
+}
+
+.adminx-confirm-card button.danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
 @media screen and (max-width: 920px) {
   .adminx-tabs {
     display: flex;
@@ -3223,13 +3652,252 @@ const ADMINX_ONLINE_STYLE = `
   letter-spacing: -.06em;
 }
 
+.adminx-command-search {
+  margin: 12px 0 0;
+  padding: 8px;
+  border-radius: 22px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  gap: 8px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .05);
+}
+
+.adminx-command-search input {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: 16px;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 0 13px;
+  font-size: 13px;
+  font-weight: 850;
+  outline: none;
+}
+
+.adminx-command-search button,
+.adminx-ops-head button {
+  border: 0;
+  border-radius: 16px;
+  background: #ffd400;
+  color: #07111f;
+  font-size: 11px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.adminx-command-search button:disabled,
+.adminx-ops-head button:disabled {
+  opacity: .62;
+  cursor: wait;
+}
+
+.adminx-ops-panel {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 26px;
+  background: #07111f;
+  border: 1px solid rgba(255, 212, 0, .28);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, .14);
+}
+
+.adminx-ops-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.adminx-ops-head span {
+  display: inline-flex;
+  width: fit-content;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #ffd400;
+  color: #07111f;
+  font-size: 9.5px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-ops-head h3 {
+  margin-top: 10px;
+  color: #ffffff;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: -.04em;
+}
+
+.adminx-ops-head p {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, .68);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.adminx-ops-head button {
+  min-height: 40px;
+  padding: 0 13px;
+}
+
+.adminx-health-grid,
+.adminx-ops-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.adminx-health-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.adminx-health-grid div,
+.adminx-ops-grid article {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .12);
+  padding: 12px;
+}
+
+.adminx-health-grid div.ok {
+  border-color: rgba(34, 197, 94, .42);
+}
+
+.adminx-health-grid div.warn {
+  border-color: rgba(248, 113, 113, .48);
+}
+
+.adminx-health-grid span,
+.adminx-ops-grid h4 {
+  display: block;
+  color: #ffd400;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-health-grid b {
+  display: block;
+  margin-top: 10px;
+  color: #ffffff;
+  font-size: 19px;
+  line-height: 1;
+  font-weight: 1000;
+}
+
+.adminx-health-grid p,
+.adminx-ops-list p {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, .68);
+  font-size: 11.5px;
+  line-height: 1.35;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.adminx-ops-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.adminx-ops-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.adminx-error-filter {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 112px 112px 56px;
+  gap: 6px;
+}
+
+.adminx-error-filter input,
+.adminx-error-filter button {
+  min-height: 34px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .09);
+  color: #ffffff;
+  padding: 0 9px;
+  font-size: 10.5px;
+  font-weight: 850;
+  outline: none;
+}
+
+.adminx-error-filter input::placeholder {
+  color: rgba(255, 255, 255, .48);
+}
+
+.adminx-error-filter button {
+  background: #ffd400;
+  color: #07111f;
+  border-color: #ffd400;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.adminx-ops-list div {
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .1);
+}
+
+.adminx-ops-list b {
+  display: block;
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 1000;
+  overflow-wrap: anywhere;
+}
+
+.adminx-ops-list span {
+  display: block;
+  margin-top: 5px;
+  color: rgba(255, 255, 255, .58);
+  font-size: 10.5px;
+  line-height: 1.3;
+  font-weight: 850;
+}
+
 @media screen and (max-width: 560px) {
+  .adminx-command-search {
+    grid-template-columns: 1fr;
+  }
+
   .adminx-online-head {
     display: grid;
   }
 
   .adminx-online-grid {
     grid-template-columns: 1fr;
+  }
+
+  .adminx-ops-head,
+  .adminx-ops-grid {
+    display: grid;
+  }
+
+  .adminx-health-grid,
+  .adminx-ops-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .adminx-error-filter {
+    grid-template-columns: 1fr 1fr;
   }
 }
 /* ===== VTDD ADMIN V3 - Permission tab & TinyMCE ===== */

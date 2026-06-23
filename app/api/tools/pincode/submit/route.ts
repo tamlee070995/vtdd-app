@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { uploadDataUrlToCloudinary } from "@/lib/cloudinary-upload";
 import { createPincodeRequest, getPincodeRequestById, normalizePincodeFlow, updatePincodeRequestImages } from "@/lib/pincode-store";
 import { getCurrentPmhToolAvailability, pmhToolClosedJson } from "@/lib/pmh-tool-guard";
+import { appendErrorLog, consumeBehaviorRateLimit, getClientIpFromRequest } from "@/lib/ops-store";
 import { getSystemSettings } from "@/lib/system-store";
 import { notifyPincodeRequestTelegram } from "@/lib/telegram";
 
@@ -34,6 +35,30 @@ function cleanCode(value: unknown) {
   return String(value ?? "").trim().replace(/\.0$/, "");
 }
 
+function getDataUrlPayloadBytes(value: unknown) {
+  const dataUrl = String(value || "");
+  const comma = dataUrl.indexOf(",");
+  if (!dataUrl.startsWith("data:") || comma < 0) return 0;
+  const payload = dataUrl.slice(comma + 1);
+  return Math.floor((payload.length * 3) / 4);
+}
+
+function validateUploadQuality(images: any[], requiredFileCount: number) {
+  const invalidSlots: number[] = [];
+
+  images.slice(0, requiredFileCount).forEach((item, index) => {
+    const dataUrl = String(item?.dataUrl || "");
+    const url = String(item?.url || "");
+    if (url && !dataUrl) return;
+    if (dataUrl.startsWith("data:audio/")) return;
+    if (getDataUrlPayloadBytes(dataUrl) < 25 * 1024) invalidSlots.push(index + 1);
+  });
+
+  if (invalidSlots.length) {
+    throw new Error(`Ảnh ${invalidSlots.join(", ")} quá nhỏ hoặc không rõ. Vui lòng chụp/chọn lại ảnh rõ hơn.`);
+  }
+}
+
 function requestBelongsToOwner(request: { maST?: string; maNV?: string } | null, maST: unknown, maNV: unknown) {
   if (!request) return false;
   return cleanCode(request.maST) === cleanCode(maST) && cleanCode(request.maNV) === cleanCode(maNV);
@@ -63,6 +88,7 @@ export async function POST(req: NextRequest) {
     const requiredFileCount = flow === "ChienGia" ? 5 : 6;
     const images = Array.isArray(body?.images) ? body.images.slice(0, 6) : [];
     const requestId = String(body?.requestId || "").trim();
+    const clientIp = getClientIpFromRequest(req);
 
     if (
       images.length !== requiredFileCount ||
@@ -90,6 +116,22 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+
+    const rate = consumeBehaviorRateLimit({
+      scope: requestId ? "pmh-update" : "pmh-submit",
+      limit: requestId ? 8 : 5,
+      lockMs: 10 * 60 * 1000,
+      keys: [clientIp, body?.maNV, body?.maST, body?.imei],
+    });
+
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { success: false, code: "SOFT_LOCKED", message: rate.message },
+        { status: 429 }
+      );
+    }
+
+    validateUploadQuality(images, requiredFileCount);
 
     const imageUrls = await Promise.all(
       images.map((item: any, index: number) => {
@@ -138,6 +180,14 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err: any) {
+    await appendErrorLog({
+      actor: "staff",
+      module: "pmh-submit",
+      page: "/api/tools/pincode/submit",
+      message: err?.message || "PMH submit error",
+      ip: getClientIpFromRequest(req),
+      userAgent: req.headers.get("user-agent") || "",
+    });
     const error = formatSubmitError(err);
     return NextResponse.json(
       { success: false, message: error.message },

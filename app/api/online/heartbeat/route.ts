@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { removeOnlineSession, touchOnlineSession } from "@/lib/online-store";
+import { getClientIpFromRequest } from "@/lib/ops-store";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,9 @@ export async function POST(req: NextRequest) {
             page,
             visitorId,
             userAgent: req.headers.get("user-agent") || "",
+            ip: getClientIpFromRequest(req),
+            path: clean(body.path),
+            device: clean(body.device),
           });
 
     return NextResponse.json({

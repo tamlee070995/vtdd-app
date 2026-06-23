@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminCanUsePmhTool, requireAdminApi } from "@/lib/admin-auth";
 import {
   approvePincodeRequest,
+  claimPincodeRequest,
   getPincodeRequestById,
   getPincodeAdminDashboard,
   importPincodes,
   rejectPincodeRequest,
+  reopenRejectedPincodeRequest,
 } from "@/lib/pincode-store";
 import { getSystemSettings } from "@/lib/system-store";
-import { notifyPincodeReviewTelegram, type TelegramReviewAction } from "@/lib/telegram";
+import { shouldSendSlaNotice } from "@/lib/ops-store";
+import { notifyPincodeReviewTelegram, notifyPincodeSlaTelegram, type TelegramReviewAction } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +55,33 @@ async function notifyPincodeReviewIfNeeded(data: {
   }
 }
 
+async function notifyPincodeSlaIfNeeded(requests: any[]) {
+  try {
+    const pending = Array.isArray(requests)
+      ? requests.filter((item) => item?.status === "Pending" && Number(item?.ageMinutes || 0) >= 5)
+      : [];
+    if (!pending.length) return;
+
+    const settings = await getSystemSettings();
+
+    await Promise.allSettled(
+      pending.slice(0, 20).map((request) => {
+        const ageMinutes = Number(request.ageMinutes || 0);
+        const level = ageMinutes >= 10 ? "danger" : "warn";
+        const marker = `${request.requestId}:${level}`;
+        if (!shouldSendSlaNotice(marker, 5 * 60 * 1000)) return Promise.resolve(null);
+
+        return notifyPincodeSlaTelegram(settings, request, {
+          level,
+          ageMinutes,
+        });
+      })
+    );
+  } catch (err: any) {
+    console.warn("PINCODE_SLA_TELEGRAM_NOTIFY_ERROR:", err?.message || err);
+  }
+}
+
 export async function GET(req: NextRequest) {
   const { admin, response } = await requireAdminApi(req);
   if (response) return response;
@@ -61,6 +91,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const dashboard = await getPincodeAdminDashboard();
+    void notifyPincodeSlaIfNeeded(dashboard?.requests || []);
 
     return NextResponse.json({
       success: true,
@@ -89,6 +120,24 @@ export async function POST(req: NextRequest) {
 
     if (action === "IMPORT_PINCODES") {
       const result = await importPincodes(Array.isArray(body?.items) ? body.items : []);
+
+      return NextResponse.json(result);
+    }
+
+    if (action === "CLAIM") {
+      const result = await claimPincodeRequest({
+        requestId: body?.requestId || "",
+        admin: adminName,
+      });
+
+      return NextResponse.json(result);
+    }
+
+    if (action === "REOPEN") {
+      const result = await reopenRejectedPincodeRequest({
+        requestId: body?.requestId || "",
+        admin: adminName,
+      });
 
       return NextResponse.json(result);
     }

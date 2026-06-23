@@ -63,9 +63,11 @@ function safeDecrypt(value: any) {
   if (!raw) return "";
 
   try {
-    return decryptText(raw) || raw;
+    const decrypted = decryptText(raw);
+    if (decrypted) return decrypted;
+    return raw.startsWith("enc:v1:") ? "" : raw;
   } catch {
-    return raw;
+    return raw.startsWith("enc:v1:") ? "" : raw;
   }
 }
 
@@ -96,8 +98,16 @@ function getLoginUrl(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const { response } = await requireAdminApi(req, { module: "tcdm", action: "staff-manage" });
+  const { admin, response } = await requireAdminApi(req, { module: "tcdm" });
   if (response) return response;
+
+  if (
+    !canRunAction(admin, "staff-manage") &&
+    !canRunAction(admin, "staff-security") &&
+    !canRunAction(admin, "staff-delete")
+  ) {
+    return NextResponse.json({ success: false, message: "Không có quyền xem danh sách nhân viên." }, { status: 403 });
+  }
 
   try {
     await ensureStaffAdminHeaders();
@@ -109,6 +119,42 @@ export async function GET(req: NextRequest) {
     const q = url.searchParams.get("q") || "";
 
     const data = await getAdminStaffPage({ page, pageSize, status, q });
+    const query = String(q || "").trim().toLowerCase();
+    const adminCode = normalizeCode(admin?.maNV || "");
+    const statusAllowsCurrentAdmin = status === "ALL" || status === "Active";
+    const currentAdminMatchesQuery =
+      Boolean(adminCode) &&
+      statusAllowsCurrentAdmin &&
+      Boolean(query) &&
+      [adminCode, admin?.name, admin?.permission]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+
+    if (
+      currentAdminMatchesQuery &&
+      !data.staff.some((item: any) => normalizeCode(item.maNV) === adminCode)
+    ) {
+      data.staff.push({
+        rowNumber: 0,
+        maNV: adminCode,
+        staffName: String(admin?.name || adminCode),
+        maST: "",
+        storeName: "",
+        department: "",
+        status: "Active",
+        resetOtpCount: "0",
+        needSetup: "0",
+        gmail: "",
+        permission: normalizePermission(admin?.permission),
+        modulePermissions: normalizePermission(admin?.permission) === "admin" ? "ALL" : (admin?.modules || []).join(","),
+      });
+
+      data.staff.sort((a: any, b: any) => normalizeCode(a.maNV).localeCompare(normalizeCode(b.maNV), "vi"));
+      data.meta.total = Number(data.meta.total || 0) + 1;
+      data.meta.pages = Math.max(1, Math.ceil(Number(data.meta.total || 0) / Number(data.meta.pageSize || pageSize)));
+    }
 
     return NextResponse.json({
       success: true,
@@ -265,7 +311,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "DELETE") {
-      if (!canRunAction(admin, "staff-manage")) {
+      if (!canRunAction(admin, "staff-delete")) {
         return NextResponse.json({ success: false, message: "Không có quyền xóa nhân viên." }, { status: 403 });
       }
 

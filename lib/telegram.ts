@@ -184,3 +184,29 @@ export async function notifyPincodeReviewTelegram(
 
   return sendTelegramMessage(config, message);
 }
+
+export async function notifyPincodeSlaTelegram(
+  settings: SystemSettingsRecord,
+  request: PincodeRequest,
+  data: {
+    level: "warn" | "danger";
+    ageMinutes: number;
+  }
+) {
+  const config = getTelegramConfig(settings, request.flow);
+
+  if (!config.enabled) {
+    return { skipped: true, message: "Telegram chÆ°a báº­t cho tool nÃ y." };
+  }
+
+  const reviewUrl = getReviewUrl(request);
+  const title = data.level === "danger" ? "Há»“ sÆ¡ PMH chá» quÃ¡ 10 phÃºt" : "Há»“ sÆ¡ PMH chá» quÃ¡ 5 phÃºt";
+  const message = [
+    `${TELEGRAM_GROUP_TAG_ALL} â± <b>${escapeHtml(title)}</b>`,
+    `Thá»i gian chá»: <b>${escapeHtml(data.ageMinutes)} phÃºt</b>`,
+    ...requestSummaryLines(request),
+    reviewUrl ? `Kiá»ƒm duyá»‡t: ${escapeHtml(reviewUrl)}` : "",
+  ].filter(Boolean).join("\n");
+
+  return sendTelegramMessage(config, message);
+}

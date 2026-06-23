@@ -30,10 +30,19 @@ function safeDecrypt(value: string) {
   if (!raw) return "";
 
   try {
-    return decryptText(raw) || raw;
+    const decrypted = decryptText(raw);
+    if (decrypted) return decrypted;
+    return raw.startsWith("enc:v1:") ? "" : raw;
   } catch {
-    return raw;
+    return raw.startsWith("enc:v1:") ? "" : raw;
   }
+}
+
+function hasConfiguredSecureValue(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  if (raw.startsWith("enc:v1:")) return raw.split(":").length >= 5;
+  return true;
 }
 
 export async function POST(req: NextRequest) {
@@ -104,8 +113,8 @@ export async function POST(req: NextRequest) {
       currentStaff.mustChangePassword ||
       isDefaultPasswordStored(staff.password) ||
       hasOldPlainPassword;
-    const hasSecurityQuestion = Boolean(safeDecrypt(staff.securityQuestion));
-    const hasGmail = Boolean(safeDecrypt(staff.gmail));
+    const hasSecurityQuestion = Boolean(safeDecrypt(staff.securityQuestion)) || hasConfiguredSecureValue(staff.securityQuestion);
+    const hasGmail = Boolean(safeDecrypt(staff.gmail)) || hasConfiguredSecureValue(staff.gmail);
     const changePassword = requestedChangePassword || mustChangePassword;
 
     const forceSetup =

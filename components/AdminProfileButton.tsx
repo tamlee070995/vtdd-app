@@ -10,6 +10,11 @@ const QUESTIONS = [
   "Tên người bạn thân nhất thời đi học là gì?",
 ];
 
+function safeProfileDisplayText(value: unknown) {
+  const text = String(value || "").trim();
+  return text.startsWith("enc:v1:") ? "" : text;
+}
+
 export default function AdminProfileButton() {
   const [open, setOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -29,8 +34,8 @@ export default function AdminProfileButton() {
         const res = await fetch("/api/staff/profile", { cache: "no-store" });
         const data = await res.json();
         if (data?.success) {
-          setGmail(data.profile?.gmail || "");
-          setQuestion(data.profile?.securityQuestion || "");
+          setGmail(safeProfileDisplayText(data.profile?.gmail));
+          setQuestion(safeProfileDisplayText(data.profile?.securityQuestion));
         }
       } catch {}
     }

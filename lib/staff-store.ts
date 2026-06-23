@@ -45,6 +45,24 @@ function cleanCode(value: any) {
   return clean(value).replace(/\.0$/, "");
 }
 
+function normalizeSearchValue(value: any) {
+  return clean(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeStaffCodeSearch(value: any) {
+  return clean(value)
+    .replace(/\.0$/, "")
+    .replace(/^(nv|ma nv|mã nv|ma nhan vien|mã nhân viên)\s*/i, "")
+    .replace(/\D/g, "");
+}
+
 export type StaffPermission = "admin" | "mod" | "";
 export type StaffAdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools";
 
@@ -200,7 +218,15 @@ export async function ensureStaffPermissionHeader() {
 export async function getStaffRows(): Promise<StaffRow[]> {
   if (isSupabaseConfigured()) {
     try {
-      const rows = await selectAllRows<any>("staff", { order: "source_row.asc" });
+      let rows: any[] = [];
+
+      try {
+        rows = await selectAllRows<any>("staff", { order: "ma_nv.asc" });
+      } catch (orderErr: any) {
+        console.warn("SUPABASE_STAFF_ORDER_FALLBACK:", orderErr?.message || orderErr);
+        rows = await selectAllRows<any>("staff");
+      }
+
       return rows
         .map(mapDbStaffRow)
         .filter((row) => row.maNV || row.staffName);
@@ -243,7 +269,8 @@ export async function getAdminStaffPage(params: {
 }) {
   const page = Math.max(1, Number(params.page || 1));
   const pageSize = Math.min(100, Math.max(10, Number(params.pageSize || 50)));
-  const q = clean(params.q).toLowerCase();
+  const q = normalizeSearchValue(params.q);
+  const qCode = normalizeStaffCodeSearch(params.q);
   const status = clean(params.status || "ALL");
 
   const rows = await getStaffRows();
@@ -268,20 +295,39 @@ export async function getAdminStaffPage(params: {
     if (status !== "ALL" && normalizedStatus !== status) return;
 
     if (q) {
-      const haystack = [
-        item.maNV,
-        item.staffName,
-        item.maST,
-        item.storeName,
-        item.department,
-        normalizedStatus,
-        item.permission,
-        item.modulePermissions,
-      ]
-        .join(" ")
-        .toLowerCase();
+      if (qCode && normalizeStaffCodeSearch(item.maNV).includes(qCode)) {
+        // Mã nhân viên khớp, bỏ qua kiểm tra text bên dưới.
+      } else {
+        const permissionLabel =
+          item.permission === "admin"
+            ? "admin quyen admin user admin quan tri quan tri vien full quyen"
+            : item.permission === "mod"
+              ? "mod quyen mod user mod moderator quan tri vien phan quyen"
+              : "user quyen user user thuong nguoi dung nhan vien";
 
-      if (!haystack.includes(q)) return;
+        const haystack = [
+          item.maNV,
+          `NV ${item.maNV}`,
+          item.staffName,
+          item.maST,
+          `ST ${item.maST}`,
+          item.storeName,
+          item.department,
+          normalizedStatus,
+          item.permission,
+          item.modulePermissions,
+          permissionLabel,
+        ]
+          .join(" ")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/đ/g, "d")
+          .replace(/Đ/g, "d")
+          .toLowerCase();
+
+        const tokens = q.split(/\s+/).filter(Boolean);
+        if (tokens.length > 0 && !tokens.every((token) => haystack.includes(token))) return;
+      }
     }
 
     filtered.push({
@@ -407,7 +453,7 @@ export async function createStandbyAccount(data: {
             reset_otp_expires: "",
             reset_otp_day: "",
             reset_otp_count: "0",
-            need_setup: "1",
+            need_setup: "0",
             permission: "",
             module_permissions: "",
             source_row: String(Date.now()),
@@ -447,7 +493,7 @@ export async function createStandbyAccount(data: {
           "",
           "",
           "",
-          "1",
+          "0",
           "",
           "",
         ]],
@@ -630,6 +676,7 @@ function normalizeModulePermissions(value: any) {
     "demo",
     "tools",
     "action:staff-manage",
+    "action:staff-delete",
     "action:staff-security",
     "action:settings-write",
     "action:reload-data",

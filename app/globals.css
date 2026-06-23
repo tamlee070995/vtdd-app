@@ -9181,6 +9181,7 @@ a {
 
 .profile-v5-shell {
   width: min(1080px, 100%);
+  height: min(760px, calc(100vh - 56px));
   max-height: min(760px, calc(100vh - 56px));
   display: grid;
   grid-template-columns: minmax(310px, .82fr) minmax(520px, 1.18fr);
@@ -9388,14 +9389,17 @@ a {
 
 .profile-v5-form {
   min-height: 0;
-  overflow: auto;
-  padding: 26px;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 26px 26px 22px;
   display: grid;
   align-content: start;
   gap: 16px;
   background:
     radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .12), transparent 28%),
     #f8fafc;
+  scrollbar-gutter: stable;
 }
 
 .profile-v5-mobile-head {
@@ -9403,6 +9407,7 @@ a {
 }
 
 .profile-v5-block {
+  min-width: 0;
   padding: 18px;
   border-radius: 26px;
   border: 1px solid #e2e8f0;
@@ -9642,14 +9647,34 @@ a {
   margin-top: 15px;
 }
 
+.profile-v5-recovery-block {
+  display: grid;
+  gap: 14px;
+}
+
+.profile-v5-recovery-block .profile-v5-block-head {
+  margin-bottom: 2px;
+}
+
+.profile-v5-recovery-grid {
+  gap: 16px;
+  align-items: start;
+}
+
+.profile-v5-recovery-grid .profile-v5-field {
+  align-content: start;
+}
+
 .profile-v5-actions {
   position: sticky;
-  bottom: -26px;
+  bottom: 0;
+  z-index: 5;
   display: grid;
   grid-template-columns: .42fr 1fr;
   gap: 12px;
-  padding: 16px 0 0;
-  background: linear-gradient(to top, #f8fafc 72%, rgba(248,250,252,0));
+  margin: 2px -26px -22px;
+  padding: 16px 26px 22px;
+  background: linear-gradient(to top, #f8fafc 82%, rgba(248,250,252,0));
 }
 
 .profile-v5-btn {
@@ -9693,6 +9718,7 @@ a {
 
   .profile-v5-shell {
     width: 100%;
+    height: auto;
     max-height: 92vh;
     display: block;
     border-radius: 28px 28px 0 0;
@@ -9706,7 +9732,9 @@ a {
   .profile-v5-form {
     padding: 16px;
     gap: 13px;
+    max-height: none;
     overflow: visible;
+    scrollbar-gutter: auto;
   }
 
   .profile-v5-mobile-head {
@@ -9756,9 +9784,10 @@ a {
   }
 
   .profile-v5-actions {
-    bottom: -16px;
+    bottom: 0;
     grid-template-columns: 1fr;
-    padding-bottom: 10px;
+    margin: 0 -16px -16px;
+    padding: 12px 16px 18px;
   }
 
   .profile-v5-btn.ghost {

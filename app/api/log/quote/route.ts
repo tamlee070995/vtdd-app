@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { detectDeviceLabel, normalizeNetworkTypeForDevice, packQuoteClientMeta } from "@/lib/quote-client-meta";
 import { appendQuoteLog } from "@/lib/quote-log-store";
+import { appendErrorLog, consumeBehaviorRateLimit, getClientIpFromRequest } from "@/lib/ops-store";
 import { insertSheetRowAt2Queued } from "@/lib/sheets-write";
 import { getCurrentStaffFromRequest } from "@/lib/staff-auth";
 
@@ -90,6 +91,23 @@ export async function POST(req: NextRequest) {
     const userAgent = req.headers.get("user-agent") || "";
     const deviceLabel = clean(body.clientDevice) || detectDeviceLabel(userAgent);
     const networkType = normalizeNetworkTypeForDevice(deviceLabel, body.networkType);
+    const clientIp = getClientIp(req, body);
+    const rate = consumeBehaviorRateLimit({
+      scope: "quote-log",
+      limit: 60,
+      lockMs: 10 * 60 * 1000,
+      keys: [clientIp, currentStaff.maNV, currentStaff.maST],
+    });
+
+    if (!rate.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: rate.message,
+        },
+        { status: 429 }
+      );
+    }
 
     const logRow = {
       time: now,
@@ -107,7 +125,7 @@ export async function POST(req: NextRequest) {
       troGiaMWG: money(body.troGiaMWG),
       tongTien: money(body.tongTien),
       khachCanBu: money(body.khachCanBu),
-      ip: getClientIp(req, body),
+      ip: clientIp,
       userAgent,
       deviceLabel,
       networkType,
@@ -146,6 +164,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("LOG_QUOTE_ERROR:", err);
+    await appendErrorLog({
+      actor: "staff",
+      module: "quote-log",
+      page: "/api/log/quote",
+      message: err?.message || "Quote log error",
+      ip: getClientIpFromRequest(req),
+      userAgent: req.headers.get("user-agent") || "",
+    });
 
     return NextResponse.json(
       {

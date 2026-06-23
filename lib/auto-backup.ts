@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { exportSyncTarget } from "@/lib/data-sync-store";
 
@@ -6,9 +6,11 @@ const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BACKUP_HOUR_VN = 23;
 const BACKUP_MINUTE_VN = 0;
-const BACKUP_DIR = process.env.VTDD_BACKUP_DIR || path.join(process.cwd(), "storage", "backups");
+const BACKUP_DIR = process.env.VTDD_BACKUP_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), "storage", "backups");
 const BACKUP_FILE_NAME = "vtdd-backup.json";
 const BACKUP_META_FILE_NAME = "vtdd-backup.meta.json";
+const BACKUP_HISTORY_FILE_NAME = "vtdd-backup.history.json";
+const BACKUP_HISTORY_DAYS = 7;
 
 type AutoBackupRuntime = {
   started: boolean;
@@ -22,6 +24,8 @@ type AutoBackupResult = {
   success: boolean;
   fileName: string;
   backupPath: string;
+  dailyFileName?: string;
+  dailyBackupPath?: string;
   createdAt: string;
   createdAtVN: string;
   bytes: number;
@@ -49,6 +53,23 @@ function backupPath() {
 
 function backupMetaPath() {
   return path.join(BACKUP_DIR, BACKUP_META_FILE_NAME);
+}
+
+function backupHistoryPath() {
+  return path.join(BACKUP_DIR, BACKUP_HISTORY_FILE_NAME);
+}
+
+function toVnDateKey(date: Date) {
+  const vn = new Date(date.getTime() + VN_OFFSET_MS);
+  return [
+    vn.getUTCFullYear(),
+    String(vn.getUTCMonth() + 1).padStart(2, "0"),
+    String(vn.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function dailyBackupFileName(date: Date) {
+  return `vtdd-backup-${toVnDateKey(date)}.json`;
 }
 
 function formatVN(date: Date) {
@@ -97,6 +118,44 @@ async function replaceFileAtomic(targetPath: string, body: string) {
   }
 }
 
+async function updateBackupHistory(result: AutoBackupResult) {
+  await mkdir(BACKUP_DIR, { recursive: true });
+
+  let history: AutoBackupResult[] = [];
+  try {
+    const parsed = JSON.parse(await readFile(backupHistoryPath(), "utf8"));
+    history = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    history = [];
+  }
+
+  const merged = [
+    result,
+    ...history.filter((item) => item.dailyFileName !== result.dailyFileName && item.fileName !== result.dailyFileName),
+  ]
+    .filter((item) => item && item.createdAt)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .slice(0, BACKUP_HISTORY_DAYS);
+
+  await replaceFileAtomic(backupHistoryPath(), JSON.stringify(merged, null, 2));
+
+  const keepFiles = new Set([
+    BACKUP_FILE_NAME,
+    BACKUP_META_FILE_NAME,
+    BACKUP_HISTORY_FILE_NAME,
+    ...merged.map((item) => item.dailyFileName || item.fileName).filter(Boolean),
+  ]);
+
+  const files = await readdir(BACKUP_DIR).catch(() => []);
+  await Promise.all(
+    files
+      .filter((name) => /^vtdd-backup-\d{4}-\d{2}-\d{2}\.json$/i.test(name) && !keepFiles.has(name))
+      .map((name) => unlink(path.join(BACKUP_DIR, name)).catch(() => undefined))
+  );
+
+  return merged;
+}
+
 export async function createAutoBackup(trigger: "schedule" | "manual" = "manual") {
   const runtime = getRuntime();
   if (runtime.running) return runtime.running;
@@ -105,10 +164,14 @@ export async function createAutoBackup(trigger: "schedule" | "manual" = "manual"
     const exported = await exportSyncTarget("backup");
     const body = exported.body;
     const createdAt = new Date();
+    const dailyFileName = dailyBackupFileName(createdAt);
+    const dailyPath = path.join(BACKUP_DIR, dailyFileName);
     const result: AutoBackupResult = {
       success: true,
       fileName: BACKUP_FILE_NAME,
       backupPath: backupPath(),
+      dailyFileName,
+      dailyBackupPath: dailyPath,
       createdAt: createdAt.toISOString(),
       createdAtVN: formatVN(createdAt),
       bytes: Buffer.byteLength(body, "utf8"),
@@ -116,7 +179,9 @@ export async function createAutoBackup(trigger: "schedule" | "manual" = "manual"
     };
 
     await replaceFileAtomic(backupPath(), body);
+    await replaceFileAtomic(dailyPath, body);
     await replaceFileAtomic(backupMetaPath(), JSON.stringify(result, null, 2));
+    await updateBackupHistory(result);
 
     runtime.lastError = "";
     return result;
@@ -165,6 +230,7 @@ export async function getAutoBackupStatus() {
 
   let fileStat: Awaited<ReturnType<typeof stat>> | null = null;
   let meta: Partial<AutoBackupResult> = {};
+  let history: AutoBackupResult[] = [];
 
   try {
     fileStat = await stat(filePath);
@@ -178,11 +244,20 @@ export async function getAutoBackupStatus() {
     meta = {};
   }
 
+  try {
+    const parsed = JSON.parse(await readFile(backupHistoryPath(), "utf8"));
+    history = Array.isArray(parsed) ? parsed.slice(0, BACKUP_HISTORY_DAYS) : [];
+  } catch {
+    history = [];
+  }
+
   return {
     enabled: true,
     schedule: "23:00 mỗi ngày",
     fileName: BACKUP_FILE_NAME,
     backupPath: filePath,
+    dailyFileName: meta.dailyFileName || "",
+    dailyBackupPath: meta.dailyBackupPath || "",
     exists: Boolean(fileStat),
     bytes: fileStat?.size || Number(meta.bytes || 0),
     updatedAt: meta.createdAt || (fileStat ? fileStat.mtime.toISOString() : ""),
@@ -190,5 +265,6 @@ export async function getAutoBackupStatus() {
     nextRunAt: nextRunAt.toISOString(),
     nextRunAtVN: formatVN(nextRunAt),
     lastError: runtime.lastError || "",
+    history,
   };
 }

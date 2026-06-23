@@ -67,8 +67,8 @@ export default async function LoginPage({ searchParams }: PageProps) {
             id="maNV"
             name="maNV"
             type="text"
-            inputMode="numeric"
-            placeholder="VD: 36964"
+            inputMode="text"
+            placeholder="NV12345"
             autoComplete="username"
           />
 

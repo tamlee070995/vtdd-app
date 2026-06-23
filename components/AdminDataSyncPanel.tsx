@@ -54,11 +54,20 @@ type BackupStatus = {
   enabled: boolean;
   schedule: string;
   fileName: string;
+  dailyFileName?: string;
   exists: boolean;
   bytes: number;
   updatedAtVN: string;
   nextRunAtVN: string;
   lastError: string;
+  history?: Array<{
+    fileName?: string;
+    dailyFileName?: string;
+    createdAt?: string;
+    createdAtVN?: string;
+    bytes?: number;
+    trigger?: string;
+  }>;
 };
 
 const EMPTY_SUMMARY: Summary = {
@@ -445,7 +454,7 @@ export default function AdminDataSyncPanel() {
               <span>Auto backup</span>
               <b>23:00 mỗi ngày</b>
             </div>
-            <p>Hệ thống tự ghi đè 1 file duy nhất: <strong>{backupStatus?.fileName || "vtdd-backup.json"}</strong></p>
+            <p>Hệ thống giữ file mới nhất và 7 bản gần đây: <strong>{backupStatus?.dailyFileName || backupStatus?.fileName || "vtdd-backup.json"}</strong></p>
             <small>
               {backupStatus?.exists
                 ? `Lần gần nhất: ${backupStatus.updatedAtVN || "-"} • ${formatBytes(backupStatus.bytes)}`
@@ -453,6 +462,16 @@ export default function AdminDataSyncPanel() {
             </small>
             <small>Lần kế tiếp: {backupStatus?.nextRunAtVN || "23:00 hôm nay/ngày mai"}</small>
             {backupStatus?.lastError ? <em>{backupStatus.lastError}</em> : null}
+            {backupStatus?.history?.length ? (
+              <div className="sync-backup-history">
+                {backupStatus.history.slice(0, 7).map((item) => (
+                  <span key={item.dailyFileName || item.createdAt}>
+                    <b>{item.dailyFileName || item.fileName}</b>
+                    <small>{item.createdAtVN || item.createdAt || "-"} • {formatBytes(Number(item.bytes || 0))}</small>
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="sync-export-grid">
@@ -812,6 +831,31 @@ const STYLE = `
   background: #fee2e2;
   border: 1px solid #fecaca;
   color: #991b1b;
+}
+.sync-backup-history {
+  margin-top: 8px;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px !important;
+}
+.sync-backup-history span {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .76);
+  border: 1px solid #dbe4ef;
+}
+.sync-backup-history b {
+  color: #07111f;
+  font-size: 11px;
+  font-weight: 1000;
+  overflow-wrap: anywhere;
+}
+.sync-backup-history small {
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 850;
 }
 .sync-export-grid {
   display: grid;

@@ -34,6 +34,13 @@ function getVisitorId() {
   }
 }
 
+function detectDevice() {
+  const ua = navigator.userAgent || "";
+  if (/ipad|tablet/i.test(ua)) return "Tablet";
+  if (/mobile|iphone|android/i.test(ua)) return "Mobile";
+  return "May tinh";
+}
+
 export default function OnlineHeartbeat() {
   const pathname = usePathname();
   const activePageRef = useRef<OnlinePageKey | "">("");
@@ -64,6 +71,8 @@ export default function OnlineHeartbeat() {
                 page: activePageRef.current,
                 visitorId,
                 eventType,
+                path: window.location.pathname,
+                device: detectDevice(),
               }),
             ],
             { type: "application/json" }
@@ -84,6 +93,8 @@ export default function OnlineHeartbeat() {
             page: activePageRef.current,
             visitorId,
             eventType,
+            path: window.location.pathname,
+            device: detectDevice(),
           }),
           keepalive: eventType === "leave",
         });

@@ -1939,6 +1939,11 @@ const SECURITY_QUESTIONS = [
   "Tên người bạn thân nhất thời đi học là gì?",
 ];
 
+function safeProfileDisplayText(value: unknown) {
+  const text = String(value || "").trim();
+  return text.startsWith("enc:v1:") ? "" : text;
+}
+
 function parseMoney(value: any) {
   if (typeof value === "number") return value;
 
@@ -2616,8 +2621,8 @@ export default function StaffTradeInApp({
 
         if (!data.success) return;
 
-        const question = String(data.profile?.securityQuestion || "").trim();
-        const gmail = String(data.profile?.gmail || "").trim();
+        const question = safeProfileDisplayText(data.profile?.securityQuestion);
+        const gmail = safeProfileDisplayText(data.profile?.gmail);
         const profileMustChangePassword = Boolean(data.profile?.mustChangePassword);
 
         setMustChangePassword(profileMustChangePassword);
@@ -2893,6 +2898,7 @@ export default function StaffTradeInApp({
   }, [showSystemPush, notifySettings.pushMessage, notifySettings.pushVersion]);
 
   useEffect(() => {
+    if (mustSetup || showProfilePanel) return;
     if (staffAccessLocked || currentStaffTabLocked) return;
 
     const isTradein = mode === "tradein";
@@ -2956,6 +2962,8 @@ export default function StaffTradeInApp({
     notifySettings.staffPopupBuyonlyMessage,
     notifySettings.staffPopupBuyonlySeconds,
     notifySettings.staffPopupBuyonlyVersion,
+    mustSetup,
+    showProfilePanel,
   ]);
 
   useEffect(() => {

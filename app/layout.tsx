@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import OnlineHeartbeat from "@/components/OnlineHeartbeat";
 import "./globals.css";
 import CmsImageLightbox from "@/components/CmsImageLightbox";
+import FrontendErrorReporter from "@/components/FrontendErrorReporter";
 
 export const metadata: Metadata = {
   title: {
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="vi" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <OnlineHeartbeat />
+        <FrontendErrorReporter />
         {children}
         <CmsImageLightbox />
       </body>

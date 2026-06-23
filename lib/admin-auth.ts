@@ -7,6 +7,7 @@ export type AdminPermission = "admin" | "mod";
 export type AdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools";
 export type AdminActionKey =
   | "staff-manage"
+  | "staff-delete"
   | "staff-security"
   | "settings-write"
   | "reload-data"
@@ -25,6 +26,7 @@ export const ADMIN_MODULES_COOKIE = "vtdd_admin_modules";
 const MODULES: AdminModuleKey[] = ["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "tools"];
 const ACTIONS: AdminActionKey[] = [
   "staff-manage",
+  "staff-delete",
   "staff-security",
   "settings-write",
   "reload-data",

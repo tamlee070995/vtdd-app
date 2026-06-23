@@ -25,6 +25,12 @@ type PincodeRequest = {
   menhGia: string;
   reason: string;
   admin: string;
+  claimedBy: string;
+  claimedAt: string;
+  ageMinutes: number;
+  slaLevel: "ok" | "warn" | "danger";
+  canReopen: boolean;
+  reopenUntil: string;
   updatedAt: string;
   completedAt: string;
   imageUrls: string[];
@@ -52,6 +58,14 @@ const EMPTY_DASHBOARD: PincodeDashboard = {
   pmh: { all: [], chienGia: [], ngoaiDs: [] },
 };
 
+type ConfirmDialogState = {
+  title: string;
+  message: string;
+  confirmText?: string;
+  danger?: boolean;
+  onConfirm: () => void | Promise<void>;
+} | null;
+
 function number(value: number) {
   return Number(value || 0).toLocaleString("vi-VN");
 }
@@ -77,6 +91,13 @@ function statusText(status: string) {
   return "Chờ duyệt";
 }
 
+function slaText(item: PincodeRequest) {
+  if (item.status !== "Pending") return "";
+  if (item.ageMinutes >= 10) return `Qua SLA ${item.ageMinutes} phut`;
+  if (item.ageMinutes >= 5) return `Cho ${item.ageMinutes} phut`;
+  return `${item.ageMinutes || 0} phut`;
+}
+
 export default function PincodeAdminTool() {
   const [dashboard, setDashboard] = useState<PincodeDashboard>(EMPTY_DASHBOARD);
   const [loading, setLoading] = useState(false);
@@ -84,6 +105,7 @@ export default function PincodeAdminTool() {
   const [importText, setImportText] = useState("");
   const [filter, setFilter] = useState<"ALL" | "Pending" | "Approved" | "Rejected">("Pending");
   const [toast, setToast] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
 
   const visibleRequests = useMemo(() => {
     return dashboard.requests.filter((item) => {
@@ -97,6 +119,12 @@ export default function PincodeAdminTool() {
   function showToast(message: string) {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
+  }
+
+  async function runConfirmDialogAction() {
+    const action = confirmDialog?.onConfirm;
+    setConfirmDialog(null);
+    await action?.();
   }
 
   async function loadDashboard(options?: { silent?: boolean }) {
@@ -171,6 +199,32 @@ export default function PincodeAdminTool() {
     } catch (err: any) {
       setBusy("");
       showToast(err?.message || "Không nạp được PMH.");
+    }
+  }
+
+  async function claimRequest(item: PincodeRequest) {
+    try {
+      setBusy(`claim-${item.requestId}`);
+      const data = await postAction({ action: "CLAIM", requestId: item.requestId });
+      setBusy("");
+      showToast(data.message || "Da nhan xu ly ho so.");
+      await loadDashboard({ silent: true });
+    } catch (err: any) {
+      setBusy("");
+      showToast(err?.message || "Khong nhan xu ly duoc ho so.");
+    }
+  }
+
+  async function reopenRequest(item: PincodeRequest) {
+    try {
+      setBusy(`reopen-${item.requestId}`);
+      const data = await postAction({ action: "REOPEN", requestId: item.requestId });
+      setBusy("");
+      showToast(data.message || "Da mo lai ho so.");
+      await loadDashboard({ silent: true });
+    } catch (err: any) {
+      setBusy("");
+      showToast(err?.message || "Khong mo lai duoc ho so.");
     }
   }
 
@@ -260,12 +314,34 @@ export default function PincodeAdminTool() {
                 <div className="pmh-request-top">
                   <span className={`pmh-flow ${item.flow === "ChienGia" ? "gold" : ""}`}>{item.flowLabel}</span>
                   <span className={`pmh-status ${item.status}`}>{statusText(item.status)}</span>
+                  {item.status === "Pending" ? <span className={`pmh-sla ${item.slaLevel}`}>{slaText(item)}</span> : null}
                 </div>
                 <h5>{item.imei || "Chưa có IMEI/SN"}</h5>
                 <p>NV {item.maNV} · {item.staffName || "Chưa rõ tên"} · ST {item.maST || "—"} · {item.createdAt}</p>
+                {item.claimedBy ? <p className="pmh-claim-line">Đang xử lý: <b>{item.claimedBy}</b>{item.claimedAt ? ` · ${item.claimedAt}` : ""}</p> : null}
+                {item.canReopen ? <p className="pmh-claim-line">Có thể mở lại đến: <b>{item.reopenUntil || "trong 5 phút"}</b></p> : null}
               </div>
 
               <div className="pmh-actions">
+                {item.status === "Pending" ? (
+                  <button type="button" onClick={() => claimRequest(item)} disabled={busy === `claim-${item.requestId}`}>
+                    {item.claimedBy ? "Đã nhận xử lý" : "Nhận xử lý"}
+                  </button>
+                ) : null}
+                {item.canReopen ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDialog({
+                      title: "Mở lại hồ sơ",
+                      message: "Mở lại hồ sơ này về trạng thái chờ duyệt?",
+                      confirmText: "Mở lại",
+                      onConfirm: () => reopenRequest(item),
+                    })}
+                    disabled={busy === `reopen-${item.requestId}`}
+                  >
+                    Mở lại hồ sơ
+                  </button>
+                ) : null}
                 <button type="button" className="approve review" onClick={() => openReview(item)}>
                   Kiểm duyệt yêu cầu
                 </button>
@@ -274,6 +350,28 @@ export default function PincodeAdminTool() {
           ))
         )}
       </div>
+
+      {confirmDialog ? (
+        <div className="pmh-confirm-layer" role="alertdialog" aria-modal="true" aria-labelledby="pmhConfirmTitle">
+          <div className="pmh-confirm-card">
+            <span>{confirmDialog.danger ? "Cần xác nhận" : "Xác nhận thao tác"}</span>
+            <h4 id="pmhConfirmTitle">{confirmDialog.title}</h4>
+            <p>{confirmDialog.message}</p>
+            <div>
+              <button type="button" className="ghost" onClick={() => setConfirmDialog(null)}>
+                Hủy
+              </button>
+              <button
+                type="button"
+                className={confirmDialog.danger ? "danger" : "primary"}
+                onClick={runConfirmDialogAction}
+              >
+                {confirmDialog.confirmText || "Xác nhận"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {toast ? <div className="pmh-toast">{toast}</div> : null}
     </section>
@@ -316,15 +414,21 @@ const STYLE = `
 .pmh-request-card { padding: 14px; display: grid; grid-template-columns: 1fr 190px; gap: 12px; }
 .pmh-request-top { display: flex; flex-wrap: wrap; gap: 7px; }
 .pmh-flow,
-.pmh-status { width: fit-content; padding: 6px 9px; border-radius: 999px; font-size: 9.5px; line-height: 1; font-weight: 1000; letter-spacing: .08em; text-transform: uppercase; }
+.pmh-status,
+.pmh-sla { width: fit-content; padding: 6px 9px; border-radius: 999px; font-size: 9.5px; line-height: 1; font-weight: 1000; letter-spacing: .08em; text-transform: uppercase; }
 .pmh-flow { background: #ecfdf5; color: #047857; }
 .pmh-flow.gold { background: #fff7ed; color: #c2410c; }
 .pmh-status { background: #eff6ff; color: #1d4ed8; }
 .pmh-status.Approved { background: #dcfce7; color: #15803d; }
 .pmh-status.Rejected_Hard,
 .pmh-status.Rejected_Soft { background: #fee2e2; color: #b91c1c; }
+.pmh-sla { background: #f1f5f9; color: #475569; }
+.pmh-sla.warn { background: #fff7ed; color: #c2410c; }
+.pmh-sla.danger { background: #fee2e2; color: #b91c1c; }
 .pmh-request-card h5 { margin: 10px 0 0; color: #07111f; font-size: 20px; font-weight: 1000; }
 .pmh-request-card p { margin: 7px 0 0; color: #64748b; font-size: 12px; line-height: 1.4; font-weight: 850; }
+.pmh-claim-line { color: #334155 !important; }
+.pmh-claim-line b { color: #07111f; }
 .pmh-info-grid { margin-top: 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .pmh-info-grid div { padding: 10px; border-radius: 14px; background: #f8fafc; border: 1px solid #e2e8f0; }
 .pmh-info-grid span { display: block; color: #64748b; font-size: 9.5px; font-weight: 1000; text-transform: uppercase; }
@@ -342,6 +446,16 @@ const STYLE = `
 .pmh-final span { color: #07111f; font-size: 13px; font-weight: 1000; word-break: break-word; }
 .pmh-final small { color: #64748b; font-size: 11px; font-weight: 850; }
 .pmh-empty { padding: 24px; border-radius: 20px; background: #fff; border: 1px solid #e2e8f0; color: #64748b; text-align: center; font-weight: 900; }
+.pmh-confirm-layer { position: fixed; inset: 0; z-index: 99998; display: grid; place-items: center; padding: 18px; background: rgba(15, 23, 42, .56); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.pmh-confirm-card { width: min(100%, 420px); padding: 22px; border-radius: 24px; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 28px 84px rgba(15,23,42,.30); }
+.pmh-confirm-card > span { display: inline-flex; width: fit-content; padding: 8px 11px; border-radius: 999px; background: #07111f; color: #ffd400; font-size: 10px; line-height: 1; font-weight: 1000; letter-spacing: .08em; text-transform: uppercase; }
+.pmh-confirm-card h4 { margin: 16px 0 0; color: #07111f; font-size: 24px; line-height: 1.08; font-weight: 1000; letter-spacing: -.04em; }
+.pmh-confirm-card p { margin: 10px 0 0; color: #475569; font-size: 14px; line-height: 1.45; font-weight: 850; }
+.pmh-confirm-card div { margin-top: 18px; display: grid; grid-template-columns: .8fr 1fr; gap: 10px; }
+.pmh-confirm-card button { min-height: 48px; border-radius: 16px; border: 0; font-size: 12px; font-weight: 1000; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+.pmh-confirm-card button.ghost { border: 1px solid #dbe3ef; background: #fff; color: #07111f; }
+.pmh-confirm-card button.primary { background: #ffd400; color: #07111f; }
+.pmh-confirm-card button.danger { background: #dc2626; color: #fff; }
 .pmh-toast { position: fixed; left: 50%; bottom: 18px; z-index: 99999; transform: translateX(-50%); width: min(calc(100% - 24px), 460px); padding: 13px 14px; border-radius: 18px; background: #07111f; color: #fff; font-size: 13px; font-weight: 900; box-shadow: 0 18px 44px rgba(15,23,42,.22); }
 @media (max-width: 900px) {
   .pmh-metrics,

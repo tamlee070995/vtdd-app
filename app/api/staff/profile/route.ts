@@ -3,6 +3,11 @@ import { getCurrentStaffFromRequest } from "@/lib/staff-auth";
 
 export const dynamic = "force-dynamic";
 
+function hideEncryptedLeak(value: unknown) {
+  const text = String(value || "").trim();
+  return text.startsWith("enc:v1:") ? "" : text;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const currentStaff = await getCurrentStaffFromRequest(req);
@@ -22,8 +27,8 @@ export async function GET(req: NextRequest) {
         staffName: currentStaff.staffName,
         storeName: currentStaff.storeName,
         department: currentStaff.department,
-        securityQuestion: currentStaff.securityQuestion,
-        gmail: currentStaff.gmail,
+        securityQuestion: hideEncryptedLeak(currentStaff.securityQuestion),
+        gmail: hideEncryptedLeak(currentStaff.gmail),
         forceSetup: currentStaff.forceSetup,
         mustChangePassword: currentStaff.mustChangePassword,
       },

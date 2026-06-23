@@ -129,8 +129,8 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
               id="admin-maNV"
               name="maNV"
               type="text"
-              inputMode="numeric"
-              placeholder="VD: 36964"
+              inputMode="text"
+              placeholder="NV12345"
               autoComplete="username"
               value={maNV}
               onChange={(e) => setMaNV(e.target.value)}

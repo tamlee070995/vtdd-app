@@ -5,6 +5,9 @@ type OnlineSession = {
   visitorId: string;
   lastSeen: number;
   userAgent: string;
+  ip: string;
+  path: string;
+  device: string;
 };
 
 type OnlineStoreGlobal = {
@@ -56,6 +59,9 @@ export function touchOnlineSession(params: {
   page: string;
   visitorId: string;
   userAgent?: string;
+  ip?: string;
+  path?: string;
+  device?: string;
 }) {
   pruneExpiredSessions();
 
@@ -74,6 +80,9 @@ export function touchOnlineSession(params: {
     visitorId,
     lastSeen: Date.now(),
     userAgent: clean(params.userAgent),
+    ip: clean(params.ip),
+    path: clean(params.path),
+    device: clean(params.device),
   });
 
   return getOnlineStats();
@@ -122,4 +131,24 @@ export function getOnlineStats() {
   });
 
   return stats;
+}
+
+export function getOnlineSessions() {
+  pruneExpiredSessions();
+
+  const store = getStore();
+  return Array.from(store.sessions.values())
+    .sort((a, b) => b.lastSeen - a.lastSeen)
+    .map((session) => ({
+      ...session,
+      lastSeenAt: new Date(session.lastSeen).toLocaleString("vi-VN", {
+        timeZone: "Asia/Ho_Chi_Minh",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }),
+    }));
 }

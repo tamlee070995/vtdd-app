@@ -85,9 +85,11 @@ function safeDecrypt(value: any) {
   if (!raw) return "";
 
   try {
-    return decryptText(raw) || raw;
+    const decrypted = decryptText(raw);
+    if (decrypted) return decrypted;
+    return raw.startsWith("enc:v1:") ? "" : raw;
   } catch {
-    return raw;
+    return raw.startsWith("enc:v1:") ? "" : raw;
   }
 }
 
