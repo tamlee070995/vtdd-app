@@ -5,6 +5,7 @@ import { insertRows, isSupabaseConfigured, selectAllRows } from "@/lib/supabase-
 const LOG_SHEET = "Log_search";
 
 export type QuoteLogRow = {
+  source: "staff" | "customer";
   time: string;
   action: string;
   maNV: string;
@@ -26,6 +27,18 @@ export type QuoteLogRow = {
   networkType: string;
 };
 
+function inferQuoteLogSource(row: { action?: any; maNV?: any; staffName?: any }) {
+  const action = clean(row.action).toUpperCase();
+  const maNV = clean(row.maNV).toUpperCase();
+  const staffName = clean(row.staffName).toLowerCase();
+
+  if (action.includes("KHÁCH") || action.includes("KHACH")) return "customer";
+  if (maNV === "KHACH" || maNV === "CUSTOMER") return "customer";
+  if (staffName === "khách hàng" || staffName === "khach hang") return "customer";
+
+  return "staff";
+}
+
 function clean(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -38,7 +51,7 @@ function money(value: unknown) {
 function mapQuoteLogRow(row: unknown[]): QuoteLogRow {
   const clientMeta = parseQuoteClientMeta(row[16]);
 
-  return {
+  const mapped = {
     time: clean(row[0]),
     action: clean(row[1]),
     maNV: clean(row[2]),
@@ -59,12 +72,17 @@ function mapQuoteLogRow(row: unknown[]): QuoteLogRow {
     deviceLabel: clientMeta.deviceLabel,
     networkType: clientMeta.networkType,
   };
+
+  return {
+    ...mapped,
+    source: inferQuoteLogSource(mapped),
+  };
 }
 
 function mapDbQuoteLogRow(row: any): QuoteLogRow {
   const clientMeta = parseQuoteClientMeta(row.user_agent);
 
-  return {
+  const mapped = {
     time: clean(row.time_text),
     action: clean(row.action),
     maNV: clean(row.ma_nv),
@@ -84,6 +102,11 @@ function mapDbQuoteLogRow(row: any): QuoteLogRow {
     userAgent: clientMeta.userAgent,
     deviceLabel: clientMeta.deviceLabel,
     networkType: clientMeta.networkType,
+  };
+
+  return {
+    ...mapped,
+    source: inferQuoteLogSource(mapped),
   };
 }
 

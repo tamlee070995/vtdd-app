@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { detectDeviceLabel, normalizeNetworkTypeForDevice, packQuoteClientMeta } from "@/lib/quote-client-meta";
-import { appendQuoteLog } from "@/lib/quote-log-store";
+import { appendQuoteLog, type QuoteLogRow } from "@/lib/quote-log-store";
 import { appendErrorLog, consumeBehaviorRateLimit, getClientIpFromRequest } from "@/lib/ops-store";
 import { insertSheetRowAt2Queued } from "@/lib/sheets-write";
 import { getCurrentStaffFromRequest } from "@/lib/staff-auth";
@@ -40,6 +40,7 @@ function money(value: any) {
 
 function getActionLabel(action: string) {
   if (action === "TRA_GIA") return "TRA GIÁ";
+  if (action === "CUSTOMER_QUOTE") return "KHÁCH TRA GIÁ";
   if (action === "COPY") return "COPY BÁO GIÁ";
   if (action === "SHARE") return "CHIA SẺ BÁO GIÁ";
   if (action === "CUSTOMER_VIEW") return "CHẾ ĐỘ KHÁCH XEM";
@@ -67,9 +68,11 @@ function getClientIp(req: NextRequest, body: any) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const currentStaff = await getCurrentStaffFromRequest(req);
+    const source = clean(body.source).toLowerCase();
+    const isCustomerQuote = source === "customer" || clean(body.action) === "CUSTOMER_QUOTE";
+    const currentStaff = isCustomerQuote ? null : await getCurrentStaffFromRequest(req);
 
-    if (!currentStaff) {
+    if (!isCustomerQuote && !currentStaff) {
       return NextResponse.json(
         {
           success: false,
@@ -93,10 +96,12 @@ export async function POST(req: NextRequest) {
     const networkType = normalizeNetworkTypeForDevice(deviceLabel, body.networkType);
     const clientIp = getClientIp(req, body);
     const rate = consumeBehaviorRateLimit({
-      scope: "quote-log",
+      scope: isCustomerQuote ? "quote-log-customer" : "quote-log",
       limit: 60,
       lockMs: 10 * 60 * 1000,
-      keys: [clientIp, currentStaff.maNV, currentStaff.maST],
+      keys: isCustomerQuote
+        ? [clientIp, deviceLabel, clean(body.spCu)]
+        : [clientIp, currentStaff?.maNV || "", currentStaff?.maST || ""],
     });
 
     if (!rate.allowed) {
@@ -109,12 +114,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const logRow = {
+    const logRow: QuoteLogRow = {
+      source: isCustomerQuote ? "customer" : "staff",
       time: now,
-      action: getActionLabel(clean(body.action)),
-      maNV: currentStaff.maNV,
-      maST: currentStaff.maST,
-      staffName: currentStaff.staffName,
+      action: getActionLabel(isCustomerQuote ? "CUSTOMER_QUOTE" : clean(body.action)),
+      maNV: isCustomerQuote ? "KHACH" : currentStaff?.maNV || "",
+      maST: isCustomerQuote ? "" : currentStaff?.maST || "",
+      staffName: isCustomerQuote ? "Khách hàng" : currentStaff?.staffName || "",
       mode: body.mode === "tradein" ? "Thu cũ đổi mới" : "Thu cũ không đổi mới",
       spMoi: clean(body.spMoi),
       spCu: clean(body.spCu),

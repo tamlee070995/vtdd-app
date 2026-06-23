@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getActiveSystemLock } from "@/lib/system-lock";
 
 type SheetRow = any[];
@@ -117,6 +117,92 @@ const SYSTEM_UI_CSS = `
   font-size: 12px;
   line-height: 1.45;
   font-weight: 850;
+}
+
+.customer-service-assurance {
+  margin: 12px 0 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.customer-service-time {
+  padding: 13px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: linear-gradient(135deg, #ecfdf5, #ffffff);
+  border: 1px solid rgba(16, 185, 129, .24);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .06);
+}
+
+.customer-service-time i {
+  width: 40px;
+  height: 40px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: #07111f;
+  color: #ffd400;
+  font-style: normal;
+  font-size: 18px;
+  font-weight: 1000;
+}
+
+.customer-service-time span,
+.customer-risk-panel span {
+  display: block;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 1000;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.customer-service-time b {
+  display: block;
+  margin-top: 3px;
+  color: #07111f;
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 1000;
+}
+
+.customer-risk-panel {
+  padding: 13px;
+  border-radius: 22px;
+  background: #fffaf0;
+  border: 1px solid rgba(251, 146, 60, .26);
+}
+
+.customer-risk-panel b {
+  display: block;
+  margin-top: 4px;
+  color: #7c2d12;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 1000;
+}
+
+.customer-risk-badges {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.customer-risk-badges em {
+  padding: 8px 9px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid rgba(251, 146, 60, .24);
+  color: #9a3412;
+  font-style: normal;
+  font-size: 10.5px;
+  line-height: 1;
+  font-weight: 950;
 }
 
 .mode-switch button:disabled,
@@ -484,12 +570,18 @@ const SYSTEM_UI_CSS = `
   padding: 10px 10px calc(14px + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .vtdd-product-option {
+  flex: 0 0 auto;
   width: 100%;
   min-height: 54px;
-  margin-bottom: 8px;
+  margin-bottom: 0;
   padding: 12px 12px;
   border-radius: 17px;
   border: 1px solid #e2e8f0;
@@ -1474,6 +1566,42 @@ function isAppleBrand(value: any) {
   return s.includes("APPLE") || s.includes("IPHONE") || s.includes("IPAD");
 }
 
+function getCustomerClientMeta() {
+  const nav = navigator as Navigator & {
+    connection?: { type?: string; effectiveType?: string };
+    mozConnection?: { type?: string; effectiveType?: string };
+    webkitConnection?: { type?: string; effectiveType?: string };
+  };
+  const ua = nav.userAgent || "";
+  const uaLower = ua.toLowerCase();
+  const connection = nav.connection || nav.mozConnection || nav.webkitConnection;
+  const type = String(connection?.type || "").toLowerCase();
+  const effectiveType = String(connection?.effectiveType || "").toLowerCase();
+
+  let clientDevice = "Không rõ";
+  if (uaLower.includes("iphone")) clientDevice = "iPhone";
+  else if (uaLower.includes("ipad")) clientDevice = "iPad";
+  else if (uaLower.includes("android")) clientDevice = "Android";
+  else if (uaLower.includes("windows") || uaLower.includes("macintosh") || uaLower.includes("linux")) clientDevice = "Máy tính";
+
+  let networkType = "Không rõ";
+  const isDesktop = uaLower.includes("windows") || uaLower.includes("macintosh") || uaLower.includes("linux");
+  if (isDesktop) {
+    if (type.includes("ethernet")) networkType = "LAN";
+    else if (type.includes("wifi")) networkType = "WiFi";
+    else networkType = "WiFi/LAN";
+  } else if (type.includes("wifi") || type.includes("ethernet")) {
+    networkType = "WiFi";
+  } else if (type.includes("cell")) {
+    networkType = effectiveType ? effectiveType.toUpperCase() : "4G/5G";
+  } else if (effectiveType.includes("5g")) networkType = "5G";
+  else if (effectiveType.includes("4g")) networkType = "4G";
+  else if (effectiveType.includes("3g")) networkType = "3G";
+  else if (effectiveType.includes("2g")) networkType = "2G";
+
+  return { clientDevice, networkType };
+}
+
 
 
 type ProductPickerProps = {
@@ -1784,10 +1912,6 @@ export default function CustomerPage() {
   const [dataTablet, setDataTablet] = useState<SheetRow[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({});
   const [notifySettings, setNotifySettings] = useState<NotifySettings>(EMPTY_NOTIFY);
-  const [dataVersion, setDataVersion] = useState("");
-  const [newDataVersion, setNewDataVersion] = useState("");
-  const [showDataReload, setShowDataReload] = useState(false);
-  const [reloadCountdown, setReloadCountdown] = useState(5);
   const [lockClockTick, setLockClockTick] = useState(() => Date.now());
 
   const [mode, setMode] = useState<"tradein" | "buyonly">("tradein");
@@ -1795,6 +1919,7 @@ export default function CustomerPage() {
   const [spMoi, setSpMoi] = useState("");
   const [spCu, setSpCu] = useState("");
   const [loai, setLoai] = useState("");
+  const lastCustomerQuoteLogKey = useRef("");
 
   useEffect(() => {
     async function load() {
@@ -1811,7 +1936,6 @@ export default function CustomerPage() {
         setDataMoi(json.data.moi || []);
         setDataCu(json.data.cu || []);
         setDataTablet(json.data.tablet || []);
-        setDataVersion(String(json.dataVersion || json.data?.system?.DATA_VERSION || "1"));
         setSystemSettings(json.data.system || {});
         setNotifySettings(makeNotifySettings(json.data.notify));
         setLoading(false);
@@ -1833,64 +1957,32 @@ export default function CustomerPage() {
   }, []);
 
   useEffect(() => {
-    if (!dataVersion) return;
-
     let stopped = false;
 
-    async function checkDataVersion() {
+    async function checkCustomerSystemState() {
       try {
         const res = await fetch("/api/data/version", {
           cache: "no-store",
           headers: { "Cache-Control": "no-store" },
         });
         const json = await res.json().catch(() => null);
-        const nextVersion = String(json?.dataVersion || "");
 
         if (!stopped && json?.system) {
           setSystemSettings(json.system || {});
         }
-
-        if (!stopped && json?.notify) {
-          setNotifySettings(makeNotifySettings(json.notify));
-        }
-
-        if (!stopped && nextVersion && nextVersion !== dataVersion) {
-          setNewDataVersion(nextVersion);
-          setShowDataReload(true);
-        }
       } catch {
-        // Không làm phiền khách nếu kiểm tra version lỗi tạm thời.
+        // Không làm phiền khách nếu kiểm tra trạng thái hệ thống lỗi tạm thời.
       }
     }
 
-    checkDataVersion();
+    checkCustomerSystemState();
 
-    const timer = window.setInterval(checkDataVersion, 5000);
+    const timer = window.setInterval(checkCustomerSystemState, 5000);
     return () => {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [dataVersion]);
-
-  useEffect(() => {
-    if (!showDataReload) return;
-
-    setReloadCountdown(5);
-
-    const timer = window.setInterval(() => {
-      setReloadCountdown((current) => {
-        if (current <= 1) {
-          window.clearInterval(timer);
-          window.location.reload();
-          return 0;
-        }
-
-        return current - 1;
-      });
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [showDataReload, newDataVersion]);
+  }, []);
 
   const brands = useMemo(() => {
     return unique(dataMoi.slice(1).map((row) => String(row[0] || "").trim()));
@@ -2012,6 +2104,75 @@ export default function CustomerPage() {
     };
   }, [mode, selectedNewRow, selectedOldRow, loai]);
 
+  async function sendCustomerQuoteLog() {
+    try {
+      const clientMeta = getCustomerClientMeta();
+
+      await fetch("/api/log/quote", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+        cache: "no-store",
+        body: JSON.stringify({
+          source: "customer",
+          action: "CUSTOMER_QUOTE",
+          mode,
+          spMoi: mode === "tradein" ? spMoi : "Chỉ thu cũ",
+          spCu,
+          memory,
+          loai,
+          giaXac: priceInfo.giaXac,
+          troGiaHang: mode === "tradein" ? priceInfo.troGiaHang : 0,
+          troGiaMWG: priceInfo.troGiaMWG,
+          tongTien: priceInfo.tongTien,
+          khachCanBu: 0,
+          clientDevice: clientMeta.clientDevice,
+          networkType: clientMeta.networkType,
+        }),
+      });
+    } catch (err) {
+      console.error("CUSTOMER_QUOTE_LOG_ERROR:", err);
+    }
+  }
+
+  useEffect(() => {
+    if (loading || customerAccessLocked || currentCustomerTabLocked) return;
+    if (!spCu || !loai || priceInfo.giaXac <= 0) return;
+    if (mode === "tradein" && !spMoi) return;
+
+    const key = [
+      mode,
+      spMoi,
+      spCu,
+      memory,
+      loai,
+      priceInfo.giaXac,
+      priceInfo.troGiaHang,
+      priceInfo.troGiaMWG,
+      priceInfo.tongTien,
+    ].join("|");
+
+    if (lastCustomerQuoteLogKey.current === key) return;
+    lastCustomerQuoteLogKey.current = key;
+
+    void sendCustomerQuoteLog();
+  }, [
+    loading,
+    customerAccessLocked,
+    currentCustomerTabLocked,
+    mode,
+    spMoi,
+    spCu,
+    memory,
+    loai,
+    priceInfo.giaXac,
+    priceInfo.troGiaHang,
+    priceInfo.troGiaMWG,
+    priceInfo.tongTien,
+  ]);
+
   useEffect(() => {
     if (mode === "tradein" && customerTradeinLocked && !customerBuyonlyLocked) {
       setMode("buyonly");
@@ -2096,7 +2257,7 @@ export default function CustomerPage() {
         <header className="customer-personal-hero">
           <div className="customer-personal-brand">
             <div
-              aria-label="MWG"
+              aria-label="Viễn Thông Di Động"
               style={{
                 width: 42,
                 height: 42,
@@ -2110,7 +2271,7 @@ export default function CustomerPage() {
             >
               <img
                 src="/mwg-logo.svg"
-                alt="MWG"
+                alt="Viễn Thông Di Động"
                 style={{ width: "100%", height: "100%", objectFit: "contain" }}
               />
             </div>
@@ -2135,7 +2296,7 @@ export default function CustomerPage() {
 
         {currentCustomerTabLocked && (
           <div className="vtdd-tab-locked-note">
-            Tab hiện tại đang tạm khóa theo cài đặt Admin. Vui lòng chọn tab còn lại hoặc thử lại sau.
+            Chương trình này đang tạm dừng. Bạn vui lòng chọn chương trình còn lại hoặc thử lại sau.
           </div>
         )}
 
@@ -2172,7 +2333,7 @@ export default function CustomerPage() {
                 <span>01</span>
                 <div>
                   <b>Máy muốn mua mới</b>
-                  <p>Chọn sản phẩm khách muốn lên đời.</p>
+                  <p>Chọn sản phẩm bạn muốn lên đời.</p>
                 </div>
               </div>
 
@@ -2213,7 +2374,7 @@ export default function CustomerPage() {
           <div className="customer-section-title second">
             <span>{mode === "buyonly" ? "01" : "02"}</span>
             <div>
-              <b>Máy cũ của khách</b>
+              <b>Máy hiện tại của bạn</b>
               <p>Chọn đúng model và tình trạng máy.</p>
             </div>
           </div>
@@ -2273,6 +2434,17 @@ export default function CustomerPage() {
             Giá chỉ mang tính tham khảo. Kết quả cuối cùng phụ thuộc tình trạng thực tế, tài khoản, IMEI/Serial và chính sách tại thời điểm giao dịch.
           </div>
 
+          <div className="customer-service-assurance" aria-label="Thông tin kiểm tra tại siêu thị">
+            <div className="customer-service-time">
+              <i>10</i>
+              <div>
+                <span>Thời gian xử lý dự kiến</span>
+                <b>Kiểm tra máy khoảng 10 phút tại siêu thị.</b>
+              </div>
+            </div>
+
+          </div>
+
           <div className="customer-result-rows">
             <div>
               <span>Máy mới</span>
@@ -2301,27 +2473,6 @@ export default function CustomerPage() {
           </a>
         </section>
       </section>
-
-      {showDataReload && (
-        <section className="vtdd-data-reload-layer" role="dialog" aria-modal="true">
-          <div className="vtdd-data-reload-card">
-            <span>Hệ thống mới</span>
-            <h2>Dữ liệu vừa được cập nhật</h2>
-            <p>
-              Phiên bản hiện tại: {dataVersion || "1"} · Phiên bản mới: {newDataVersion || "mới"}.
-              Trang sẽ reload để dùng cấu hình mới nhất.
-            </p>
-            <div className="vtdd-data-reload-countdown">
-              Tự reload sau {reloadCountdown}s nếu chưa thao tác.
-            </div>
-            <div className="vtdd-data-reload-actions">
-              <button type="button" onClick={() => window.location.reload()}>
-                Reload ngay
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
 
     </main>
   );

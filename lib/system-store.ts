@@ -505,6 +505,7 @@ export async function appendAdminAudit(data: {
 }
 
 export type DashboardLogRow = {
+  source: "staff" | "customer";
   time: string;
   action: string;
   maNV: string;
@@ -521,10 +522,12 @@ export type DashboardLogRow = {
   networkType: string;
 };
 
-export async function getAdminDashboardStats() {
-  const cleanRows = await getQuoteLogs(1000);
+export async function getAdminDashboardStats(source: "staff" | "customer" = "staff") {
+  const allRows = await getQuoteLogs(2000);
+  const cleanRows = allRows.filter((row) => row.source === source);
 
   const recentLogs: DashboardLogRow[] = cleanRows.slice(0, 20).map((row) => ({
+    source: row.source,
     time: row.time,
     action: row.action,
     maNV: row.maNV,
@@ -544,6 +547,8 @@ export async function getAdminDashboardStats() {
   const countMap = new Map<string, number>();
   const staffMap = new Map<string, { maNV: string; staffName: string; count: number; totalValue: number }>();
   const storeMap = new Map<string, { maST: string; count: number; totalValue: number }>();
+  const deviceMap = new Map<string, { label: string; count: number; totalValue: number }>();
+  const ipMap = new Map<string, { ip: string; count: number; totalValue: number }>();
   const dayMap = new Map<string, number>();
   const actionMap = new Map<string, number>();
   let totalValue = 0;
@@ -575,6 +580,26 @@ export async function getAdminDashboardStats() {
     currentStore.totalValue += row.tongTien;
     storeMap.set(storeKey, currentStore);
 
+    const deviceKey = clean(row.deviceLabel) || "Không rõ thiết bị";
+    const currentDevice = deviceMap.get(deviceKey) || {
+      label: deviceKey,
+      count: 0,
+      totalValue: 0,
+    };
+    currentDevice.count += 1;
+    currentDevice.totalValue += row.tongTien;
+    deviceMap.set(deviceKey, currentDevice);
+
+    const ipKey = clean(row.ip) || "Không rõ IP";
+    const currentIp = ipMap.get(ipKey) || {
+      ip: ipKey,
+      count: 0,
+      totalValue: 0,
+    };
+    currentIp.count += 1;
+    currentIp.totalValue += row.tongTien;
+    ipMap.set(ipKey, currentIp);
+
     const dayKey = clean(row.time).slice(0, 10) || "Không rõ";
     dayMap.set(dayKey, (dayMap.get(dayKey) || 0) + 1);
 
@@ -596,6 +621,14 @@ export async function getAdminDashboardStats() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
+  const topDevices = Array.from(deviceMap.values())
+    .sort((a, b) => b.count - a.count || b.totalValue - a.totalValue)
+    .slice(0, 10);
+
+  const topIps = Array.from(ipMap.values())
+    .sort((a, b) => b.count - a.count || b.totalValue - a.totalValue)
+    .slice(0, 10);
+
   const dailyLogs = Array.from(dayMap.entries())
     .map(([day, count]) => ({ day, count }))
     .slice(0, 14);
@@ -608,6 +641,8 @@ export async function getAdminDashboardStats() {
     topOldProducts,
     topStaff,
     topStores,
+    topDevices,
+    topIps,
     dailyLogs,
     actionCounts,
     recentLogs,

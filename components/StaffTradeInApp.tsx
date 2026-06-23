@@ -862,12 +862,18 @@ const SYSTEM_UI_CSS = `
   padding: 10px 10px calc(14px + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .vtdd-product-option {
+  flex: 0 0 auto;
   width: 100%;
   min-height: 54px;
-  margin-bottom: 8px;
+  margin-bottom: 0;
   padding: 12px 12px;
   border-radius: 17px;
   border: 1px solid #e2e8f0;

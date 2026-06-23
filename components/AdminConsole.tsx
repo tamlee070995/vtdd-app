@@ -36,6 +36,7 @@ type StaffMeta = {
 };
 
 type DashboardLogRow = {
+  source: "staff" | "customer";
   time: string;
   action: string;
   maNV: string;
@@ -52,10 +53,14 @@ type DashboardLogRow = {
   networkType: string;
 };
 
+type DashboardSource = "staff" | "customer";
+
 type AdminDashboard = {
   topOldProducts: Array<{ product: string; count: number }>;
   topStaff: Array<{ maNV: string; staffName: string; count: number; totalValue: number }>;
   topStores: Array<{ maST: string; count: number; totalValue: number }>;
+  topDevices: Array<{ label: string; count: number; totalValue: number }>;
+  topIps: Array<{ ip: string; count: number; totalValue: number }>;
   dailyLogs: Array<{ day: string; count: number }>;
   actionCounts: Array<{ action: string; count: number }>;
   recentLogs: DashboardLogRow[];
@@ -137,6 +142,8 @@ const EMPTY_DASHBOARD: AdminDashboard = {
   topOldProducts: [],
   topStaff: [],
   topStores: [],
+  topDevices: [],
+  topIps: [],
   dailyLogs: [],
   actionCounts: [],
   recentLogs: [],
@@ -400,6 +407,7 @@ function TcdmAdminConsole({
   const [opsErrorTo, setOpsErrorTo] = useState("");
   const [opsLoading, setOpsLoading] = useState(false);
   const [commandInput, setCommandInput] = useState("");
+  const [dashboardSource, setDashboardSource] = useState<DashboardSource>("staff");
   const [dashboardData, setDashboardData] = useState<AdminDashboard>(EMPTY_DASHBOARD);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
@@ -449,6 +457,41 @@ function TcdmAdminConsole({
   const canResetStaffOtp = canResetStaffSecurity || canManageStaff;
   const canWriteSettings = canUseAction("settings-write");
   const canReloadData = canUseAction("reload-data");
+  const dashboardIsCustomer = dashboardSource === "customer";
+  const dashboardDeviceRanking = useMemo(() => {
+    if (dashboardData.topDevices.length > 0) return dashboardData.topDevices;
+
+    const map = new Map<string, { label: string; count: number; totalValue: number }>();
+
+    dashboardData.recentLogs.forEach((item) => {
+      const label = item.deviceLabel || "Khong ro thiet bi";
+      const current = map.get(label) || { label, count: 0, totalValue: 0 };
+      current.count += 1;
+      current.totalValue += item.tongTien || 0;
+      map.set(label, current);
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => b.count - a.count || b.totalValue - a.totalValue)
+      .slice(0, 10);
+  }, [dashboardData.recentLogs, dashboardData.topDevices]);
+  const dashboardIpRanking = useMemo(() => {
+    if (dashboardData.topIps.length > 0) return dashboardData.topIps;
+
+    const map = new Map<string, { ip: string; count: number; totalValue: number }>();
+
+    dashboardData.recentLogs.forEach((item) => {
+      const ip = item.ip || "Khong ro IP";
+      const current = map.get(ip) || { ip, count: 0, totalValue: 0 };
+      current.count += 1;
+      current.totalValue += item.tongTien || 0;
+      map.set(ip, current);
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => b.count - a.count || b.totalValue - a.totalValue)
+      .slice(0, 10);
+  }, [dashboardData.recentLogs, dashboardData.topIps]);
 
   function isStaffAdminLocked(item: AdminStaff) {
     return !isFullAdmin && item.permission === "admin";
@@ -644,7 +687,7 @@ function TcdmAdminConsole({
     try {
       if (!options?.silent) setDashboardLoading(true);
 
-      const res = await fetch("/api/admin/dashboard", {
+      const res = await fetch(`/api/admin/dashboard?source=${dashboardSource}`, {
         cache: "no-store",
         headers: {
           "Cache-Control": "no-store",
@@ -664,6 +707,14 @@ function TcdmAdminConsole({
       setDashboardLoading(false);
       showToast("error", getErrorMessage(err));
     }
+  }
+
+  function changeDashboardSource(source: DashboardSource) {
+    if (dashboardSource === source) return;
+
+    setDashboardSource(source);
+    setDashboardData(EMPTY_DASHBOARD);
+    setDashboardLoaded(false);
   }
 
   useEffect(() => {
@@ -722,7 +773,7 @@ function TcdmAdminConsole({
     if (dashboardLoaded) return;
     loadDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, dashboardLoaded]);
+  }, [tab, dashboardLoaded, dashboardSource]);
 
   async function runStaffAction(action: "ACTIVE" | "STANDBY" | "RESET_SECURITY" | "RESET_OTP_COUNT" | "DELETE", maNV: string) {
     try {
@@ -1916,9 +1967,29 @@ function TcdmAdminConsole({
               <h2>Dashboard tra giá</h2>
               <p>Dữ liệu log chỉ được tải khi mở tab Dashboard để giữ trang Admin nhẹ và nhanh.</p>
             </div>
-            <button className="adminx-action-btn" type="button" onClick={() => loadDashboard()} disabled={dashboardLoading}>
-              {dashboardLoading ? "Đang tải..." : dashboardLoaded ? "Tải lại" : "Tải dashboard"}
-            </button>
+            <div className="adminx-dashboard-head-actions">
+              <div className="adminx-dashboard-source-switch" role="tablist" aria-label="Chọn nguồn dashboard">
+                <button
+                  type="button"
+                  className={dashboardSource === "staff" ? "active" : ""}
+                  onClick={() => changeDashboardSource("staff")}
+                  disabled={dashboardLoading}
+                >
+                  Nhân viên
+                </button>
+                <button
+                  type="button"
+                  className={dashboardSource === "customer" ? "active" : ""}
+                  onClick={() => changeDashboardSource("customer")}
+                  disabled={dashboardLoading}
+                >
+                  Khách hàng
+                </button>
+              </div>
+              <button className="adminx-action-btn" type="button" onClick={() => loadDashboard()} disabled={dashboardLoading}>
+                {dashboardLoading ? "Đang tải..." : dashboardLoaded ? "Tải lại" : "Tải dashboard"}
+              </button>
+            </div>
           </div>
 
           <div className="adminx-metric-grid adminx-dashboard-metrics">
@@ -1933,14 +2004,22 @@ function TcdmAdminConsole({
               <p>Tổng tiền khách nhận trong các log gần nhất.</p>
             </div>
             <div className="adminx-metric-card">
-              <span>Nhân viên</span>
-              <b>{formatNumber(dashboardData.topStaff.length)}</b>
-              <p>Số nhân viên có phát sinh log trong dữ liệu tải về.</p>
+              <span>{dashboardIsCustomer ? "Thiết bị" : "Nhân viên"}</span>
+              <b>{formatNumber(dashboardIsCustomer ? dashboardDeviceRanking.length : dashboardData.topStaff.length)}</b>
+              <p>
+                {dashboardIsCustomer
+                  ? "Số nhóm thiết bị khách hàng phát sinh log gần đây."
+                  : "Số nhân viên có phát sinh log trong dữ liệu tải về."}
+              </p>
             </div>
             <div className="adminx-metric-card">
-              <span>Siêu thị</span>
-              <b>{formatNumber(dashboardData.topStores.length)}</b>
-              <p>Số siêu thị có phát sinh log tra giá.</p>
+              <span>{dashboardIsCustomer ? "IP gần đây" : "Siêu thị"}</span>
+              <b>{formatNumber(dashboardIsCustomer ? dashboardIpRanking.length : dashboardData.topStores.length)}</b>
+              <p>
+                {dashboardIsCustomer
+                  ? "Số IP khách hàng có phát sinh log gần đây."
+                  : "Số siêu thị có phát sinh log tra giá."}
+              </p>
             </div>
           </div>
 
@@ -1963,9 +2042,21 @@ function TcdmAdminConsole({
             </div>
 
             <div className="adminx-analytics-card">
-              <h3>Top nhân viên tra giá</h3>
+              <h3>{dashboardIsCustomer ? "Thiết bị khách dùng" : "Top nhân viên tra giá"}</h3>
               <div className="adminx-ranking-list">
-                {dashboardData.topStaff.length === 0 ? (
+                {dashboardIsCustomer ? (
+                  dashboardDeviceRanking.length === 0 ? (
+                    <p>Chưa có dữ liệu.</p>
+                  ) : (
+                    dashboardDeviceRanking.map((item, index) => (
+                      <div key={`${item.label}-${index}`}>
+                        <span>{String(index + 1).padStart(2, "0")}</span>
+                        <b>{item.label}</b>
+                        <em>{item.count} lượt · {money(item.totalValue)}</em>
+                      </div>
+                    ))
+                  )
+                ) : dashboardData.topStaff.length === 0 ? (
                   <p>Chưa có dữ liệu.</p>
                 ) : (
                   dashboardData.topStaff.map((item, index) => (
@@ -1980,9 +2071,21 @@ function TcdmAdminConsole({
             </div>
 
             <div className="adminx-analytics-card">
-              <h3>Top siêu thị phát sinh log</h3>
+              <h3>{dashboardIsCustomer ? "IP khách phát sinh log" : "Top siêu thị phát sinh log"}</h3>
               <div className="adminx-ranking-list">
-                {dashboardData.topStores.length === 0 ? (
+                {dashboardIsCustomer ? (
+                  dashboardIpRanking.length === 0 ? (
+                    <p>Chưa có dữ liệu.</p>
+                  ) : (
+                    dashboardIpRanking.map((item, index) => (
+                      <div key={`${item.ip}-${index}`}>
+                        <span>{String(index + 1).padStart(2, "0")}</span>
+                        <b>{maskIpAddress(item.ip, isFullAdmin)}</b>
+                        <em>{item.count} lượt · {money(item.totalValue)}</em>
+                      </div>
+                    ))
+                  )
+                ) : dashboardData.topStores.length === 0 ? (
                   <p>Chưa có dữ liệu.</p>
                 ) : (
                   dashboardData.topStores.map((item, index) => (
@@ -2040,7 +2143,7 @@ function TcdmAdminConsole({
                     <div key={`${item.time}-${index}`}>
                       <b>{item.spCu || "Không rõ máy cũ"}</b>
                       <span>
-                        {item.time} • NV {item.maNV} • {item.action} • {money(item.tongTien)}
+                        {item.time} • {dashboardIsCustomer ? "Khách hàng" : `NV ${item.maNV}`} • {item.action} • {money(item.tongTien)}
                       </span>
                       <small className="adminx-log-meta">
                         <em>{item.deviceLabel || "Không rõ"}</em>
@@ -2396,6 +2499,48 @@ const ADMINX_STYLE = `
 .adminx-button-stack.no-system-save .adminx-action-btn:not(.secondary),
 .adminx-button-stack.no-reload .adminx-action-btn.secondary {
   display: none;
+}
+
+.adminx-dashboard-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.adminx-dashboard-source-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.adminx-dashboard-source-switch button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.adminx-dashboard-source-switch button.active {
+  background: #07111f;
+  color: #ffd400;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, .12);
+}
+
+.adminx-dashboard-source-switch button:disabled {
+  opacity: .55;
+  cursor: wait;
 }
 
 .adminx-metric-grid,
@@ -4515,11 +4660,25 @@ const ADMINX_ONLINE_STYLE = `
   .adminx-staff-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .adminx-dashboard-head-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 520px) {
   .admin-saas-page {
     padding: 10px 8px 20px;
+  }
+
+  .adminx-dashboard-head-actions,
+  .adminx-dashboard-source-switch {
+    width: 100%;
+  }
+
+  .adminx-dashboard-source-switch button {
+    flex: 1;
   }
 
   .admin-saas-shell {

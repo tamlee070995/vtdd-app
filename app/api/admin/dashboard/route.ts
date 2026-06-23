@@ -9,10 +9,13 @@ export async function GET(req: NextRequest) {
     const { response } = await requireAdminApi(req, { module: "tcdm", action: "dashboard-view" });
     if (response) return response;
 
-    const dashboard = await getAdminDashboardStats();
+    const sourceParam = req.nextUrl.searchParams.get("source");
+    const source = sourceParam === "customer" ? "customer" : "staff";
+    const dashboard = await getAdminDashboardStats(source);
 
     return NextResponse.json({
       success: true,
+      source,
       dashboard,
     });
   } catch (err: any) {
