@@ -8,7 +8,7 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
-type DeviceType = "unknown" | "android" | "ios" | "installed";
+type DeviceType = "unknown" | "android" | "ios" | "desktop" | "installed";
 
 type BrowserProfile = {
   device: DeviceType;
@@ -18,8 +18,27 @@ type BrowserProfile = {
   inAppName: string;
 };
 
-const EXTERNAL_INSTALL_URL = "/install-app";
 const CHROME_PLAY_URL = "https://play.google.com/store/apps/details?id=com.android.chrome&hl=vi";
+const IOS_INSTALL_IMAGES = [
+  {
+    step: "1",
+    title: "Mở link trong Safari",
+    src: "/install-app/ios-step-1-safari.png",
+    alt: "Ảnh hướng dẫn mở link cài VTDD App trong Safari trên Apple iOS",
+  },
+  {
+    step: "2",
+    title: "Bấm nút Chia sẻ",
+    src: "/install-app/ios-step-2-share.png",
+    alt: "Ảnh hướng dẫn bấm nút Chia sẻ trên Safari Apple iOS",
+  },
+  {
+    step: "3",
+    title: "Thêm vào màn hình chính",
+    src: "/install-app/ios-step-3-add-home.png",
+    alt: "Ảnh hướng dẫn chọn Thêm vào màn hình chính trên Apple iOS",
+  },
+];
 
 const DEFAULT_PROFILE: BrowserProfile = {
   device: "unknown",
@@ -391,6 +410,22 @@ const INSTALL_STYLE = `
   font-weight: 800;
 }
 
+.install-app-desktop-note {
+  padding: 20px;
+  border-radius: 26px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  box-shadow: 0 14px 38px rgba(15, 23, 42, .06);
+}
+
+.install-app-desktop-note p {
+  margin: 10px 0 0;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 900;
+}
+
 .install-app-steps {
   margin-top: 14px;
   display: grid;
@@ -423,6 +458,49 @@ const INSTALL_STYLE = `
   color: #07111f;
   font-size: 11px;
   font-weight: 1000;
+}
+
+.install-app-ios-visuals {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.install-app-ios-visual {
+  overflow: hidden;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .06);
+}
+
+.install-app-ios-visual-head {
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #07111f;
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.install-app-ios-visual-head span {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #ffd400;
+  color: #07111f;
+}
+
+.install-app-ios-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-top: 1px solid #e2e8f0;
+  background: #eef4fb;
 }
 
 .install-app-card-actions {
@@ -500,6 +578,7 @@ function detectProfile(): BrowserProfile {
   const lower = ua.toLowerCase();
   const isAndroid = lower.includes("android");
   const isIos = /iphone|ipad|ipod/.test(lower);
+  const isDesktop = /windows|macintosh|mac os x|linux|cros/.test(lower) && !isAndroid && !isIos;
   const isChrome = lower.includes("chrome/") && !lower.includes("edg/") && !lower.includes("samsungbrowser");
   const isSafari = isIos && lower.includes("safari") && !lower.includes("crios") && !lower.includes("fxios");
   const inAppChecks = [
@@ -511,7 +590,7 @@ function detectProfile(): BrowserProfile {
   const inApp = inAppChecks.find((item) => item.test);
 
   return {
-    device: isAndroid ? "android" : isIos ? "ios" : "unknown",
+    device: isAndroid ? "android" : isIos ? "ios" : isDesktop ? "desktop" : "unknown",
     isChrome,
     isSafari,
     isInApp: Boolean(inApp),
@@ -528,7 +607,6 @@ export default function InstallAppClient() {
   const [profile, setProfile] = useState<BrowserProfile>(DEFAULT_PROFILE);
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
   const [status, setStatus] = useState("Đang nhận biết thiết bị để hiển thị hướng dẫn phù hợp.");
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const current = detectProfile();
@@ -542,7 +620,9 @@ export default function InstallAppClient() {
           ? "Đã nhận biết Apple iOS. Hãy mở bằng Safari rồi thêm vào màn hình chính."
           : current.device === "android"
             ? "Đã nhận biết Android. Hãy mở bằng Chrome để cài VTDD App."
-            : "Không nhận biết được hệ điều hành. Hãy mở link bằng Android Chrome hoặc iPhone Safari."
+            : current.device === "desktop"
+              ? "Đã nhận biết Desktop/PC/Laptop. Link cài VTDD App chỉ áp dụng cho điện thoại hoặc tablet."
+              : "Không nhận biết được hệ điều hành. Hãy mở link bằng Android Chrome hoặc iPhone Safari."
     );
 
     const handlePrompt = (event: Event) => {
@@ -570,6 +650,7 @@ export default function InstallAppClient() {
     if (profile.device === "installed") return "Đã cài VTDD App";
     if (profile.device === "android") return profile.isChrome ? "Android Chrome" : "Android";
     if (profile.device === "ios") return profile.isSafari ? "Apple iOS Safari" : "Apple iOS";
+    if (profile.device === "desktop") return "Desktop / PC / Laptop";
     return "Đang nhận biết";
   }, [profile]);
 
@@ -605,18 +686,11 @@ export default function InstallAppClient() {
     }
   }
 
-  async function copyExternalUrl() {
-    try {
-      await navigator.clipboard.writeText(EXTERNAL_INSTALL_URL);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setStatus("Không copy được link tự động. Link cài đặt là /install-app.");
-    }
-  }
-
   const iosActive = profile.device === "ios";
   const androidActive = profile.device === "android";
+  const desktopActive = profile.device === "desktop";
+  const shouldShowAndroidGuide = androidActive || profile.device === "unknown" || profile.device === "installed";
+  const shouldShowIosGuide = iosActive || profile.device === "unknown";
 
   return (
     <main className="install-app-page">
@@ -642,30 +716,21 @@ export default function InstallAppClient() {
           <div className="install-app-hero-main">
             <div className="install-app-badge">Cài đặt web app</div>
             <h1>Cài VTDD App lên màn hình chính.</h1>
-            <p>
-              Link cài đặt: https://vienthongdidong.com/install-app. Trang sẽ tự nhận biết Android hoặc Apple iOS để
-              hiển thị đúng hướng dẫn cho nhân viên.
-            </p>
 
-            <div className="install-app-primary-actions">
-              <button
-                type="button"
-                className="install-app-primary"
-                onClick={installOnChrome}
-                disabled={profile.device === "installed"}
-              >
-                {profile.device === "installed" ? "Đã cài VTDD App" : "Cài VTDD App"}
-              </button>
-              <a className="install-app-secondary" href={EXTERNAL_INSTALL_URL}>
-                Mở bằng trình duyệt ngoài
-              </a>
-            </div>
-
-            <div className={promptEvent || profile.device === "installed" ? "install-app-status" : "install-app-note"}>
-              {profile.isInApp
-                ? `Bạn đang mở trong ${profile.inAppName}. Hãy bấm Mở bằng trình duyệt ngoài, sau đó chọn Chrome nếu dùng Android hoặc Safari nếu dùng Apple iOS.`
-                : status}
-            </div>
+            {(androidActive || profile.device === "installed") && (
+              <>
+                <div className="install-app-primary-actions">
+                  <button
+                    type="button"
+                    className="install-app-primary"
+                    onClick={installOnChrome}
+                    disabled={profile.device === "installed"}
+                  >
+                    {profile.device === "installed" ? "Đã cài VTDD App" : "Cài VTDD App"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           <aside className="install-app-phone-card" aria-label="Mô phỏng VTDD App">
@@ -691,12 +756,27 @@ export default function InstallAppClient() {
           </aside>
         </section>
 
+        {desktopActive && (
+          <section className="install-app-desktop-note" role="status">
+            <div className="install-app-title">
+              <i>PC</i>
+              <h2>Link cài chỉ áp dụng cho điện thoại/tablet</h2>
+            </div>
+            <p>
+              Hệ thống nhận biết thiết bị hiện tại là Desktop/PC/Laptop. Vui lòng mở
+              https://vienthongdidong.com/install-app bằng Android hoặc Apple iOS để cài VTDD App ra màn hình chính.
+            </p>
+          </section>
+        )}
+
+        {!desktopActive && (
         <section className="install-app-grid">
+          {shouldShowAndroidGuide && (
           <article className={androidActive ? "install-app-card active" : "install-app-card"}>
             <div className="install-app-card-head">
               <div className="install-app-title">
                 <i>01</i>
-                <h2>Android</h2>
+                <h2>Hướng dẫn cài đặt</h2>
               </div>
               {androidActive && <span className="install-app-detect">Đã nhận biết</span>}
             </div>
@@ -716,44 +796,40 @@ export default function InstallAppClient() {
               </li>
             </ol>
             <div className="install-app-card-actions">
-              <a href={EXTERNAL_INSTALL_URL}>Mở bằng Chrome</a>
               <a className="light" href={CHROME_PLAY_URL} target="_blank" rel="noreferrer">
                 Tải Chrome trên CH Play
               </a>
             </div>
           </article>
+          )}
 
+          {shouldShowIosGuide && (
           <article className={iosActive ? "install-app-card active" : "install-app-card"}>
             <div className="install-app-card-head">
               <div className="install-app-title">
-                <i>02</i>
-                <h2>Apple iOS</h2>
+                <i>{iosActive ? "01" : "02"}</i>
+                <h2>Hướng dẫn cài đặt</h2>
               </div>
               {iosActive && <span className="install-app-detect">Đã nhận biết</span>}
             </div>
             <p>Apple yêu cầu người dùng tự thêm web vào màn hình chính bằng Safari.</p>
-            <ol className="install-app-steps">
-              <li>
-                <span>1</span>
-                <b>Mở link bằng Safari.</b>
-              </li>
-              <li>
-                <span>2</span>
-                <b>Bấm nút Chia sẻ.</b>
-              </li>
-              <li>
-                <span>3</span>
-                <b>Chọn Add to Home Screen / Thêm vào màn hình chính, rồi bấm Add.</b>
-              </li>
-            </ol>
-            <div className="install-app-card-actions">
-              <a href={EXTERNAL_INSTALL_URL}>Mở bằng Safari</a>
-              <button type="button" onClick={copyExternalUrl}>
-                {copied ? "Đã copy link" : "Copy link cài VTDD App"}
-              </button>
-            </div>
+            {iosActive && (
+              <div className="install-app-ios-visuals" aria-label="Hình ảnh hướng dẫn Apple iOS">
+                {IOS_INSTALL_IMAGES.map((image) => (
+                  <div className="install-app-ios-visual" key={image.step}>
+                    <div className="install-app-ios-visual-head">
+                      <span>{image.step}</span>
+                      <b>{image.title}</b>
+                    </div>
+                    <img className="install-app-ios-image" src={image.src} alt={image.alt} />
+                  </div>
+                ))}
+              </div>
+            )}
           </article>
+          )}
         </section>
+        )}
       </section>
     </main>
   );
