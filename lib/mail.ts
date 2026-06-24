@@ -509,6 +509,9 @@ export async function sendNewStaffAccountMail(params: {
   staffName: string;
   gmail: string;
   adminUrl: string;
+  registrationIp?: string;
+  ipAccountCount?: number;
+  ipRecentUsers?: string[];
 }) {
   const smtpUser = String(process.env.MAIL_USER || "").trim();
   const to = params.to || process.env.NEW_STAFF_NOTIFY_EMAIL || "tamlee070995@gmail.com";
@@ -519,6 +522,24 @@ export async function sendNewStaffAccountMail(params: {
 
   const staffName = params.staffName || "Nhân viên mới";
   const adminUrl = safeUrl(params.adminUrl);
+  const registrationIp = String(params.registrationIp || "Không xác định").trim();
+  const ipAccountCount = Number(params.ipAccountCount || 0);
+  const ipRecentUsers = (params.ipRecentUsers || [])
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  const ipWarningHtml =
+    ipAccountCount >= 2
+      ? buildWarningBox({
+          title: "Cảnh báo IP tạo nhiều tài khoản",
+          desc: `IP <b>${escapeHtml(registrationIp)}</b> đã tạo <b>${escapeHtml(
+            String(ipAccountCount)
+          )}</b> tài khoản trong thời gian gần đây.${
+            ipRecentUsers.length
+              ? `<br>Mã NV liên quan: <b>${escapeHtml(ipRecentUsers.join(", "))}</b>.`
+              : ""
+          }<br>Nếu có dấu hiệu spam, Admin có thể chặn IP này trong mục Tường lửa.`,
+        })
+      : "";
 
   const html = buildEmailShell({
     preheader: `Tài khoản mới ${params.maNV} đang chờ Admin duyệt Active.`,
@@ -532,8 +553,10 @@ export async function sendNewStaffAccountMail(params: {
           { label: "Mã nhân viên", value: params.maNV },
           { label: "Tên nhân viên", value: staffName },
           { label: "Gmail xác thực", value: params.gmail },
+          { label: "IP tạo tài khoản", value: registrationIp, accent: ipAccountCount >= 2 },
         ])}
       </table>
+      ${ipWarningHtml}
       ${buildActionButton("Mở trang Admin để duyệt", adminUrl)}
       ${buildWarningBox({
         title: "Gợi ý xử lý",
@@ -547,6 +570,14 @@ export async function sendNewStaffAccountMail(params: {
     `Mã nhân viên: ${params.maNV}`,
     `Tên nhân viên: ${staffName}`,
     `Gmail xác thực: ${params.gmail}`,
+    `IP tạo tài khoản: ${registrationIp}`,
+    ...(ipAccountCount >= 2
+      ? [
+          `Cảnh báo: IP này đã tạo ${ipAccountCount} tài khoản trong thời gian gần đây.${
+            ipRecentUsers.length ? ` Mã NV liên quan: ${ipRecentUsers.join(", ")}.` : ""
+          }`,
+        ]
+      : []),
     `Mở Admin: ${adminUrl}`,
   ].join("\n\n");
 

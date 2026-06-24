@@ -37,7 +37,7 @@ const SECURITY_QUESTIONS = [
 const WAIT_MESSAGE = "Chờ thông tin hướng dẫn sử dụng từ admin.";
 
 function normalizeUserInput(value: string) {
-  return String(value || "").trim().replace(/\s+/g, "").replace(/^NV/i, "");
+  return String(value || "").replace(/\D/g, "");
 }
 
 function getErrorMessage(err: any) {
@@ -373,7 +373,7 @@ export default function AccountCheckPage() {
                 <i>01</i>
                 <div>
                   <h2>Nhập user cần kiểm tra</h2>
-                  <p>Ví dụ: 12345.</p>
+                  <p>Chỉ nhập số, ví dụ: 12345.</p>
                 </div>
               </div>
 
@@ -381,10 +381,11 @@ export default function AccountCheckPage() {
                 <span>User / mã nhân viên</span>
                 <input
                   value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
+                  onChange={(e) => setUserInput(normalizeUserInput(e.target.value))}
                   placeholder="12345"
                   autoComplete="off"
-                  inputMode="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                 />
               </label>
 
@@ -437,7 +438,7 @@ export default function AccountCheckPage() {
               <div className="account-check-grid two">
                 <label className="account-check-field">
                   <span>Mã nhân viên</span>
-                  <input value={`${checkedUser}`} readOnly />
+                  <input value={`${checkedUser}`} readOnly inputMode="numeric" pattern="[0-9]*" />
                 </label>
                 <label className="account-check-field">
                   <span>Mã siêu thị</span>

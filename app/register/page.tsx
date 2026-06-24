@@ -306,7 +306,17 @@ export default function RegisterPage() {
           <div className="register-vtd-grid two">
             <label className="register-vtd-field">
               <span>Mã nhân viên</span>
-              <input name="maNV" inputMode="numeric" placeholder="Ví dụ: 123123" autoComplete="off" required />
+              <input
+                name="maNV"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Ví dụ: 123123"
+                autoComplete="off"
+                onInput={(e) => {
+                  e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
+                }}
+                required
+              />
             </label>
 
             <label className="register-vtd-field">

@@ -13,6 +13,7 @@ import {
   checkRegisterRateLimit,
   checkRegisterTrap,
   getRegisterClientIp,
+  recordRegisterIpSuccess,
   verifyRegisterTurnstile,
 } from "@/lib/register-guard";
 
@@ -216,6 +217,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!/^\d+$/.test(maNV)) {
+      return redirectRegister(
+        req,
+        "error",
+        "Mã nhân viên chỉ được nhập số."
+      );
+    }
+
     const passwordRuleError = checkPasswordRule(password);
 
     if (passwordRuleError) {
@@ -262,11 +271,16 @@ export async function POST(req: NextRequest) {
       encryptedGmail: encryptText(gmail),
     });
 
+    const ipStats = recordRegisterIpSuccess(clientIp, maNV);
+
     try {
       await sendNewStaffAccountMail({
         maNV,
         staffName,
         gmail,
+        registrationIp: clientIp,
+        ipAccountCount: ipStats.count,
+        ipRecentUsers: ipStats.recentUsers,
         adminUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://vienthongdidong.com"}/admin`,
       });
 

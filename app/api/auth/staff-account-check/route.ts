@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 function normalizeStaffUser(value: any) {
-  return normalizeCode(value).replace(/^NV/i, "");
+  const user = normalizeCode(value);
+  return /^\d+$/.test(user) ? user : "";
 }
 
 export async function POST(req: NextRequest) {
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
 
     if (!maNV) {
       return NextResponse.json(
-        { success: false, message: "Vui lòng nhập mã user cần kiểm tra." },
+        { success: false, message: "Mã user chỉ được nhập số." },
         { status: 400 }
       );
     }

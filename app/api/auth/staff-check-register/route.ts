@@ -13,6 +13,7 @@ import {
   checkRegisterRateLimit,
   checkRegisterTrap,
   getRegisterClientIp,
+  recordRegisterIpSuccess,
   verifyRegisterTurnstile,
 } from "@/lib/register-guard";
 
@@ -20,7 +21,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 function normalizeStaffUser(value: any) {
-  return normalizeCode(value).replace(/^NV/i, "");
+  const user = normalizeCode(value);
+  return /^\d+$/.test(user) ? user : "";
 }
 
 function jsonError(message: string, status = 400) {
@@ -118,7 +120,11 @@ export async function POST(req: NextRequest) {
 
     const question = questionType === "custom" ? customQuestion : questionType;
 
-    if (!maNV || !maST || !staffName || !password || !confirmPassword || !question || !answer || !gmail) {
+    if (!maNV) {
+      return jsonError("Mã nhân viên chỉ được nhập số.");
+    }
+
+    if (!maST || !staffName || !password || !confirmPassword || !question || !answer || !gmail) {
       return jsonError("Vui lòng nhập đầy đủ thông tin tạo tài khoản.");
     }
 
@@ -150,11 +156,16 @@ export async function POST(req: NextRequest) {
       encryptedGmail: encryptText(gmail),
     });
 
+    const ipStats = recordRegisterIpSuccess(clientIp, maNV);
+
     try {
       await sendNewStaffAccountMail({
         maNV,
         staffName,
         gmail,
+        registrationIp: clientIp,
+        ipAccountCount: ipStats.count,
+        ipRecentUsers: ipStats.recentUsers,
         adminUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://vienthongdidong.com"}/admin`,
       });
     } catch (mailErr) {

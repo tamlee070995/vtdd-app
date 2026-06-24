@@ -5,6 +5,11 @@ type Bucket = {
   resetAt: number;
 };
 
+type RegisterIpHit = {
+  maNV: string;
+  at: number;
+};
+
 type RateLimitInput = {
   ip: string;
   maNV: string;
@@ -22,11 +27,13 @@ type TurnstileResult = {
 };
 
 const buckets = new Map<string, Bucket>();
+const registerIpHits = new Map<string, RegisterIpHit[]>();
 let lastCleanupAt = 0;
 
 const MIN_FORM_AGE_MS = 2500;
 const MAX_FORM_AGE_MS = 45 * 60 * 1000;
 const CLOCK_SKEW_MS = 30 * 1000;
+const REGISTER_IP_HISTORY_MS = 24 * 60 * 60 * 1000;
 const TOO_MANY_REQUESTS_MESSAGE =
   "Hệ thống nhận quá nhiều yêu cầu đăng ký. Vui lòng thử lại sau ít phút.";
 
@@ -143,6 +150,31 @@ export function checkRegisterRateLimit(input: RateLimitInput) {
   });
 
   return allowed ? "" : TOO_MANY_REQUESTS_MESSAGE;
+}
+
+export function recordRegisterIpSuccess(ip: string, maNV: string) {
+  const now = Date.now();
+  const key = normalizeRateKey(ip || "unknown-ip") || "unknown-ip";
+  const staffCode = String(maNV || "")
+    .trim()
+    .replace(/\D/g, "")
+    .slice(0, 30);
+  const hits = (registerIpHits.get(key) || []).filter((hit) => {
+    return now - hit.at <= REGISTER_IP_HISTORY_MS;
+  });
+
+  hits.push({
+    maNV: staffCode,
+    at: now,
+  });
+  registerIpHits.set(key, hits);
+
+  return {
+    ip: key,
+    count: hits.length,
+    recentUsers: Array.from(new Set(hits.map((hit) => hit.maNV).filter(Boolean))).slice(-8),
+    repeated: hits.length >= 2,
+  };
 }
 
 export async function verifyRegisterTurnstile(
