@@ -4,6 +4,7 @@ import "./globals.css";
 import CmsImageLightbox from "@/components/CmsImageLightbox";
 import FrontendErrorReporter from "@/components/FrontendErrorReporter";
 import PwaRegister from "@/components/PwaRegister";
+import AppBootSplash from "@/components/AppBootSplash";
 
 export const metadata: Metadata = {
   title: {
@@ -76,6 +77,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <OnlineHeartbeat />
         <FrontendErrorReporter />
         <PwaRegister />
+        <AppBootSplash />
         {children}
         <CmsImageLightbox />
       </body>

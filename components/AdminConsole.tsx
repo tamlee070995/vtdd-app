@@ -412,6 +412,8 @@ function TcdmAdminConsole({
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+  const [bulkStandbyOpen, setBulkStandbyOpen] = useState(false);
+  const [bulkStandbyRoles, setBulkStandbyRoles] = useState({ user: true, mod: false });
 
   const [staff, setStaff] = useState<AdminStaff[]>([]);
   const [staffMeta, setStaffMeta] = useState<StaffMeta>({
@@ -793,6 +795,44 @@ function TcdmAdminConsole({
     }
   }
 
+  async function runBulkStandby() {
+    const roles = [
+      bulkStandbyRoles.user ? "user" : "",
+      bulkStandbyRoles.mod ? "mod" : "",
+    ].filter(Boolean);
+
+    if (!isFullAdmin) {
+      showToast("error", "Chỉ Admin mới được chuyển Standby hàng loạt.");
+      return;
+    }
+
+    if (roles.length === 0) {
+      showToast("error", "Vui lòng chọn ít nhất một cấp bậc áp dụng.");
+      return;
+    }
+
+    try {
+      setBusy("STANDBY_BULK");
+
+      const data = await postJSON("/api/admin/staff", {
+        action: "STANDBY_BULK",
+        roles,
+      });
+
+      setBulkStandbyOpen(false);
+      showToast("success", data.message || "Đã chuyển Standby hàng loạt.");
+      setBusy("");
+      if (staffPage === 1) {
+        await loadStaff(1, { silent: true });
+      } else {
+        setStaffPage(1);
+      }
+    } catch (err: any) {
+      setBusy("");
+      showToast("error", getErrorMessage(err));
+    }
+  }
+
   async function runStaffAdminAccess(maNV: string, permission: string, modules: string) {
     try {
       setBusy(`UPDATE_PERMISSION-${maNV}`);
@@ -1163,9 +1203,24 @@ function TcdmAdminConsole({
               <h2>Nhân viên & phê duyệt</h2>
               <p>Quản lý trạng thái tài khoản, reset bảo mật và OTP cho nhân viên.</p>
             </div>
-            <button className="adminx-action-btn" type="button" onClick={() => loadStaff(staffPage)} disabled={staffLoading}>
-              {staffLoading ? "Đang tải..." : "Tải lại"}
-            </button>
+            <div className="adminx-panel-actions">
+              {isFullAdmin && (
+                <button
+                  className="adminx-action-btn standby"
+                  type="button"
+                  onClick={() => {
+                    setBulkStandbyRoles({ user: true, mod: false });
+                    setBulkStandbyOpen(true);
+                  }}
+                  disabled={staffLoading || busy === "STANDBY_BULK"}
+                >
+                  {busy === "STANDBY_BULK" ? "Đang xử lý..." : "Standby"}
+                </button>
+              )}
+              <button className="adminx-action-btn" type="button" onClick={() => loadStaff(staffPage)} disabled={staffLoading}>
+                {staffLoading ? "Đang tải..." : "Tải lại"}
+              </button>
+            </div>
           </div>
 
           <div className="adminx-staff-summary">
@@ -2159,6 +2214,55 @@ function TcdmAdminConsole({
         </section>
       )}
 
+      {bulkStandbyOpen && (
+        <div className="adminx-confirm-layer" role="dialog" aria-modal="true" aria-labelledby="bulkStandbyTitle">
+          <div className="adminx-confirm-card adminx-bulk-standby-card">
+            <span>Standby hàng loạt</span>
+            <h3 id="bulkStandbyTitle">Chọn cấp bậc áp dụng</h3>
+            <p>Chỉ tài khoản quyền Admin mới dùng được. Hệ thống không chuyển Standby tài khoản quyền Admin.</p>
+
+            <section className="adminx-bulk-standby-options" aria-label="Cấp bậc áp dụng">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={bulkStandbyRoles.user}
+                  onChange={(e) => setBulkStandbyRoles((prev) => ({ ...prev, user: e.target.checked }))}
+                />
+                <span>
+                  <b>Nhân viên</b>
+                  <small>Tài khoản user thường, không có quyền Admin/Mod.</small>
+                </span>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={bulkStandbyRoles.mod}
+                  onChange={(e) => setBulkStandbyRoles((prev) => ({ ...prev, mod: e.target.checked }))}
+                />
+                <span>
+                  <b>Mod</b>
+                  <small>Tài khoản quản trị theo module được cấp quyền.</small>
+                </span>
+              </label>
+            </section>
+
+            <div className="adminx-confirm-actions">
+              <button type="button" className="ghost" onClick={() => setBulkStandbyOpen(false)} disabled={busy === "STANDBY_BULK"}>
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={runBulkStandby}
+                disabled={busy === "STANDBY_BULK" || (!bulkStandbyRoles.user && !bulkStandbyRoles.mod)}
+              >
+                {busy === "STANDBY_BULK" ? "Đang áp dụng..." : "Áp dụng"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmDialog && (
         <div className="adminx-confirm-layer" role="alertdialog" aria-modal="true" aria-labelledby="adminConfirmTitle">
           <div className="adminx-confirm-card">
@@ -2412,6 +2516,14 @@ const ADMINX_STYLE = `
   gap: 14px;
 }
 
+.adminx-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .adminx-eyebrow {
   width: fit-content;
   display: inline-flex;
@@ -2468,6 +2580,11 @@ const ADMINX_STYLE = `
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   color: #0f172a;
+}
+
+.adminx-action-btn.standby {
+  background: #020617;
+  color: #ffd400;
 }
 
 .adminx-staff-actions button.primary {
@@ -3404,6 +3521,10 @@ const ADMINX_STYLE = `
   box-shadow: 0 28px 90px rgba(15, 23, 42, .32);
 }
 
+.adminx-bulk-standby-card {
+  width: min(100%, 520px);
+}
+
 .adminx-confirm-card > span {
   display: inline-flex;
   width: fit-content;
@@ -3440,6 +3561,47 @@ const ADMINX_STYLE = `
   display: grid;
   grid-template-columns: .8fr 1fr;
   gap: 10px;
+}
+
+.adminx-bulk-standby-options {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.adminx-bulk-standby-options label {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dbe4ef;
+  border-radius: 18px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.adminx-bulk-standby-options input {
+  width: 18px;
+  height: 18px;
+  accent-color: #ffd400;
+}
+
+.adminx-bulk-standby-options b {
+  display: block;
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.15;
+  font-weight: 1000;
+}
+
+.adminx-bulk-standby-options small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 800;
 }
 
 .adminx-confirm-card button {

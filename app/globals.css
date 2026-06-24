@@ -794,6 +794,12 @@ a {
   color: #ffffff;
 }
 
+.vtdd-app-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+}
+
 .vtdd-app-loading-card {
   width: min(100%, 430px);
   padding: 34px 26px;

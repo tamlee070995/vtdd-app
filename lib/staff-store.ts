@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { readSheetRange } from "@/lib/sheets";
-import { deleteRows, eq, insertRows, isSupabaseConfigured, selectAllRows, selectRows, updateRows } from "@/lib/supabase-rest";
+import { deleteRows, eq, insertRows, isNull, isSupabaseConfigured, selectAllRows, selectRows, updateRows } from "@/lib/supabase-rest";
 
 const SHEET_NAME = "Data_Staff";
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -588,6 +588,55 @@ export async function updateStaffStatus(rowNumber: number, status: "Active" | "S
       requestBody: { values: [[status]] },
     });
   });
+}
+
+export async function bulkStandbyStaffByPermission(roles: Array<"user" | "mod">) {
+  const selectedRoles = Array.from(new Set(roles.filter((role) => role === "user" || role === "mod")));
+  if (selectedRoles.length === 0) return { updated: 0 };
+
+  if (isSupabaseConfigured()) {
+    let updated = 0;
+
+    if (selectedRoles.includes("mod")) {
+      const rows = await updateRows<any>(
+        "staff",
+        { permission: eq("mod") },
+        { status: "Standby" }
+      );
+      updated += Array.isArray(rows) ? rows.length : 0;
+    }
+
+    if (selectedRoles.includes("user")) {
+      const blankPermissionRows = await updateRows<any>(
+        "staff",
+        { permission: eq("") },
+        { status: "Standby" }
+      );
+      updated += Array.isArray(blankPermissionRows) ? blankPermissionRows.length : 0;
+
+      const nullPermissionRows = await updateRows<any>(
+        "staff",
+        { permission: isNull() },
+        { status: "Standby" }
+      );
+      updated += Array.isArray(nullPermissionRows) ? nullPermissionRows.length : 0;
+    }
+
+    return { updated };
+  }
+
+  const rows = await getStaffRows();
+  const targets = rows.filter((row) => {
+    if (row.permission === "admin") return false;
+    if (row.permission === "mod") return selectedRoles.includes("mod");
+    return selectedRoles.includes("user");
+  });
+
+  for (const row of targets) {
+    await updateStaffStatus(row.rowNumber, "Standby", row.maNV);
+  }
+
+  return { updated: targets.length };
 }
 
 export async function deleteStaffAccount(rowNumber: number, maNV: string) {

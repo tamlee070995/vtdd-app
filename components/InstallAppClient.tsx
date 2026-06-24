@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type InstallPromptEvent = Event & {
@@ -123,20 +122,6 @@ const INSTALL_STYLE = `
   font-weight: 950;
   letter-spacing: .08em;
   text-transform: uppercase;
-}
-
-.install-app-home {
-  min-height: 42px;
-  padding: 0 16px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #ffd400;
-  color: #07111f;
-  font-size: 12px;
-  font-weight: 1000;
-  white-space: nowrap;
 }
 
 .install-app-hero {
@@ -707,9 +692,6 @@ export default function InstallAppClient() {
               <span>VTDD App</span>
             </div>
           </div>
-          <Link className="install-app-home" href="/">
-            Trang chủ
-          </Link>
         </header>
 
         <section className="install-app-hero">

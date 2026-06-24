@@ -3,6 +3,7 @@ import { adminHasAction, normalizeAdminAccess, requireAdminApi, type AdminAction
 import {
   adminResetStaffOtpCount,
   adminResetStaffSecurity,
+  bulkStandbyStaffByPermission,
   deleteStaffAccount,
   ensureStaffAdminHeaders,
   findStaffByMaNV,
@@ -178,6 +179,41 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const action = String(body.action || "").trim().toUpperCase();
+
+    if (action === "STANDBY_BULK") {
+      if (!(await isFullAdmin(admin))) {
+        return NextResponse.json(
+          { success: false, message: "Chỉ Admin mới được chuyển Standby hàng loạt." },
+          { status: 403 }
+        );
+      }
+
+      if (!canRunAction(admin, "staff-manage")) {
+        return NextResponse.json({ success: false, message: "Không có quyền quản lý trạng thái nhân viên." }, { status: 403 });
+      }
+
+      const roles = Array.isArray(body.roles)
+        ? body.roles
+            .map((role: any) => String(role || "").trim().toLowerCase())
+            .filter((role: string): role is "user" | "mod" => role === "user" || role === "mod")
+        : [];
+
+      if (roles.length === 0) {
+        return NextResponse.json({ success: false, message: "Vui lòng chọn cấp bậc cần chuyển Standby." }, { status: 400 });
+      }
+
+      const result = await bulkStandbyStaffByPermission(roles);
+      const labels = Array.from(new Set(roles))
+        .map((role) => (role === "mod" ? "Mod" : "Nhân viên"))
+        .join(", ");
+
+      return NextResponse.json({
+        success: true,
+        updated: result.updated,
+        message: `Đã chuyển Standby ${result.updated} tài khoản thuộc cấp bậc: ${labels}.`,
+      });
+    }
+
     const maNV = normalizeCode(body.maNV);
 
     if (!maNV) {
