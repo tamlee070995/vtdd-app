@@ -10,7 +10,9 @@ import {
   setStaffSessionCookies,
   shouldForceStaffSetup,
 } from "@/lib/staff-auth";
+import { checkFirewallUserAccess, getClientIpFromHeaders } from "@/lib/firewall";
 import { findStaffByMaNV } from "@/lib/staff-store";
+import { getSystemSettings } from "@/lib/system-store";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +60,13 @@ export async function POST(req: NextRequest) {
 
     if (!verifyPassword(password, staff.password)) {
       return redirectLogin(req, "Mật khẩu không đúng. Vui lòng kiểm tra lại.");
+    }
+
+    const settings = await getSystemSettings();
+    const userFirewall = checkFirewallUserAccess(settings, staff.maNV, getClientIpFromHeaders(req.headers));
+
+    if (!userFirewall.allowed) {
+      return redirectLogin(req, userFirewall.reason);
     }
 
     if (!staff.maST) {

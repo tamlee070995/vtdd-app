@@ -1,8 +1,9 @@
 export type FirewallDecision = {
   allowed: boolean;
   ip: string;
+  user?: string;
   reason: string;
-  mode: "allow" | "blacklist" | "whitelist";
+  mode: "allow" | "blacklist" | "whitelist" | "user-blacklist" | "user-whitelist";
 };
 
 type HeaderReader = {
@@ -69,8 +70,31 @@ function ipMatches(ip: string, pattern: string) {
   return false;
 }
 
+function normalizeUserCode(value: string) {
+  return clean(value)
+    .normalize("NFKC")
+    .replace(/\s+/g, "")
+    .replace(/^NV/i, "")
+    .toUpperCase();
+}
+
+function userMatches(user: string, pattern: string) {
+  const target = normalizeUserCode(user);
+  const rule = normalizeUserCode(pattern);
+
+  if (!target || !rule) return false;
+  if (rule === target) return true;
+  if (rule.includes("*")) return wildcardToRegex(rule).test(target);
+
+  return false;
+}
+
 function findMatchingRule(ip: string, rules: Rule[]) {
   return rules.find((rule) => ipMatches(ip, rule.pattern)) || null;
+}
+
+function findMatchingUserRule(user: string, rules: Rule[]) {
+  return rules.find((rule) => userMatches(user, rule.pattern)) || null;
 }
 
 export function getClientIpFromHeaders(headersList: HeaderReader) {
@@ -121,6 +145,51 @@ export function checkFirewallAccess(settings: Record<string, string>, ip: string
   return {
     allowed: true,
     ip: clientIp,
+    reason: "",
+    mode: "allow",
+  };
+}
+
+export function checkFirewallUserAccess(
+  settings: Record<string, string>,
+  user: string,
+  ip = ""
+): FirewallDecision {
+  const clientIp = clean(ip) || "unknown";
+  const userCode = normalizeUserCode(user);
+  const message = clean(settings.FIREWALL_USER_MESSAGE) || "Tài khoản của bạn không được phép truy cập hệ thống tra giá.";
+  const blacklist = parseRules(settings.FIREWALL_USER_BLACKLIST);
+  const whitelist = parseRules(settings.FIREWALL_USER_WHITELIST);
+  const blacklisted = findMatchingUserRule(userCode, blacklist);
+
+  if (blacklisted) {
+    return {
+      allowed: false,
+      ip: clientIp,
+      user: userCode,
+      reason: blacklisted.reason || message,
+      mode: "user-blacklist",
+    };
+  }
+
+  if (whitelist.length > 0) {
+    const whitelisted = findMatchingUserRule(userCode, whitelist);
+
+    if (!whitelisted) {
+      return {
+        allowed: false,
+        ip: clientIp,
+        user: userCode,
+        reason: message,
+        mode: "user-whitelist",
+      };
+    }
+  }
+
+  return {
+    allowed: true,
+    ip: clientIp,
+    user: userCode,
     reason: "",
     mode: "allow",
   };

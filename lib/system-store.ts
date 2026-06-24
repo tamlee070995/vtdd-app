@@ -45,6 +45,9 @@ export const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
   FIREWALL_BLACKLIST: "",
   FIREWALL_WHITELIST: "",
   FIREWALL_MESSAGE: "IP của bạn không được phép truy cập hệ thống tra giá.",
+  FIREWALL_USER_BLACKLIST: "",
+  FIREWALL_USER_WHITELIST: "",
+  FIREWALL_USER_MESSAGE: "Tài khoản của bạn không được phép truy cập hệ thống tra giá.",
 
   DATA_VERSION: "1",
   ADMIN_PIN_HASH: "",

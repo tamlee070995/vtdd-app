@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import FirewallBlockedPage from "@/components/FirewallBlockedPage";
 import StaffTradeInApp from "@/components/StaffTradeInApp";
-import { checkFirewallAccess, getClientIpFromHeaders } from "@/lib/firewall";
+import { checkFirewallAccess, checkFirewallUserAccess, getClientIpFromHeaders } from "@/lib/firewall";
 import { getCurrentStaffFromCookies } from "@/lib/staff-auth";
 import { getSystemSettings } from "@/lib/system-store";
 
@@ -15,10 +15,17 @@ export default async function StaffPage() {
 
   const headersList = await headers();
   const settings = await getSystemSettings();
-  const firewall = checkFirewallAccess(settings, getClientIpFromHeaders(headersList));
+  const clientIp = getClientIpFromHeaders(headersList);
+  const firewall = checkFirewallAccess(settings, clientIp);
 
   if (!firewall.allowed) {
     return <FirewallBlockedPage ip={firewall.ip} message={firewall.reason} />;
+  }
+
+  const userFirewall = checkFirewallUserAccess(settings, currentStaff.maNV, clientIp);
+
+  if (!userFirewall.allowed) {
+    return <FirewallBlockedPage ip={userFirewall.ip} user={userFirewall.user} message={userFirewall.reason} />;
   }
 
   return (

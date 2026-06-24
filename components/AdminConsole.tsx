@@ -250,7 +250,14 @@ const SCHEDULE_LOCK_SETTING_KEYS = [
 ];
 const STAFF_LOCK_SETTING_KEYS = ["STAFF_PAGE_LOCKED", "STAFF_TRADEIN_LOCKED", "STAFF_BUYONLY_LOCKED"];
 const CUSTOMER_LOCK_SETTING_KEYS = ["CUSTOMER_PAGE_LOCKED", "CUSTOMER_TRADEIN_LOCKED", "CUSTOMER_BUYONLY_LOCKED"];
-const FIREWALL_SETTING_KEYS = ["FIREWALL_BLACKLIST", "FIREWALL_WHITELIST", "FIREWALL_MESSAGE"];
+const FIREWALL_SETTING_KEYS = [
+  "FIREWALL_BLACKLIST",
+  "FIREWALL_WHITELIST",
+  "FIREWALL_MESSAGE",
+  "FIREWALL_USER_BLACKLIST",
+  "FIREWALL_USER_WHITELIST",
+  "FIREWALL_USER_MESSAGE",
+];
 
 function stripHiddenClientSettings(values: Record<string, string>) {
   return Object.fromEntries(Object.entries(values).filter(([key]) => !HIDDEN_CLIENT_SETTING_KEYS.has(key)));
@@ -1995,8 +2002,35 @@ function TcdmAdminConsole({
                 </label>
               </div>
 
+              <div className="adminx-firewall-panel adminx-firewall-user-panel">
+                <label>
+                  <span>Blacklist User (chặn user | lý do)</span>
+                  <textarea
+                    value={settings.FIREWALL_USER_BLACKLIST || ""}
+                    onChange={(e) => setSetting("FIREWALL_USER_BLACKLIST", e.target.value)}
+                    placeholder={"NV36964 | Tạm khóa truy cập\n12345 | Spam tra giá"}
+                  />
+                </label>
+                <label>
+                  <span>Whitelist User (chỉ user này vào)</span>
+                  <textarea
+                    value={settings.FIREWALL_USER_WHITELIST || ""}
+                    onChange={(e) => setSetting("FIREWALL_USER_WHITELIST", e.target.value)}
+                    placeholder={"Nếu ô này có dữ liệu, toàn bộ user khác sẽ bị chặn.\nVD: NV36964"}
+                  />
+                </label>
+                <label className="adminx-firewall-message">
+                  <span>Nội dung hiển thị khi user bị chặn</span>
+                  <input
+                    value={settings.FIREWALL_USER_MESSAGE || ""}
+                    onChange={(e) => setSetting("FIREWALL_USER_MESSAGE", e.target.value)}
+                    placeholder="Tài khoản của bạn không được phép truy cập hệ thống tra giá."
+                  />
+                </label>
+              </div>
+
               <div className="adminx-lock-help">
-                Blacklist chặn đúng IP, có thể ghi kèm lý do bằng dấu |. Whitelist nếu có dữ liệu sẽ chuyển sang chế độ chỉ cho các IP trong danh sách truy cập.
+                Blacklist chặn đúng IP/User, có thể ghi kèm lý do bằng dấu |. Whitelist nếu có dữ liệu sẽ chuyển sang chế độ chỉ cho các IP/User trong danh sách truy cập.
               </div>
 
               <div className="adminx-section-actions">
@@ -2006,7 +2040,7 @@ function TcdmAdminConsole({
                   onClick={() => saveSystemSection(FIREWALL_SETTING_KEYS, "firewall-settings")}
                   disabled={!canWriteSettings || busy === "firewall-settings"}
                 >
-                  {busy === "firewall-settings" ? "Đang lưu..." : "Lưu tường lửa IP"}
+                  {busy === "firewall-settings" ? "Đang lưu..." : "Lưu tường lửa IP/User"}
                 </button>
               </div>
             </section>
@@ -3262,6 +3296,11 @@ const ADMINX_STYLE = `
   gap: 14px;
   background: #020617;
   border: 1px solid #0f172a;
+}
+
+.adminx-firewall-user-panel {
+  margin-top: 12px;
+  background: #111827;
 }
 
 .adminx-firewall-panel label {

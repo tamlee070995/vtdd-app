@@ -2,10 +2,11 @@ import Link from "next/link";
 
 type FirewallBlockedPageProps = {
   ip: string;
+  user?: string;
   message: string;
 };
 
-export default function FirewallBlockedPage({ ip, message }: FirewallBlockedPageProps) {
+export default function FirewallBlockedPage({ ip, user, message }: FirewallBlockedPageProps) {
   return (
     <main className="vtdd-firewall-page">
       <section className="vtdd-firewall-card">
@@ -13,6 +14,7 @@ export default function FirewallBlockedPage({ ip, message }: FirewallBlockedPage
         <span>Tường lửa hệ thống</span>
         <h1>Truy cập bị chặn</h1>
         <p>{message || "IP của bạn không được phép truy cập hệ thống tra giá."}</p>
+        {user ? <div className="vtdd-firewall-ip">User: NV{user}</div> : null}
         <div className="vtdd-firewall-ip">IP: {ip || "Không xác định"}</div>
         <Link href="/">Quay về trang chủ</Link>
       </section>
