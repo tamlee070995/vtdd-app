@@ -432,7 +432,10 @@ export async function createStandbyAccount(data: {
   encryptedQuestion: string;
   answerHash: string;
   encryptedGmail: string;
+  needSetup?: "0" | "1";
 }) {
+  const needSetup = data.needSetup === "1" ? "1" : "0";
+
   if (isSupabaseConfigured()) {
     try {
       await insertRows(
@@ -453,7 +456,7 @@ export async function createStandbyAccount(data: {
             reset_otp_expires: "",
             reset_otp_day: "",
             reset_otp_count: "0",
-            need_setup: "0",
+            need_setup: needSetup,
             permission: "",
             module_permissions: "",
             source_row: String(Date.now()),
@@ -493,7 +496,7 @@ export async function createStandbyAccount(data: {
           "",
           "",
           "",
-          "0",
+          needSetup,
           "",
           "",
         ]],
