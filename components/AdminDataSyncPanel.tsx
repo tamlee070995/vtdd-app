@@ -329,6 +329,41 @@ export default function AdminDataSyncPanel() {
     }
   }
 
+  async function downloadBackupFile(fileName?: string) {
+    const safeName = String(fileName || backupStatus?.fileName || "vtdd-backup.json").trim() || "vtdd-backup.json";
+
+    try {
+      setBusy(`backup-download:${safeName}`);
+      const params = new URLSearchParams({
+        target: "backup-file",
+        file: safeName,
+      });
+      const res = await fetch(`/api/admin/tools/sync?${params.toString()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || "Không tải được file backup.");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = getFileNameFromResponse(res, "backup");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setBusy("");
+    } catch (err: any) {
+      setBusy("");
+      showToast(err?.message || "Không tải được file backup.");
+    }
+  }
+
   return (
     <section className="admin-sync-panel">
       <style>{STYLE}</style>
@@ -450,26 +485,48 @@ export default function AdminDataSyncPanel() {
           </div>
 
           <div className="sync-auto-backup">
-            <div>
+            <div className="sync-auto-backup-head">
               <span>Auto backup</span>
               <b>23:00 mỗi ngày</b>
             </div>
-            <p>Hệ thống giữ file mới nhất và 7 bản gần đây: <strong>{backupStatus?.dailyFileName || backupStatus?.fileName || "vtdd-backup.json"}</strong></p>
+            <p>Hệ thống giữ file mới nhất và 7 bản gần đây: <strong>{backupStatus?.fileName || "vtdd-backup.json"}</strong></p>
             <small>
               {backupStatus?.exists
                 ? `Lần gần nhất: ${backupStatus.updatedAtVN || "-"} • ${formatBytes(backupStatus.bytes)}`
                 : "Chưa có file backup tự động. File sẽ được tạo lúc 23:00."}
             </small>
+            {backupStatus?.exists ? (
+              <button
+                type="button"
+                className="sync-backup-download sync-backup-latest"
+                onClick={() => downloadBackupFile(backupStatus.fileName || "vtdd-backup.json")}
+                disabled={busy === `backup-download:${backupStatus.fileName || "vtdd-backup.json"}`}
+              >
+                {busy === `backup-download:${backupStatus.fileName || "vtdd-backup.json"}` ? "Đang tải..." : "Tải backup mới nhất"}
+              </button>
+            ) : null}
             <small>Lần kế tiếp: {backupStatus?.nextRunAtVN || "23:00 hôm nay/ngày mai"}</small>
             {backupStatus?.lastError ? <em>{backupStatus.lastError}</em> : null}
             {backupStatus?.history?.length ? (
               <div className="sync-backup-history">
-                {backupStatus.history.slice(0, 7).map((item) => (
-                  <span key={item.dailyFileName || item.createdAt}>
-                    <b>{item.dailyFileName || item.fileName}</b>
-                    <small>{item.createdAtVN || item.createdAt || "-"} • {formatBytes(Number(item.bytes || 0))}</small>
-                  </span>
-                ))}
+                {backupStatus.history.slice(0, 7).map((item) => {
+                  const historyFileName = item.dailyFileName || item.fileName || "";
+
+                  return (
+                    <div className="sync-backup-history-item" key={historyFileName || item.createdAt}>
+                      <b>{historyFileName || "vtdd-backup.json"}</b>
+                      <small>{item.createdAtVN || item.createdAt || "-"} • {formatBytes(Number(item.bytes || 0))}</small>
+                      <button
+                        type="button"
+                        className="sync-backup-download"
+                        onClick={() => downloadBackupFile(historyFileName)}
+                        disabled={!historyFileName || busy === `backup-download:${historyFileName}`}
+                      >
+                        {busy === `backup-download:${historyFileName}` ? "Đang tải..." : "Tải xuống"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
           </div>
@@ -793,7 +850,7 @@ const STYLE = `
   background: linear-gradient(135deg, #ecfdf5, #ffffff);
   border: 1px solid #99f6e4;
 }
-.sync-auto-backup div {
+.sync-auto-backup-head {
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -832,13 +889,32 @@ const STYLE = `
   border: 1px solid #fecaca;
   color: #991b1b;
 }
+.sync-backup-download {
+  width: fit-content;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(7, 17, 31, .08);
+  background: #07111f;
+  color: #ffd400;
+  font-size: 10.5px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+.sync-backup-download:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+}
+.sync-backup-latest {
+  margin-top: 3px;
+}
 .sync-backup-history {
   margin-top: 8px;
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px !important;
 }
-.sync-backup-history span {
+.sync-backup-history-item {
   display: grid;
   gap: 4px;
   padding: 9px 10px;
@@ -846,16 +922,20 @@ const STYLE = `
   background: rgba(255, 255, 255, .76);
   border: 1px solid #dbe4ef;
 }
-.sync-backup-history b {
+.sync-backup-history-item b {
   color: #07111f;
   font-size: 11px;
   font-weight: 1000;
   overflow-wrap: anywhere;
 }
-.sync-backup-history small {
+.sync-backup-history-item small {
   color: #64748b;
   font-size: 10.5px;
   font-weight: 850;
+}
+.sync-backup-history-item .sync-backup-download {
+  width: 100%;
+  min-height: 30px;
 }
 .sync-export-grid {
   display: grid;

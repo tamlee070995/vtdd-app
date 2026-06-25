@@ -268,3 +268,48 @@ export async function getAutoBackupStatus() {
     history,
   };
 }
+
+function normalizeBackupFileName(fileName?: string | null) {
+  const requested = String(fileName || BACKUP_FILE_NAME).trim() || BACKUP_FILE_NAME;
+  const cleanName = path.basename(requested);
+
+  if (cleanName !== requested) {
+    throw new Error("Tên file backup không hợp lệ.");
+  }
+
+  if (cleanName !== BACKUP_FILE_NAME && !/^vtdd-backup-\d{4}-\d{2}-\d{2}\.json$/i.test(cleanName)) {
+    throw new Error("Tên file backup không hợp lệ.");
+  }
+
+  return cleanName;
+}
+
+export async function getAutoBackupDownload(fileName?: string | null) {
+  const safeName = normalizeBackupFileName(fileName);
+  const backupDir = path.resolve(BACKUP_DIR);
+  const filePath = path.resolve(backupDir, safeName);
+  const relativePath = path.relative(backupDir, filePath);
+
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error("Tên file backup không hợp lệ.");
+  }
+
+  try {
+    const [body, fileStat] = await Promise.all([readFile(filePath), stat(filePath)]);
+
+    return {
+      fileName: safeName,
+      backupPath: filePath,
+      body,
+      bytes: fileStat.size,
+      updatedAt: fileStat.mtime.toISOString(),
+      updatedAtVN: formatVN(fileStat.mtime),
+    };
+  } catch (err: any) {
+    if (err?.code === "ENOENT") {
+      throw new Error("Chưa có file backup này để tải xuống.");
+    }
+
+    throw err;
+  }
+}

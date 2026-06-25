@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-auth";
-import { ensureAutoBackupScheduler, getAutoBackupStatus } from "@/lib/auto-backup";
+import {
+  createAutoBackup,
+  ensureAutoBackupScheduler,
+  getAutoBackupDownload,
+  getAutoBackupStatus,
+} from "@/lib/auto-backup";
 import { appendAdminAudit } from "@/lib/system-store";
 import {
   exportSyncTarget,
@@ -21,6 +26,17 @@ function noStoreHeaders(extra?: HeadersInit) {
     "Cache-Control": "no-store, no-cache, must-revalidate",
     ...(extra || {}),
   };
+}
+
+function backupDownloadResponse(backup: Awaited<ReturnType<typeof getAutoBackupDownload>>) {
+  return new NextResponse(new Uint8Array(backup.body), {
+    status: 200,
+    headers: noStoreHeaders({
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": String(backup.bytes),
+      "Content-Disposition": `attachment; filename="${backup.fileName}"`,
+    }),
+  });
 }
 
 export async function GET(req: NextRequest) {
@@ -78,11 +94,30 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if (target === "backup-file") {
+      if (admin?.permission !== "admin") {
+        return NextResponse.json(
+          { success: false, message: "Chỉ Admin được tải file backup." },
+          { status: 403, headers: noStoreHeaders() }
+        );
+      }
+
+      const fileName = req.nextUrl.searchParams.get("file");
+      const backup = await getAutoBackupDownload(fileName);
+      return backupDownloadResponse(backup);
+    }
+
     if (ADMIN_ONLY_EXPORT_TARGETS.has(target) && admin?.permission !== "admin") {
       return NextResponse.json(
         { success: false, message: "Chỉ Admin được xuất dữ liệu nhạy cảm." },
         { status: 403, headers: noStoreHeaders() }
       );
+    }
+
+    if (target === "backup") {
+      const created = await createAutoBackup("manual");
+      const backup = await getAutoBackupDownload(created.fileName);
+      return backupDownloadResponse(backup);
     }
 
     const exported = await exportSyncTarget(target);

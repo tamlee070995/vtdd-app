@@ -578,6 +578,19 @@ function TcdmAdminConsole({
     return data;
   }
 
+  function getDownloadFileName(res: Response, fallback: string) {
+    const header = res.headers.get("content-disposition") || "";
+    const match = header.match(/filename="?([^"]+)"?/i);
+
+    if (!match?.[1]) return fallback;
+
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      return match[1];
+    }
+  }
+
   async function loadOnlineStats(options?: { silent?: boolean }) {
     try {
       if (!options?.silent) setOnlineLoading(true);
@@ -628,6 +641,41 @@ function TcdmAdminConsole({
     } catch (err: any) {
       setOpsLoading(false);
       if (!options?.silent) showToast("error", getErrorMessage(err));
+    }
+  }
+
+  async function downloadBackupFile(fileName?: string) {
+    const safeName = String(fileName || "vtdd-backup.json").trim() || "vtdd-backup.json";
+
+    try {
+      setBusy(`backup-download:${safeName}`);
+      const params = new URLSearchParams({
+        target: "backup-file",
+        file: safeName,
+      });
+      const res = await fetch(`/api/admin/tools/sync?${params.toString()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || "Không tải được file backup.");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = getDownloadFileName(res, safeName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setBusy("");
+    } catch (err: any) {
+      setBusy("");
+      showToast("error", getErrorMessage(err));
     }
   }
 
@@ -1159,6 +1207,16 @@ function TcdmAdminConsole({
                   <span>Backup</span>
                   <b>{opsHealth?.backup?.exists ? "Đã có file" : "Chưa có file"}</b>
                   <p>{opsHealth?.backup?.updatedAtVN || opsHealth?.backup?.nextRunAtVN || "Tự chạy lúc 23:00 mỗi ngày."}</p>
+                  {opsHealth?.backup?.exists ? (
+                    <button
+                      type="button"
+                      className="adminx-health-action"
+                      onClick={() => downloadBackupFile(opsHealth.backup.fileName || "vtdd-backup.json")}
+                      disabled={busy === `backup-download:${opsHealth.backup.fileName || "vtdd-backup.json"}`}
+                    >
+                      {busy === `backup-download:${opsHealth.backup.fileName || "vtdd-backup.json"}` ? "Đang tải..." : "Tải backup mới nhất"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -1194,13 +1252,25 @@ function TcdmAdminConsole({
                   <h4>Lịch sử backup</h4>
                   <div className="adminx-ops-list">
                     {opsHealth?.backup?.history?.length ? (
-                      opsHealth.backup.history.slice(0, 7).map((item: any) => (
-                        <div key={item.dailyFileName || item.createdAt}>
-                          <b>{item.dailyFileName || item.fileName}</b>
-                          <span>{item.createdAtVN || item.createdAt || "—"} • {formatNumber(Number(item.bytes || 0))} bytes</span>
-                          <p>{item.trigger === "schedule" ? "Backup tự động" : "Backup thủ công"}</p>
-                        </div>
-                      ))
+                      opsHealth.backup.history.slice(0, 7).map((item: any) => {
+                        const backupFileName = item.dailyFileName || item.fileName || "";
+
+                        return (
+                          <div key={backupFileName || item.createdAt}>
+                            <b>{backupFileName || "vtdd-backup.json"}</b>
+                            <span>{item.createdAtVN || item.createdAt || "—"} • {formatNumber(Number(item.bytes || 0))} bytes</span>
+                            <p>{item.trigger === "schedule" ? "Backup tự động" : "Backup thủ công"}</p>
+                            <button
+                              type="button"
+                              className="adminx-backup-download"
+                              onClick={() => downloadBackupFile(backupFileName)}
+                              disabled={!backupFileName || busy === `backup-download:${backupFileName}`}
+                            >
+                              {busy === `backup-download:${backupFileName}` ? "Đang tải..." : "Tải xuống"}
+                            </button>
+                          </div>
+                        );
+                      })
                     ) : (
                       <p>Chưa có lịch sử backup. Hệ thống sẽ giữ 7 bản gần nhất.</p>
                     )}
@@ -4327,6 +4397,24 @@ const ADMINX_ONLINE_STYLE = `
   overflow-wrap: anywhere;
 }
 
+.adminx-health-action {
+  width: 100%;
+  min-height: 32px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 212, 0, .95);
+  color: #07111f;
+  font-size: 10.5px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.adminx-health-action:disabled {
+  opacity: .62;
+  cursor: not-allowed;
+}
+
 .adminx-ops-grid {
   grid-template-columns: repeat(3, 1fr);
 }
@@ -4395,6 +4483,24 @@ const ADMINX_ONLINE_STYLE = `
   font-size: 10.5px;
   line-height: 1.3;
   font-weight: 850;
+}
+
+.adminx-backup-download {
+  width: 100%;
+  min-height: 32px;
+  margin-top: 9px;
+  border: 0;
+  border-radius: 12px;
+  background: #ffd400;
+  color: #07111f;
+  font-size: 10.5px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.adminx-backup-download:disabled {
+  opacity: .62;
+  cursor: not-allowed;
 }
 
 @media screen and (max-width: 560px) {
