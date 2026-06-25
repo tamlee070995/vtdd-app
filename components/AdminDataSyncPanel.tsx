@@ -495,16 +495,26 @@ export default function AdminDataSyncPanel() {
                 ? `Lần gần nhất: ${backupStatus.updatedAtVN || "-"} • ${formatBytes(backupStatus.bytes)}`
                 : "Chưa có file backup tự động. File sẽ được tạo lúc 23:00."}
             </small>
-            {backupStatus?.exists ? (
+            <div className="sync-backup-actions">
               <button
                 type="button"
-                className="sync-backup-download sync-backup-latest"
-                onClick={() => downloadBackupFile(backupStatus.fileName || "vtdd-backup.json")}
-                disabled={busy === `backup-download:${backupStatus.fileName || "vtdd-backup.json"}`}
+                className="sync-backup-download sync-backup-manual"
+                onClick={() => runExport("backup")}
+                disabled={busy === "export:backup"}
               >
-                {busy === `backup-download:${backupStatus.fileName || "vtdd-backup.json"}` ? "Đang tải..." : "Tải backup mới nhất"}
+                {busy === "export:backup" ? "Đang tạo backup..." : "Tạo backup tay"}
               </button>
-            ) : null}
+              {backupStatus?.exists ? (
+                <button
+                  type="button"
+                  className="sync-backup-download sync-backup-latest"
+                  onClick={() => downloadBackupFile(backupStatus.fileName || "vtdd-backup.json")}
+                  disabled={busy === `backup-download:${backupStatus.fileName || "vtdd-backup.json"}`}
+                >
+                  {busy === `backup-download:${backupStatus.fileName || "vtdd-backup.json"}` ? "Đang tải..." : "Tải backup mới nhất"}
+                </button>
+              ) : null}
+            </div>
             <small>Lần kế tiếp: {backupStatus?.nextRunAtVN || "23:00 hôm nay/ngày mai"}</small>
             {backupStatus?.lastError ? <em>{backupStatus.lastError}</em> : null}
             {backupStatus?.history?.length ? (
@@ -905,8 +915,20 @@ const STYLE = `
   cursor: not-allowed;
   opacity: .62;
 }
-.sync-backup-latest {
+.sync-backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
   margin-top: 3px;
+}
+.sync-backup-manual {
+  background: #ffd400;
+  color: #07111f;
+}
+.sync-backup-latest {
+  background: #07111f;
+  color: #ffd400;
 }
 .sync-backup-history {
   margin-top: 8px;
