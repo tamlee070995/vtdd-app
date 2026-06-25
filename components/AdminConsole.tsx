@@ -166,12 +166,22 @@ type ConfirmDialogState = {
   onConfirm: () => void | Promise<void>;
 } | null;
 
+type DeleteStaffDialogState = {
+  maNV: string;
+  staffName: string;
+  gmail: string;
+} | null;
+
 const EMPTY_SUMMARY: StaffSummary = {
   total: 0,
   active: 0,
   standby: 0,
   needSetup: 0,
 };
+
+const DEFAULT_DELETE_STAFF_MAIL_TITLE = "Thông báo tài khoản đã bị xóa";
+const DEFAULT_DELETE_STAFF_MAIL_MESSAGE =
+  "Tài khoản của bạn đã được Admin xóa khỏi hệ thống. Nếu cần hỗ trợ, vui lòng liên hệ quản trị viên.";
 
 const TAB_ITEMS: Array<{
   key: TabKey;
@@ -421,6 +431,10 @@ function TcdmAdminConsole({
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [bulkStandbyOpen, setBulkStandbyOpen] = useState(false);
   const [bulkStandbyRoles, setBulkStandbyRoles] = useState({ user: true, mod: false });
+  const [deleteStaffDialog, setDeleteStaffDialog] = useState<DeleteStaffDialogState>(null);
+  const [deleteStaffMailEnabled, setDeleteStaffMailEnabled] = useState(true);
+  const [deleteStaffMailTitle, setDeleteStaffMailTitle] = useState(DEFAULT_DELETE_STAFF_MAIL_TITLE);
+  const [deleteStaffMailMessage, setDeleteStaffMailMessage] = useState(DEFAULT_DELETE_STAFF_MAIL_MESSAGE);
 
   const [staff, setStaff] = useState<AdminStaff[]>([]);
   const [staffMeta, setStaffMeta] = useState<StaffMeta>({
@@ -784,13 +798,18 @@ function TcdmAdminConsole({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, dashboardLoaded, dashboardSource]);
 
-  async function runStaffAction(action: "ACTIVE" | "STANDBY" | "RESET_SECURITY" | "RESET_OTP_COUNT" | "DELETE", maNV: string) {
+  async function runStaffAction(
+    action: "ACTIVE" | "STANDBY" | "RESET_SECURITY" | "RESET_OTP_COUNT" | "DELETE",
+    maNV: string,
+    extra?: Record<string, unknown>
+  ) {
     try {
       setBusy(`${action}-${maNV}`);
 
       const data = await postJSON("/api/admin/staff", {
         action,
         maNV,
+        ...(extra || {}),
       });
 
       showToast("success", data.message || "Đã cập nhật.");
@@ -800,6 +819,32 @@ function TcdmAdminConsole({
       setBusy("");
       showToast("error", getErrorMessage(err));
     }
+  }
+
+  function openDeleteStaffDialog(item: AdminStaff) {
+    setDeleteStaffDialog({
+      maNV: item.maNV,
+      staffName: item.staffName || "nhân viên này",
+      gmail: item.gmail || "",
+    });
+    setDeleteStaffMailEnabled(true);
+    setDeleteStaffMailTitle(DEFAULT_DELETE_STAFF_MAIL_TITLE);
+    setDeleteStaffMailMessage(DEFAULT_DELETE_STAFF_MAIL_MESSAGE);
+  }
+
+  async function submitDeleteStaffDialog() {
+    const target = deleteStaffDialog;
+    if (!target) return;
+
+    const title = deleteStaffMailTitle.trim() || DEFAULT_DELETE_STAFF_MAIL_TITLE;
+    const message = deleteStaffMailMessage.trim() || DEFAULT_DELETE_STAFF_MAIL_MESSAGE;
+
+    setDeleteStaffDialog(null);
+    await runStaffAction("DELETE", target.maNV, {
+      notifyDeleteStaff: deleteStaffMailEnabled,
+      deleteMailTitle: title,
+      deleteMailMessage: message,
+    });
   }
 
   async function runBulkStandby() {
@@ -1386,15 +1431,7 @@ function TcdmAdminConsole({
                         type="button"
                         className="danger"
                         disabled={!canDeleteStaff || busy === `DELETE-${item.maNV}`}
-                        onClick={() => {
-                          openConfirmDialog({
-                            title: "Xóa nhân viên",
-                            message: `Xóa tài khoản ${item.maNV} - ${item.staffName || "nhân viên này"}? Thao tác này không thể hoàn tác.`,
-                            confirmText: "Xóa",
-                            danger: true,
-                            onConfirm: () => runStaffAction("DELETE", item.maNV),
-                          });
-                        }}
+                        onClick={() => openDeleteStaffDialog(item)}
                       >
                         Xóa nhân viên
                       </button>
@@ -2291,6 +2328,61 @@ function TcdmAdminConsole({
                 disabled={busy === "STANDBY_BULK" || (!bulkStandbyRoles.user && !bulkStandbyRoles.mod)}
               >
                 {busy === "STANDBY_BULK" ? "Đang áp dụng..." : "Áp dụng"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteStaffDialog && (
+        <div className="adminx-confirm-layer" role="dialog" aria-modal="true" aria-labelledby="deleteStaffTitle">
+          <div className="adminx-confirm-card adminx-delete-staff-card">
+            <span>Xóa nhân viên</span>
+            <h3 id="deleteStaffTitle">Xóa tài khoản NV {deleteStaffDialog.maNV}</h3>
+            <p>
+              {deleteStaffDialog.staffName}. Thao tác này không thể hoàn tác. Có thể gửi mail để nhân viên biết lý do tài khoản bị xóa.
+            </p>
+
+            <label className="adminx-delete-mail-toggle">
+              <input
+                type="checkbox"
+                checked={deleteStaffMailEnabled}
+                onChange={(e) => setDeleteStaffMailEnabled(e.target.checked)}
+              />
+              <span>
+                <b>Gửi mail thông báo cho tài khoản bị xóa</b>
+                <small>{deleteStaffDialog.gmail ? `Gửi đến Gmail đã đăng ký: ${deleteStaffDialog.gmail}` : "Nếu tài khoản chưa có Gmail hợp lệ, hệ thống sẽ chỉ xóa tài khoản."}</small>
+              </span>
+            </label>
+
+            <section className={!deleteStaffMailEnabled ? "adminx-delete-mail-fields disabled" : "adminx-delete-mail-fields"}>
+              <label>
+                <span>Tiêu đề mail</span>
+                <input
+                  value={deleteStaffMailTitle}
+                  onChange={(e) => setDeleteStaffMailTitle(e.target.value)}
+                  disabled={!deleteStaffMailEnabled}
+                  placeholder="VD: Thông báo tài khoản đã bị xóa"
+                />
+              </label>
+              <label>
+                <span>Nội dung gửi nhân viên</span>
+                <textarea
+                  value={deleteStaffMailMessage}
+                  onChange={(e) => setDeleteStaffMailMessage(e.target.value)}
+                  disabled={!deleteStaffMailEnabled}
+                  rows={4}
+                  placeholder="Nhập nội dung để nhân viên biết lý do..."
+                />
+              </label>
+            </section>
+
+            <div className="adminx-confirm-actions">
+              <button type="button" className="ghost" onClick={() => setDeleteStaffDialog(null)}>
+                Hủy
+              </button>
+              <button type="button" className="danger" onClick={submitDeleteStaffDialog}>
+                Xóa tài khoản
               </button>
             </div>
           </div>
@@ -3564,6 +3656,10 @@ const ADMINX_STYLE = `
   width: min(100%, 520px);
 }
 
+.adminx-delete-staff-card {
+  width: min(100%, 560px);
+}
+
 .adminx-confirm-card > span {
   display: inline-flex;
   width: fit-content;
@@ -3641,6 +3737,88 @@ const ADMINX_STYLE = `
   font-size: 12px;
   line-height: 1.35;
   font-weight: 800;
+}
+
+.adminx-delete-mail-toggle {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dbe4ef;
+  border-radius: 18px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.adminx-delete-mail-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #ffd400;
+}
+
+.adminx-delete-mail-toggle b {
+  display: block;
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.15;
+  font-weight: 1000;
+}
+
+.adminx-delete-mail-toggle small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.adminx-delete-mail-fields {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.adminx-delete-mail-fields.disabled {
+  opacity: .55;
+}
+
+.adminx-delete-mail-fields label {
+  display: grid;
+  gap: 7px;
+}
+
+.adminx-delete-mail-fields label > span {
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-delete-mail-fields input,
+.adminx-delete-mail-fields textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid #dbe4ef;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 850;
+  outline: none;
+  resize: vertical;
+}
+
+.adminx-delete-mail-fields input:focus,
+.adminx-delete-mail-fields textarea:focus {
+  border-color: #facc15;
+  box-shadow: 0 0 0 4px rgba(250, 204, 21, .16);
 }
 
 .adminx-confirm-card button {

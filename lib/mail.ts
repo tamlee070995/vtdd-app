@@ -506,6 +506,7 @@ async function sendMailWithFallback(options: any) {
 export async function sendNewStaffAccountMail(params: {
   to?: string;
   maNV: string;
+  maST?: string;
   staffName: string;
   gmail: string;
   adminUrl: string;
@@ -522,6 +523,7 @@ export async function sendNewStaffAccountMail(params: {
 
   const staffName = params.staffName || "Nhân viên mới";
   const adminUrl = safeUrl(params.adminUrl);
+  const maST = String(params.maST || "").trim() || "Chưa có mã siêu thị";
   const registrationIp = String(params.registrationIp || "Không xác định").trim();
   const ipAccountCount = Number(params.ipAccountCount || 0);
   const ipRecentUsers = (params.ipRecentUsers || [])
@@ -551,6 +553,7 @@ export async function sendNewStaffAccountMail(params: {
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="border-radius:22px;border:1px solid #e5e7eb;background:#ffffff;overflow:hidden;">
         ${buildInfoRows([
           { label: "Mã nhân viên", value: params.maNV },
+          { label: "Mã siêu thị đăng ký", value: maST },
           { label: "Tên nhân viên", value: staffName },
           { label: "Gmail xác thực", value: params.gmail },
           { label: "IP tạo tài khoản", value: registrationIp, accent: ipAccountCount >= 2 },
@@ -568,6 +571,7 @@ export async function sendNewStaffAccountMail(params: {
   const text = [
     "Có tài khoản mới chờ duyệt.",
     `Mã nhân viên: ${params.maNV}`,
+    `Mã siêu thị đăng ký: ${maST}`,
     `Tên nhân viên: ${staffName}`,
     `Gmail xác thực: ${params.gmail}`,
     `IP tạo tài khoản: ${registrationIp}`,
@@ -648,6 +652,79 @@ export async function sendStaffActivatedMail(params: {
     to: params.to,
     text,
     subject: "Viễn Thông Di Động - Tài khoản đã được kích hoạt",
+    headers: getAutoMailHeaders(),
+    html,
+  });
+
+  const report = buildDeliveryReport(info);
+  ensureRecipientAccepted(report, params.to);
+
+  return report;
+}
+
+export async function sendStaffDeletedMail(params: {
+  to: string;
+  staffName: string;
+  maNV: string;
+  title: string;
+  message: string;
+}) {
+  const smtpUser = String(process.env.MAIL_USER || "").trim();
+  const staffName = params.staffName || "Nhân viên";
+  const title = String(params.title || "").trim() || "Thông báo tài khoản đã bị xóa";
+  const message =
+    String(params.message || "").trim() ||
+    "Tài khoản của bạn đã được Admin xóa khỏi hệ thống. Nếu cần hỗ trợ, vui lòng liên hệ quản trị viên.";
+  const htmlMessage = escapeHtml(message).replace(/\n/g, "<br>");
+
+  const text = [
+    `Xin chào ${staffName},`,
+    title,
+    message,
+    `Mã nhân viên: ${params.maNV}`,
+    "Email tự động từ hệ thống Viễn Thông Di Động.",
+  ].join("\n\n");
+
+  const html = buildEmailShell({
+    preheader: `${title} - NV ${params.maNV}.`,
+    statusLabel: "Đã xóa",
+    eyebrow: "Account Notice",
+    title,
+    description: `Xin chào <b style="color:#ffffff;">${escapeHtml(staffName)}</b>, tài khoản nhân viên <b style="color:#ffd400;">${escapeHtml(params.maNV)}</b> có cập nhật từ Admin.`,
+    body: `
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="border-radius:22px;background:#fff7ed;border:1px solid #fed7aa;overflow:hidden;">
+        <tr>
+          <td style="padding:18px 18px 16px;">
+            <div style="font-family:Roboto,Arial,sans-serif;color:#9a3412;font-size:10px;line-height:12px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;">
+              Nội dung thông báo
+            </div>
+            <div style="margin-top:8px;font-family:Roboto,Arial,sans-serif;color:#0f172a;font-size:15px;line-height:23px;font-weight:800;">
+              ${htmlMessage}
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="margin-top:18px;border-radius:22px;border:1px solid #e5e7eb;background:#ffffff;overflow:hidden;">
+        ${buildInfoRows([
+          { label: "Mã nhân viên", value: params.maNV },
+          { label: "Trạng thái", value: "Tài khoản đã bị xóa khỏi hệ thống", accent: true },
+        ])}
+      </table>
+
+      ${buildWarningBox({
+        title: "Cần hỗ trợ thêm?",
+        desc: "Vui lòng liên hệ Admin hoặc quản lý trực tiếp để được kiểm tra lại thông tin tài khoản.",
+      })}
+    `,
+  });
+
+  const info = await sendMailWithFallback({
+    from: getMailFrom(),
+    envelope: smtpUser ? { from: smtpUser, to: params.to } : undefined,
+    to: params.to,
+    text,
+    subject: title,
     headers: getAutoMailHeaders(),
     html,
   });

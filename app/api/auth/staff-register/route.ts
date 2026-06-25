@@ -276,6 +276,7 @@ export async function POST(req: NextRequest) {
     try {
       await sendNewStaffAccountMail({
         maNV,
+        maST,
         staffName,
         gmail,
         registrationIp: clientIp,

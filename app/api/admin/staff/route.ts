@@ -12,7 +12,7 @@ import {
   updateStaffStatus,
 } from "@/lib/staff-store";
 import { decryptText, hashPassword, normalizeCode } from "@/lib/staff-security";
-import { getPublicMailError, sendStaffActivatedMail } from "@/lib/mail";
+import { getPublicMailError, sendStaffActivatedMail, sendStaffDeletedMail } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -361,8 +361,41 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const notifyDeleteStaff = Boolean(body.notifyDeleteStaff);
+      const deleteMailTitle =
+        String(body.deleteMailTitle || "").trim() || "Thông báo tài khoản đã bị xóa";
+      const deleteMailMessage =
+        String(body.deleteMailMessage || "").trim() ||
+        "Tài khoản của bạn đã được Admin xóa khỏi hệ thống. Nếu cần hỗ trợ, vui lòng liên hệ quản trị viên.";
+      let mailResultMessage = "";
+
+      if (notifyDeleteStaff) {
+        const gmail = getStaffNotificationEmail(target);
+
+        if (!gmail) {
+          mailResultMessage = " Tài khoản chưa có Gmail hợp lệ nên không gửi được mail thông báo.";
+        } else {
+          try {
+            await sendStaffDeletedMail({
+              to: gmail,
+              staffName: target.staffName,
+              maNV: target.maNV,
+              title: deleteMailTitle,
+              message: deleteMailMessage,
+            });
+            mailResultMessage = ` Đã gửi mail thông báo đến ${maskEmail(gmail)}.`;
+          } catch (mailErr: any) {
+            console.error("SEND_STAFF_DELETED_MAIL_ERROR:", {
+              maNV: target.maNV,
+              message: mailErr?.message || mailErr,
+            });
+            mailResultMessage = ` Chưa gửi được mail thông báo. ${getPublicMailError(mailErr)}`;
+          }
+        }
+      }
+
       await deleteStaffAccount(target.rowNumber, target.maNV);
-      return NextResponse.json({ success: true, message: `Đã xóa tài khoản NV ${target.maNV}.` });
+      return NextResponse.json({ success: true, message: `Đã xóa tài khoản NV ${target.maNV}.${mailResultMessage}` });
     }
 
     return NextResponse.json({ success: false, message: "Action không hợp lệ." }, { status: 400 });
