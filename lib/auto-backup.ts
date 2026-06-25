@@ -1,4 +1,5 @@
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { exportSyncTarget } from "@/lib/data-sync-store";
 
@@ -6,7 +7,7 @@ const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BACKUP_HOUR_VN = 23;
 const BACKUP_MINUTE_VN = 0;
-const BACKUP_DIR = process.env.VTDD_BACKUP_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), "storage", "backups");
+const BACKUP_DIR = getBackupDir();
 const BACKUP_FILE_NAME = "vtdd-backup.json";
 const BACKUP_META_FILE_NAME = "vtdd-backup.meta.json";
 const BACKUP_HISTORY_FILE_NAME = "vtdd-backup.history.json";
@@ -34,6 +35,23 @@ type AutoBackupResult = {
 
 declare global {
   var __vtddAutoBackupRuntime: AutoBackupRuntime | undefined;
+}
+
+function getBackupDir() {
+  const configuredDir = String(process.env.VTDD_BACKUP_DIR || "").trim();
+  if (configuredDir) return configuredDir;
+
+  const isServerless =
+    Boolean(process.env.VERCEL) ||
+    Boolean(process.env.NOW_REGION) ||
+    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+    Boolean(process.env.LAMBDA_TASK_ROOT);
+
+  if (isServerless) {
+    return path.join(tmpdir(), "vtdd-backups");
+  }
+
+  return path.join(/* turbopackIgnore: true */ process.cwd(), "storage", "backups");
 }
 
 function getRuntime() {
