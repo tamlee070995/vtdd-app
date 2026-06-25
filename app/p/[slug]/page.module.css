@@ -90,7 +90,7 @@
   color: #07111f;
   font-size: 16px;
   line-height: 1.65;
-  font-weight: 750;
+  font-weight: 400;
 }
 .body p {
   margin: 0;
@@ -126,7 +126,23 @@
   background: transparent;
   border-radius: 0;
 }
-.body a { color: #2563eb; font-weight: 900; }
+.body p,
+.body li,
+.body div,
+.body span,
+.body a,
+.body td {
+  font-weight: 400;
+}
+.body strong,
+.body b,
+.body strong *,
+.body b * {
+  font-weight: 700;
+}
+.body a {
+  color: #2563eb;
+}
 .body table { width: 100%; border-collapse: collapse; margin: 14px 0; }
 .body td, .body th { border: 1px solid #cbd5e1; padding: 10px; }
 @media (max-width: 720px) {

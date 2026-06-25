@@ -245,6 +245,7 @@ export function consumeBehaviorRateLimit(params: {
   const store = getStore();
   const now = Date.now();
   const keys = params.keys.map(clean).filter(Boolean);
+  let highestCount = 0;
 
   for (const keyPart of keys) {
     const key = `${params.scope}:${keyPart.toLowerCase()}`;
@@ -254,6 +255,8 @@ export function consumeBehaviorRateLimit(params: {
       return {
         allowed: false,
         key,
+        count: current.count || 0,
+        limit: params.limit,
         retryAfterMs: current.lockedUntil - now,
         message: "Thao tac qua nhieu lan. Vui long thu lai sau it phut.",
       };
@@ -272,6 +275,7 @@ export function consumeBehaviorRateLimit(params: {
           };
 
     bucket.count += 1;
+    highestCount = Math.max(highestCount, bucket.count);
 
     if (bucket.count > params.limit) {
       bucket.lockedUntil = now + params.lockMs;
@@ -279,6 +283,8 @@ export function consumeBehaviorRateLimit(params: {
       return {
         allowed: false,
         key,
+        count: bucket.count,
+        limit: params.limit,
         retryAfterMs: params.lockMs,
         message: "He thong dang khoa tam do thao tac qua nhieu lan.",
       };
@@ -289,6 +295,8 @@ export function consumeBehaviorRateLimit(params: {
 
   return {
     allowed: true,
+    count: highestCount,
+    limit: params.limit,
     retryAfterMs: 0,
     message: "",
   };

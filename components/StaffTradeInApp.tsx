@@ -632,10 +632,30 @@ const SYSTEM_UI_CSS = `
   color: #111827;
   font-size: 12.2px;
   line-height: 1.48;
-  font-weight: 900;
+  font-weight: 400;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.vtdd-system-banner-body p,
+.vtdd-system-banner-body li,
+.vtdd-system-banner-body div,
+.vtdd-system-banner-body span,
+.vtdd-system-banner-body a,
+.vtdd-system-banner-body td {
+  font-weight: 400;
+}
+
+.vtdd-system-banner-body strong,
+.vtdd-system-banner-body b,
+.vtdd-system-banner-body strong *,
+.vtdd-system-banner-body b * {
+  font-weight: 700;
+}
+
+.vtdd-system-banner-body a {
+  color: #2563eb;
 }
 
 .vtdd-system-banner-body p::before {
@@ -1069,11 +1089,31 @@ const SYSTEM_UI_CSS = `
   color: #111827;
   font-size: 12.2px;
   line-height: 1.42;
-  font-weight: 900;
+  font-weight: 400;
   white-space: pre-line;
   overflow-wrap: anywhere;
   word-break: break-word;
   box-shadow: none;
+}
+
+.system-notice-v3-rich p,
+.system-notice-v3-rich li,
+.system-notice-v3-rich div,
+.system-notice-v3-rich span,
+.system-notice-v3-rich a,
+.system-notice-v3-rich td {
+  font-weight: 400;
+}
+
+.system-notice-v3-rich strong,
+.system-notice-v3-rich b,
+.system-notice-v3-rich strong *,
+.system-notice-v3-rich b * {
+  font-weight: 700;
+}
+
+.system-notice-v3-rich a {
+  color: #2563eb;
 }
 
 .system-notice-v3-list p + p {
@@ -1460,12 +1500,12 @@ const SYSTEM_UI_CSS = `
   color: inherit;
   font-size: 12.4px;
   line-height: 1.45;
-  font-weight: inherit;
+  font-weight: 400;
   white-space: normal;
 }
 
 .system-notice-v3-rich :where(strong, b) {
-  font-weight: 1000;
+  font-weight: 700;
 }
 
 .system-notice-v3-rich :where(div, span) {
@@ -1486,6 +1526,7 @@ const SYSTEM_UI_CSS = `
   margin: 4px 0;
   font-size: 12.4px;
   line-height: 1.45;
+  font-weight: 400;
 }
 
 .system-notice-v3-rich img,
@@ -1918,6 +1959,18 @@ const QUOTE_TOOLS_CSS = `
   font-weight: 1000;
   white-space: nowrap;
 }
+.result-btn-copy {
+  margin-top: 10px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 14px;
+  background: #ffd400 !important;
+  color: #07111f !important;
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  cursor: pointer;
+}
 @media (max-width: 760px) {
   .vtdd-data-reload-actions,
   .quote-history-item {
@@ -2089,6 +2142,40 @@ function compactSearchText(value: any) {
   return normalizeSearchText(value).replace(/\s+/g, "");
 }
 
+function expandSearchAliases(value: any) {
+  const tokens = normalizeSearchText(value).split(/\s+/).filter(Boolean);
+  const expanded = tokens.flatMap((token) => {
+    const map: Record<string, string[]> = {
+      ip: ["iphone"],
+      iph: ["iphone"],
+      iphone: ["iphone"],
+      ipad: ["ipad"],
+      prm: ["pro", "max"],
+      promax: ["pro", "max"],
+      pm: ["pro", "max"],
+      pr: ["pro"],
+      ss: ["samsung"],
+      ssg: ["samsung"],
+      ssung: ["samsung"],
+      glx: ["galaxy"],
+      gal: ["galaxy"],
+      mb: ["macbook"],
+      mac: ["macbook"],
+      mtb: ["tablet"],
+      tab: ["tab"],
+      tb: ["tab"],
+    };
+
+    return map[token] || [token];
+  });
+
+  return expanded.join(" ");
+}
+
+function compactExpandedSearchText(value: any) {
+  return expandSearchAliases(value).replace(/\s+/g, "");
+}
+
 function getProductSearchParts(value: any) {
   const raw = String(value || "");
   const modelRaw = raw.split("_")[0] || raw;
@@ -2133,8 +2220,8 @@ function productTokenMatches(
 
 function rankProductSearch(item: string, query: string) {
   const product = getProductSearchParts(item);
-  const q = normalizeSearchText(query);
-  const qCompact = compactSearchText(query);
+  const q = expandSearchAliases(query);
+  const qCompact = compactExpandedSearchText(query);
 
   if (!q) return 99;
   if (product.model === q) return 0;
@@ -2183,8 +2270,8 @@ function levenshteinDistance(a: string, b: string) {
 }
 
 function getProductSuggestions(options: string[], keyword: string, limit = 2) {
-  const q = normalizeSearchText(keyword);
-  const qCompact = compactSearchText(keyword);
+  const q = expandSearchAliases(keyword);
+  const qCompact = compactExpandedSearchText(keyword);
 
   if (!q || qCompact.length < 3) return [];
 
@@ -2233,12 +2320,12 @@ function ProductPicker({ label, value, placeholder, options, disabled = false, o
   const [keyword, setKeyword] = useState("");
 
   const filteredOptions = useMemo(() => {
-    const q = normalizeSearchText(keyword);
+    const q = expandSearchAliases(keyword);
     if (!q) return options;
 
     const words = q.split(/\s+/).filter(Boolean);
     const queryHasText = words.some((word) => /[a-z]/.test(word));
-    const qCompact = compactSearchText(keyword);
+    const qCompact = compactExpandedSearchText(keyword);
 
     return options
       .filter((item) => {
@@ -3009,7 +3096,11 @@ function resetForm() {
   setQuoteTime("");
 }
 
-    function buildQuoteText() {
+  function buildQuoteText() {
+    return buildInternalQuoteText();
+  }
+
+  function buildInternalQuoteText() {
     return (
       "BÁO GIÁ THU CŨ ĐỔI MỚI\n" +
       "-------------------------\n" +
@@ -3452,6 +3543,21 @@ function getClientDeviceMeta() {
     if (!res.ok || !data?.success) {
       console.error("SEND_LOG_FAILED:", data?.message || res.statusText);
     } else {
+      if (data.spamWarning) {
+        const warnKey = `vtdd_quote_spam_warning_${data.spamCount || "near"}`;
+        const shown = window.sessionStorage.getItem(warnKey) === "1";
+
+        if (!shown) {
+          window.sessionStorage.setItem(warnKey, "1");
+          showSwal(
+            "warning",
+            "Tra giá khá nhiều lần",
+            `Bạn đã tra giá ${data.spamCount || ""}/${data.spamLimit || 60} lượt trong thời gian ngắn. Vui lòng thao tác chậm lại để tránh bị khóa tạm.`,
+            2600
+          );
+        }
+      }
+
       loadQuoteHistory({ silent: true });
     }
   } catch (err) {

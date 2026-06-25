@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
     const deviceLabel = clean(body.clientDevice) || detectDeviceLabel(userAgent);
     const networkType = normalizeNetworkTypeForDevice(deviceLabel, body.networkType);
     const clientIp = getClientIp(req, body);
+    const action = clean(body.action);
     const rate = consumeBehaviorRateLimit({
       scope: isCustomerQuote ? "quote-log-customer" : "quote-log",
       limit: 60,
@@ -114,10 +115,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const spamWarning =
+      !isCustomerQuote &&
+      action === "TRA_GIA" &&
+      Number(rate.count || 0) >= 45;
+
+    if (spamWarning && (Number(rate.count || 0) === 45 || Number(rate.count || 0) % 10 === 0)) {
+      await appendErrorLog({
+        actor: currentStaff?.maNV || "staff",
+        module: "quote-spam-warning",
+        page: "/staff",
+        message: `Nhân viên ${currentStaff?.maNV || ""} tra giá ${rate.count}/${rate.limit} lượt trong 10 phút.`,
+        ip: clientIp,
+        userAgent,
+        severity: "warn",
+      });
+    }
+
     const logRow: QuoteLogRow = {
       source: isCustomerQuote ? "customer" : "staff",
       time: now,
-      action: getActionLabel(isCustomerQuote ? "CUSTOMER_QUOTE" : clean(body.action)),
+      action: getActionLabel(isCustomerQuote ? "CUSTOMER_QUOTE" : action),
       maNV: isCustomerQuote ? "KHACH" : currentStaff?.maNV || "",
       maST: isCustomerQuote ? "" : currentStaff?.maST || "",
       staffName: isCustomerQuote ? "Khách hàng" : currentStaff?.staffName || "",
@@ -167,6 +185,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      spamWarning,
+      spamCount: rate.count || 0,
+      spamLimit: rate.limit || 0,
     });
   } catch (err: any) {
     console.error("LOG_QUOTE_ERROR:", err);

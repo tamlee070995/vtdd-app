@@ -1037,8 +1037,8 @@ function TcdmAdminConsole({
 
   return (
     <section className="adminx-console">
-      <style>{ADMINX_STYLE}</style>
-      <style>{ADMINX_ONLINE_STYLE}</style>
+      <style suppressHydrationWarning>{ADMINX_STYLE}</style>
+      <style suppressHydrationWarning>{ADMINX_ONLINE_STYLE}</style>
 
       <nav className="adminx-tabs" aria-label="Admin navigation">
         {visibleTabs.map((item) => (
@@ -5779,7 +5779,7 @@ export default function AdminConsole({
 
   return (
     <section className="admin-cms-shell-v5">
-      <style>{ADMIN_CMS_STYLE}</style>
+      <style suppressHydrationWarning>{ADMIN_CMS_STYLE}</style>
 
       <div className="admin-cms-headline-v5">
         <div>
@@ -6014,7 +6014,7 @@ const ADMIN_CMS_STYLE = `
 .cms-toolbar select,
 .cms-toolbar input[type=color] { min-height: 34px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; color: #07111f; padding: 0 10px; font-size: 12px; font-weight: 900; cursor: pointer; }
 .cms-toolbar input[type=color] { width: 44px; padding: 3px; }
-.cms-rich-editor { min-height: 380px; padding: 18px; border-radius: 18px; border: 1px solid #cbd5e1; background: #fff; color: #07111f; outline: none; font-size: 15px; line-height: 1.65; font-weight: 700; overflow: auto; }
+.cms-rich-editor { min-height: 380px; padding: 18px; border-radius: 18px; border: 1px solid #cbd5e1; background: #fff; color: #07111f; outline: none; font-size: 15px; line-height: 1.65; font-weight: 400; overflow: auto; }
 .cms-rich-editor:focus { border-color: #ffd400; box-shadow: 0 0 0 4px rgba(255,212,0,.16); }
 .cms-rich-editor h2,
 .cms-preview-body h2 { font-size: 28px; line-height: 1.15; margin: 18px 0 8px; }
@@ -6026,7 +6026,18 @@ const ADMIN_CMS_STYLE = `
 .cms-preview-toolbar { display: flex; justify-content: space-between; gap: 12px; color: #64748b; font-size: 12px; font-weight: 900; margin-bottom: 14px; }
 .cms-pro-preview article h3 { margin: 0; color: #07111f; font-size: 30px; line-height: 1.08; font-weight: 1000; letter-spacing: -.04em; }
 .cms-pro-preview article > p { margin: 10px 0 18px; color: #475569; font-size: 14px; line-height: 1.5; font-weight: 850; }
-.cms-preview-body { color: #07111f; font-size: 15px; line-height: 1.65; font-weight: 700; }
+.cms-preview-body { color: #07111f; font-size: 15px; line-height: 1.65; font-weight: 400; }
+.cms-preview-body p,
+.cms-preview-body li,
+.cms-preview-body div,
+.cms-preview-body span,
+.cms-preview-body a,
+.cms-preview-body td { font-weight: 400; }
+.cms-preview-body strong,
+.cms-preview-body b,
+.cms-preview-body strong *,
+.cms-preview-body b * { font-weight: 700; }
+.cms-preview-body a { color: #2563eb; }
 .cms-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 .cms-actions button { min-height: 46px; border: 0; border-radius: 15px; padding: 0 18px; background: #e2e8f0; color: #07111f; font-size: 12px; font-weight: 1000; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 .cms-actions button.publish { background: #ffd400; }
