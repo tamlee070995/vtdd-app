@@ -6,7 +6,6 @@ import {
   markPincodeSkipped,
   normalizePincodeFlow,
 } from "@/lib/pincode-store";
-import { getCurrentPmhToolAvailability, pmhToolClosedJson } from "@/lib/pmh-tool-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +31,6 @@ function requestBelongsToOwner(request: { maST?: string; maNV?: string } | null,
 
 export async function GET(req: NextRequest) {
   try {
-    const availability = await getCurrentPmhToolAvailability();
-
-    if (!availability.enabled) {
-      return pmhToolClosedJson(availability, { request: null });
-    }
-
     const requestId = String(req.nextUrl.searchParams.get("requestId") || "").trim();
     const maST = String(req.nextUrl.searchParams.get("maST") || "").trim();
     const maNV = String(req.nextUrl.searchParams.get("maNV") || "").trim();
@@ -87,17 +80,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const availability = await getCurrentPmhToolAvailability();
-
-    if (!availability.enabled) {
-      return pmhToolClosedJson(availability);
-    }
-
     const body = await req.json().catch(() => null);
     const requestId = String(body?.requestId || "").trim();
     const action = String(body?.action || "DONE").trim().toUpperCase();
     const maST = cleanCode(body?.maST);
     const maNV = cleanCode(body?.maNV);
+
     const request = await getPincodeRequestById(requestId);
 
     if (!request) {

@@ -27,14 +27,17 @@ export type QuoteLogRow = {
   networkType: string;
 };
 
-function inferQuoteLogSource(row: { action?: any; maNV?: any; staffName?: any }) {
+function inferQuoteLogSource(row: { source?: any; action?: any; maNV?: any; staffName?: any }) {
+  const explicitSource = clean(row.source).toLowerCase();
+  if (explicitSource === "staff" || explicitSource === "customer") return explicitSource as "staff" | "customer";
+
   const action = clean(row.action).toUpperCase();
   const maNV = clean(row.maNV).toUpperCase();
   const staffName = clean(row.staffName).toLowerCase();
 
-  if (action.includes("KHÁCH") || action.includes("KHACH")) return "customer";
   if (maNV === "KHACH" || maNV === "CUSTOMER") return "customer";
   if (staffName === "khách hàng" || staffName === "khach hang") return "customer";
+  if (/^KH(Á|A)CH\s+TRA\s+GI(Á|A)/i.test(action)) return "customer";
 
   return "staff";
 }
@@ -106,7 +109,7 @@ function mapDbQuoteLogRow(row: any): QuoteLogRow {
 
   return {
     ...mapped,
-    source: inferQuoteLogSource(mapped),
+    source: inferQuoteLogSource({ ...mapped, source: row.source }),
   };
 }
 

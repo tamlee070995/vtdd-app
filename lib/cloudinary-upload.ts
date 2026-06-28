@@ -38,7 +38,7 @@ function safePublicId(name: string) {
 export async function uploadDataUrlToCloudinary(dataUrl: string, options?: { folder?: string; name?: string }) {
   const data = String(dataUrl || "");
   const isImage = data.startsWith("data:image/");
-  const isAudio = data.startsWith("data:audio/");
+  const isAudio = data.startsWith("data:audio/") || data.startsWith("data:application/octet-stream");
 
   if (!isImage && !isAudio) {
     throw new Error("Chỉ hỗ trợ upload ảnh hoặc file ghi âm.");

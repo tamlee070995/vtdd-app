@@ -238,6 +238,10 @@ function isValidSerialNumber(value: string) {
   return /^[A-Z0-9]{11}$/.test(clean(value).toUpperCase());
 }
 
+function isHeicFile(file: File) {
+  return /image\/hei[cf]/i.test(file.type) || /\.(hei[cf])$/i.test(file.name);
+}
+
 function makeImageDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
@@ -643,6 +647,11 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
 
     if (!isAudioSlot && !file.type.startsWith("image/")) {
       showToast("Chỉ nhận file hình ảnh.");
+      return;
+    }
+
+    if (!isAudioSlot && isHeicFile(file)) {
+      showToast("Ảnh HEIC/HEIF chưa hỗ trợ. Vui lòng chụp ảnh trực tiếp hoặc chọn JPG/PNG/WEBP.");
       return;
     }
 
@@ -1161,7 +1170,7 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
                     <input
                       id={libraryInputId}
                       type="file"
-                      accept={item.accept || "image/png,image/jpeg,image/webp,image/heic,image/heif"}
+                      accept={item.accept || "image/png,image/jpeg,image/webp"}
                       onChange={(event) => {
                         changeSlotImage(item.id, event.target.files);
                         event.currentTarget.value = "";
@@ -1326,7 +1335,7 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
                     <input
                       id={libraryInputId}
                       type="file"
-                      accept={item.accept || "image/png,image/jpeg,image/webp,image/heic,image/heif"}
+                      accept={item.accept || "image/png,image/jpeg,image/webp"}
                       onChange={(event) => {
                         changeSlotImage(item.id, event.target.files);
                         event.currentTarget.value = "";

@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { createHash } from "crypto";
-import { eq, insertRows, isSupabaseConfigured, selectAllRows, selectRows, updateRows } from "@/lib/supabase-rest";
+import { eq, insertRows, isNull, isSupabaseConfigured, selectAllRows, selectRows, updateRows } from "@/lib/supabase-rest";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 const DEFAULT_PINCODE_SPREADSHEET_ID = "1cmuS7ipRG3Dhh1uycqgWhCKwNRnwB42wDR2ckPNULFw";
@@ -560,6 +560,25 @@ function getPmhFlowSuffix(flow: unknown) {
   return normalizePincodeFlow(flow) === "ChienGia" ? "All" : "TCDM";
 }
 
+function getPincodeRequiredFileCount(flow: unknown) {
+  return normalizePincodeFlow(flow) === "ChienGia" ? 5 : 6;
+}
+
+function normalizePincodeImageSlots(slots: unknown, flow: unknown) {
+  const maxSlot = getPincodeRequiredFileCount(flow);
+
+  return Array.from(
+    new Set(
+      (Array.isArray(slots) ? slots : [])
+        .map((item) => clean(item))
+        .filter((item) => {
+          const value = Number(item);
+          return Number.isInteger(value) && value >= 1 && value <= maxSlot;
+        })
+    )
+  ).sort((a, b) => Number(a) - Number(b));
+}
+
 function getPmhSuffixFromMenhGia(menhGia: unknown) {
   const parts = clean(menhGia).split(/\s+/);
   const last = parts[parts.length - 1]?.toUpperCase() || "";
@@ -586,6 +605,19 @@ function comparePmhMenhGia(a: unknown, b: unknown) {
   const diff = getPmhMenhGiaValue(a) - getPmhMenhGiaValue(b);
   if (diff !== 0) return diff;
   return clean(a).localeCompare(clean(b), "vi", { numeric: true });
+}
+
+function isPmhUsedStatus(value: unknown) {
+  return clean(value).toLowerCase() === "used";
+}
+
+function assertPincodeClaimOwner(request: PincodeRequest, admin: unknown) {
+  const claimedBy = clean(request.claimedBy);
+  const currentAdmin = clean(admin);
+
+  if (claimedBy && claimedBy !== currentAdmin) {
+    throw new Error(`Hồ sơ đã được ${claimedBy} nhận xử lý.`);
+  }
 }
 
 function normalizeStatus(value: unknown, done?: unknown): PincodeStatus {
@@ -1177,7 +1209,7 @@ export async function getPmhStats(flow?: PincodeFlow) {
         const status = clean(row.status);
         const menhGia = clean(row.menh_gia) || "Mặc định";
 
-        if (!pin || status === "Used") return;
+        if (!pin || isPmhUsedStatus(status) || clean(row.request_id)) return;
         if (flow && !isPmhMenhGiaMatchFlow(menhGia, flow)) return;
         stats.set(menhGia, (stats.get(menhGia) || 0) + 1);
       });
@@ -1200,7 +1232,7 @@ export async function getPmhStats(flow?: PincodeFlow) {
     const status = clean(row[1]);
     const menhGia = clean(row[2]) || "Mặc định";
 
-    if (!pin || status === "Used") return;
+    if (!pin || isPmhUsedStatus(status)) return;
     if (flow && !isPmhMenhGiaMatchFlow(menhGia, flow)) return;
     stats.set(menhGia, (stats.get(menhGia) || 0) + 1);
   });
@@ -1251,6 +1283,7 @@ async function findActiveDuplicate(imei: string, flow: PincodeFlow, maST?: strin
       if (targetStore && item.maST !== targetStore) return false;
       if (targetStaff && item.maNV !== targetStaff) return false;
       if (item.status === "Rejected_Hard") return false;
+      if (item.doneStatus.toLowerCase() === "x") return false;
       const createdMs = parseVietnamDateMs(item.createdAt);
       if (createdMs && now - createdMs > PMH_DUPLICATE_WINDOW_MS && item.status !== "Approved") return false;
       return true;
@@ -1650,6 +1683,7 @@ export async function approvePincodeRequest(data: {
         const request = await getPincodeRequestById(data.requestId);
         if (!request) throw new Error("Không tìm thấy hồ sơ cần duyệt.");
         if (request.status !== "Pending") throw new Error(`Hồ sơ đã được xử lý với trạng thái ${request.status}.`);
+        assertPincodeClaimOwner(request, data.admin);
 
         const selectedMenhGia = clean(data.menhGia);
         if (selectedMenhGia && !isPmhMenhGiaMatchFlow(selectedMenhGia, request.flow)) {
@@ -1661,12 +1695,14 @@ export async function approvePincodeRequest(data: {
           .map((row) => ({
             pin: clean(row.pincode),
             status: clean(row.status),
+            statusFilter: row.status == null ? isNull() : eq(clean(row.status)),
+            requestId: clean(row.request_id),
             menhGia: clean(row.menh_gia),
             sourceRow: sourceRowNumber(row.source_row),
             value: getPmhMenhGiaValue(row.menh_gia),
           }))
           .filter((row) => {
-            if (!row.pin || row.status === "Used") return false;
+            if (!row.pin || isPmhUsedStatus(row.status) || row.requestId) return false;
             if (!isPmhMenhGiaMatchFlow(row.menhGia, request.flow)) return false;
             if (selectedMenhGia && row.menhGia !== selectedMenhGia) return false;
             return true;
@@ -1689,7 +1725,7 @@ export async function approvePincodeRequest(data: {
         const usedAt = nowVN();
         const claimed = await updateRows<any>(
           "pmh_codes",
-          { pincode: eq(selectedPin.pin) },
+          { pincode: eq(selectedPin.pin), status: selectedPin.statusFilter },
           {
             status: "Used",
             request_id: request.requestId,
@@ -1699,20 +1735,36 @@ export async function approvePincodeRequest(data: {
         );
 
         if (!Array.isArray(claimed) || claimed.length === 0) {
-          throw new Error("Không giữ được mã PMH, vui lòng thử lại.");
+          throw new Error("Mã PMH vừa được người khác sử dụng, vui lòng thử lại.");
         }
 
-        await updateDbPincodeRequest(
-          request.requestId,
-          dbRequestPatchFromInput({
-            status: "Approve",
-            pincode: selectedPin.pin,
-            rejectReason: "",
-            adminReviewer: clean(data.admin),
-            completionStatus: "",
-            menhGia: selectedPin.menhGia,
-          })
-        );
+        try {
+          await updateDbPincodeRequest(
+            request.requestId,
+            dbRequestPatchFromInput({
+              status: "Approve",
+              pincode: selectedPin.pin,
+              rejectReason: "",
+              adminReviewer: clean(data.admin),
+              completionStatus: "",
+              menhGia: selectedPin.menhGia,
+            })
+          );
+        } catch (err) {
+          await updateRows<any>(
+            "pmh_codes",
+            { pincode: eq(selectedPin.pin), request_id: eq(request.requestId) },
+            {
+              status: selectedPin.status,
+              request_id: selectedPin.requestId,
+              used_at: "",
+              used_by: "",
+            }
+          ).catch((rollbackErr: any) => {
+            console.warn("SUPABASE_ROLLBACK_PINCODE_ERROR:", rollbackErr?.message || rollbackErr);
+          });
+          throw err;
+        }
 
         return {
           success: true,
@@ -1733,6 +1785,7 @@ export async function approvePincodeRequest(data: {
     const request = await getPincodeRequestById(data.requestId);
     if (!request) throw new Error("Không tìm thấy hồ sơ cần duyệt.");
     if (request.status !== "Pending") throw new Error(`Hồ sơ đã được xử lý với trạng thái ${request.status}.`);
+    assertPincodeClaimOwner(request, data.admin);
 
     const pmhRows = await readValues(`${PMH_SHEET}!A2:C`);
     const selectedMenhGia = clean(data.menhGia);
@@ -1751,7 +1804,7 @@ export async function approvePincodeRequest(data: {
       const status = clean(pmhRows[i][1]);
       const menhGia = clean(pmhRows[i][2]);
 
-      if (!pin || status === "Used") continue;
+      if (!pin || isPmhUsedStatus(status)) continue;
       if (!isPmhMenhGiaMatchFlow(menhGia, request.flow)) continue;
       if (selectedMenhGia && menhGia !== selectedMenhGia) continue;
 
@@ -1826,15 +1879,11 @@ export async function rejectPincodeRequest(data: {
       const request = await getPincodeRequestById(data.requestId);
       if (!request) throw new Error("Không tìm thấy hồ sơ cần từ chối.");
       if (request.status !== "Pending") throw new Error(`Hồ sơ đã được xử lý với trạng thái ${request.status}.`);
+      assertPincodeClaimOwner(request, data.admin);
 
       const status: PincodeStatus = data.soft ? "Rejected_Soft" : "Rejected_Hard";
-      const slots = Array.from(
-        new Set(
-          (data.imageSlots || [])
-            .map((item) => clean(item))
-            .filter((item) => /^[1-6]$/.test(item))
-        )
-      ).sort((a, b) => Number(a) - Number(b));
+      const slots = normalizePincodeImageSlots(data.imageSlots, request.flow);
+      if (data.soft && slots.length === 0) throw new Error("Vui lòng chọn ít nhất 1 file cần chụp lại.");
       const reasonText = clean(data.reason) || "Admin từ chối hồ sơ.";
       const storedReason = data.soft && slots.length > 0
         ? `[CHUP_LAI_ANH:${slots.join(",")}]\n${reasonText}`
@@ -1863,15 +1912,11 @@ export async function rejectPincodeRequest(data: {
     const request = await getPincodeRequestById(data.requestId);
     if (!request) throw new Error("Không tìm thấy hồ sơ cần từ chối.");
     if (request.status !== "Pending") throw new Error(`Hồ sơ đã được xử lý với trạng thái ${request.status}.`);
+    assertPincodeClaimOwner(request, data.admin);
 
     const status: PincodeStatus = data.soft ? "Rejected_Soft" : "Rejected_Hard";
-    const slots = Array.from(
-      new Set(
-        (data.imageSlots || [])
-          .map((item) => clean(item))
-          .filter((item) => /^[1-6]$/.test(item))
-      )
-    ).sort((a, b) => Number(a) - Number(b));
+    const slots = normalizePincodeImageSlots(data.imageSlots, request.flow);
+    if (data.soft && slots.length === 0) throw new Error("Vui lòng chọn ít nhất 1 file cần chụp lại.");
     const reasonText = clean(data.reason) || "Admin từ chối hồ sơ.";
     const storedReason = data.soft && slots.length > 0
       ? `[CHUP_LAI_ANH:${slots.join(",")}]\n${reasonText}`

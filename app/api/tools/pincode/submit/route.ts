@@ -43,14 +43,32 @@ function getDataUrlPayloadBytes(value: unknown) {
   return Math.floor((payload.length * 3) / 4);
 }
 
-function validateUploadQuality(images: any[], requiredFileCount: number) {
+function isAudioUploadSlot(flow: string, index: number) {
+  return flow === "ChienGia" && index === 4;
+}
+
+function isAcceptedAudioDataUrl(value: string) {
+  return /^data:(audio\/|application\/octet-stream|;base64,)/i.test(value);
+}
+
+function isAcceptedUploadDataUrl(value: string, flow: string, index: number) {
+  if (value.startsWith("data:image/")) return true;
+  if (isAudioUploadSlot(flow, index) && isAcceptedAudioDataUrl(value)) return true;
+  return false;
+}
+
+function normalizeAudioDataUrl(value: string) {
+  return /^data:;base64,/i.test(value) ? value.replace(/^data:;base64,/i, "data:audio/mpeg;base64,") : value;
+}
+
+function validateUploadQuality(images: any[], requiredFileCount: number, flow: string) {
   const invalidSlots: number[] = [];
 
   images.slice(0, requiredFileCount).forEach((item, index) => {
     const dataUrl = String(item?.dataUrl || "");
     const url = String(item?.url || "");
     if (url && !dataUrl) return;
-    if (dataUrl.startsWith("data:audio/")) return;
+    if (isAudioUploadSlot(flow, index) && isAcceptedAudioDataUrl(dataUrl)) return;
     if (getDataUrlPayloadBytes(dataUrl) < 25 * 1024) invalidSlots.push(index + 1);
   });
 
@@ -131,15 +149,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    validateUploadQuality(images, requiredFileCount);
+    validateUploadQuality(images, requiredFileCount, flow);
 
     const imageUrls = await Promise.all(
       images.map((item: any, index: number) => {
         const dataUrl = String(item?.dataUrl || "");
         const url = String(item?.url || "").trim();
 
-        if (dataUrl.startsWith("data:image/") || dataUrl.startsWith("data:audio/")) {
-          return uploadDataUrlToCloudinary(dataUrl, {
+        if (isAcceptedUploadDataUrl(dataUrl, flow, index)) {
+          return uploadDataUrlToCloudinary(isAudioUploadSlot(flow, index) ? normalizeAudioDataUrl(dataUrl) : dataUrl, {
             folder: "vtdd/pincode",
             name: `pmh-${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${index + 1}`,
           });

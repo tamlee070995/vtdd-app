@@ -41,10 +41,24 @@ function statusText(status: string) {
   return "Chờ duyệt";
 }
 
-const IMAGE_NUMBERS = ["1", "2", "3", "4", "5", "6"];
-
 function cleanMenhGiaLabel(value: string) {
   return String(value || "").replace(/\s+(TCDM|ALL)$/i, "").trim() || value;
+}
+
+function getReviewSlotNumbers(flow: PincodeRequest["flow"]) {
+  const total = flow === "ChienGia" ? 5 : 6;
+  return Array.from({ length: total }, (_, index) => String(index + 1));
+}
+
+function getReviewFiles(request: PincodeRequest) {
+  const slots = getReviewSlotNumbers(request.flow);
+  return slots
+    .map((slot, index) => ({
+      slot,
+      url: request.imageUrls[index] || "",
+      type: request.flow === "ChienGia" && index === 4 ? "audio" as const : "image" as const,
+    }))
+    .filter((item) => item.url);
 }
 
 export default function PincodeReviewPage({ request, pmhStats, adminName }: Props) {
@@ -53,7 +67,9 @@ export default function PincodeReviewPage({ request, pmhStats, adminName }: Prop
   const [reason, setReason] = useState(request.reason || "");
   const [actionMode, setActionMode] = useState<"" | "soft" | "hard">("");
   const [rejectPanelOpen, setRejectPanelOpen] = useState(false);
-  const [selectedImageSlots, setSelectedImageSlots] = useState<string[]>(IMAGE_NUMBERS);
+  const slotNumbers = useMemo(() => getReviewSlotNumbers(request.flow), [request.flow]);
+  const reviewFiles = useMemo(() => getReviewFiles(request), [request]);
+  const [selectedImageSlots, setSelectedImageSlots] = useState<string[]>(slotNumbers);
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
   const [done, setDone] = useState(false);
@@ -65,11 +81,17 @@ export default function PincodeReviewPage({ request, pmhStats, adminName }: Prop
     return pmhStats.map((item) => `${item.menhGia}: ${item.count}`).join(" | ") || "Chưa có PMH đúng luồng";
   }, [pmhStats]);
   const autoMenhGiaText = pmhStats[0]?.menhGia ? cleanMenhGiaLabel(pmhStats[0].menhGia) : "chưa có mã";
-  const activeImageUrl = request.imageUrls[activeImage] || request.imageUrls[0] || "";
+  const activeFile = reviewFiles[activeImage] || reviewFiles[0] || null;
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    setSelectedImageSlots(slotNumbers);
+    setActiveImage(0);
+    setZoom(1);
+  }, [slotNumbers]);
 
   function showToast(message: string) {
     setToast(message);
@@ -78,7 +100,7 @@ export default function PincodeReviewPage({ request, pmhStats, adminName }: Prop
 
   function toggleImageSlot(slot: string) {
     if (slot === "All") {
-      setSelectedImageSlots((current) => (current.length === IMAGE_NUMBERS.length ? [] : IMAGE_NUMBERS));
+      setSelectedImageSlots((current) => (current.length === slotNumbers.length ? [] : slotNumbers));
       return;
     }
 
@@ -258,10 +280,10 @@ export default function PincodeReviewPage({ request, pmhStats, adminName }: Prop
               setZoom(1);
               setGalleryOpen(true);
             }}
-            disabled={request.imageUrls.length === 0}
+            disabled={reviewFiles.length === 0}
           >
-            <span>Ảnh hồ sơ</span>
-            <b>Xem {request.imageUrls.length || 0} ảnh</b>
+            <span>Hồ sơ đính kèm</span>
+            <b>Xem {reviewFiles.length || 0} file</b>
             <small>Bấm để xem trong trang, không mở tab mới</small>
           </button>
         </section>
@@ -314,13 +336,13 @@ export default function PincodeReviewPage({ request, pmhStats, adminName }: Prop
                         <label>
                           <input
                             type="checkbox"
-                            checked={selectedImageSlots.length === IMAGE_NUMBERS.length}
+                            checked={selectedImageSlots.length === slotNumbers.length}
                             onChange={() => toggleImageSlot("All")}
                             disabled={disabled}
                           />
                           All
                         </label>
-                        {IMAGE_NUMBERS.map((slot) => (
+                        {slotNumbers.map((slot) => (
                           <label key={slot}>
                             <input
                               type="checkbox"
@@ -370,51 +392,64 @@ export default function PincodeReviewPage({ request, pmhStats, adminName }: Prop
           <div className="review-gallery-panel">
             <div className="review-gallery-head">
               <div>
-                <span>Ảnh {activeImage + 1}/{request.imageUrls.length}</span>
+                <span>File {activeImage + 1}/{reviewFiles.length}</span>
                 <b>Hồ sơ thẩm định</b>
               </div>
               <button type="button" onClick={() => setGalleryOpen(false)}>Đóng</button>
             </div>
 
             <div className="review-gallery-stage">
-              {activeImageUrl ? (
+              {activeFile?.type === "image" ? (
                 <img
-                  src={activeImageUrl}
-                  alt={`Ảnh hồ sơ ${activeImage + 1}`}
+                  src={activeFile.url}
+                  alt={`Ảnh hồ sơ ${activeFile.slot}`}
                   style={{
                     width: `${zoom * 100}%`,
                     maxWidth: zoom === 1 ? "100%" : "none",
                     maxHeight: zoom === 1 ? "62dvh" : "none",
                   }}
                 />
+              ) : activeFile?.type === "audio" ? (
+                <div className="review-gallery-audio">
+                  <span>File ghi âm cuộc gọi / dò giá</span>
+                  <audio src={activeFile.url} controls />
+                </div>
               ) : (
-                <p>Chưa có ảnh hồ sơ.</p>
+                <p>Chưa có file hồ sơ.</p>
               )}
             </div>
 
-            <div className="review-gallery-controls">
-              <button type="button" onClick={() => setZoom((value) => Math.max(1, Number((value - 0.25).toFixed(2))))}>
-                Thu nhỏ
-              </button>
-              <b>{Math.round(zoom * 100)}%</b>
-              <button type="button" onClick={() => setZoom((value) => Math.min(3, Number((value + 0.25).toFixed(2))))}>
-                Phóng to
-              </button>
-            </div>
+            {activeFile?.type === "image" ? (
+              <div className="review-gallery-controls">
+                <button type="button" onClick={() => setZoom((value) => Math.max(1, Number((value - 0.25).toFixed(2))))}>
+                  Thu nhỏ
+                </button>
+                <b>{Math.round(zoom * 100)}%</b>
+                <button type="button" onClick={() => setZoom((value) => Math.min(3, Number((value + 0.25).toFixed(2))))}>
+                  Phóng to
+                </button>
+              </div>
+            ) : null}
 
             <div className="review-gallery-thumbs">
-              {request.imageUrls.map((url, index) => (
+              {reviewFiles.map((file, index) => (
                 <button
                   type="button"
-                  key={`${url}-${index}`}
+                  key={`${file.url}-${index}`}
                   className={index === activeImage ? "active" : ""}
                   onClick={() => {
                     setActiveImage(index);
                     setZoom(1);
                   }}
                 >
-                  <img src={url} alt={`Ảnh nhỏ ${index + 1}`} />
-                  <span>{index + 1}</span>
+                  {file.type === "audio" ? (
+                    <div className="review-gallery-audio-thumb">
+                      <b>Audio</b>
+                    </div>
+                  ) : (
+                    <img src={file.url} alt={`Ảnh nhỏ ${file.slot}`} />
+                  )}
+                  <span>{file.slot}</span>
                 </button>
               ))}
             </div>
@@ -806,6 +841,29 @@ const STYLE = `
   object-fit: contain;
   transition: width .18s ease;
 }
+.review-gallery-audio {
+  width: 100%;
+  min-height: 280px;
+  padding: 24px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  color: #fff;
+  text-align: center;
+}
+.review-gallery-audio span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 212, 0, .14);
+  border: 1px solid rgba(255, 212, 0, .35);
+  color: #ffd400;
+  font-size: 12px;
+  font-weight: 1000;
+}
+.review-gallery-audio audio {
+  width: min(100%, 520px);
+}
 .review-gallery-stage p {
   color: #fff;
   font-weight: 900;
@@ -847,6 +905,18 @@ const STYLE = `
   aspect-ratio: 1;
   object-fit: cover;
   display: block;
+}
+.review-gallery-audio-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  background: #07111f;
+  color: #ffd400;
+}
+.review-gallery-audio-thumb b {
+  font-size: 11px;
+  font-weight: 1000;
 }
 .review-gallery-thumbs span {
   position: absolute;
