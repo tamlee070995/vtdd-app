@@ -797,6 +797,8 @@ function TcdmAdminConsole({
     }, 10000);
 
     return () => window.clearInterval(timer);
+    // Admin health polling is intentionally started once; calling changing loaders here would restart the timer on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function runCommandSearch() {
@@ -5798,9 +5800,11 @@ function CmsEditor({
         <button type="button" className="publish" onClick={() => post("PUBLISH")} disabled={!!busy}>
           {busy === "PUBLISH" ? "Đang xuất bản..." : "Xuất bản"}
         </button>
-        <button type="button" className="unpublish" onClick={() => post("UNPUBLISH")} disabled={!!busy}>
-          {busy === "UNPUBLISH" ? "Đang tắt..." : "Ngừng xuất bản"}
-        </button>
+        {item.published ? (
+          <button type="button" className="unpublish" onClick={() => post("UNPUBLISH")} disabled={!!busy}>
+            {busy === "UNPUBLISH" ? "Đang tắt..." : "Ngừng xuất bản"}
+          </button>
+        ) : null}
       </div>
     </section>
   );

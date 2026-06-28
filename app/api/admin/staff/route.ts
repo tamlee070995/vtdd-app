@@ -281,8 +281,6 @@ export async function POST(req: NextRequest) {
           loginUrl: getLoginUrl(req),
         });
 
-        console.log("SEND_STAFF_ACTIVATED_MAIL_OK", { maNV: target.maNV });
-
         return NextResponse.json({
           success: true,
           mailSent: true,

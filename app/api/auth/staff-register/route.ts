@@ -285,7 +285,6 @@ export async function POST(req: NextRequest) {
         adminUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://vienthongdidong.com"}/admin`,
       });
 
-      console.log("SEND_NEW_STAFF_ACCOUNT_MAIL_OK", { maNV });
     } catch (mailErr) {
       console.error("SEND_NEW_STAFF_ACCOUNT_MAIL_ERROR", mailErr);
       return redirectRegister(

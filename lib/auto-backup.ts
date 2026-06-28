@@ -51,7 +51,7 @@ function getBackupDir() {
     return path.join(tmpdir(), "vtdd-backups");
   }
 
-  return path.join(/* turbopackIgnore: true */ process.cwd(), "storage", "backups");
+  return path.join(/*turbopackIgnore: true*/ process.cwd(), "storage", "backups");
 }
 
 function getRuntime() {

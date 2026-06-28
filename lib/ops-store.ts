@@ -66,14 +66,14 @@ export async function appendErrorLog(data: {
   severity?: "info" | "warn" | "error";
 }) {
   const message = clean(data.message || "Unknown error").slice(0, 1000);
-  const module = clean(data.module || "system").slice(0, 120);
+  const moduleName = clean(data.module || "system").slice(0, 120);
   const page = clean(data.page || "").slice(0, 180);
 
   try {
     await appendAdminAudit({
       admin: clean(data.actor || "system"),
       action: "ERROR_LOG",
-      target: module,
+      target: moduleName,
       oldValue: page,
       newValue: message,
       ip: clean(data.ip),

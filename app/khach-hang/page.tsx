@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getActiveSystemLock } from "@/lib/system-lock";
 
 type SheetRow = any[];
@@ -1459,31 +1459,6 @@ function getEffectiveRange(notify: NotifySettings) {
   return "";
 }
 
-function formatSystemMessageLines(message: string) {
-  const raw = String(message || "")
-    .replace(/\r/g, "")
-    // Giữ đúng nội dung Admin nhập. Nếu Admin xuống dòng thì web xuống dòng theo.
-    // Nếu Admin nhập liền dòng, hệ thống tự tách trước A/, B/, 1/, 2/ để dễ đọc.
-    .replace(/\s+(?=[A-Za-zÀ-ỹ]\s*\/\s*)/g, "\n")
-    .replace(/\s+(?=\d+\s*\/\s*)/g, "\n")
-    .trim();
-
-  if (!raw) return [];
-
-  return raw
-    .split(/\n+/)
-    .map((line) =>
-      line
-        .trim()
-        // Bỏ các dấu bullet/chấm đầu dòng do Admin hoặc text copy từ nguồn khác.
-        .replace(/^[•▪▫●◆◇*·]\s*/g, "")
-        .replace(/^-\s+/g, "")
-        .trim()
-    )
-    .filter(Boolean);
-}
-
-
 const TYPE_OPTIONS = [
   {
     label: "Loại 1",
@@ -2104,7 +2079,7 @@ export default function CustomerPage() {
     };
   }, [mode, selectedNewRow, selectedOldRow, loai]);
 
-  async function sendCustomerQuoteLog() {
+  const sendCustomerQuoteLog = useCallback(async () => {
     try {
       const clientMeta = getCustomerClientMeta();
 
@@ -2135,7 +2110,17 @@ export default function CustomerPage() {
     } catch (err) {
       console.error("CUSTOMER_QUOTE_LOG_ERROR:", err);
     }
-  }
+  }, [
+    mode,
+    spMoi,
+    spCu,
+    memory,
+    loai,
+    priceInfo.giaXac,
+    priceInfo.troGiaHang,
+    priceInfo.troGiaMWG,
+    priceInfo.tongTien,
+  ]);
 
   useEffect(() => {
     if (loading || customerAccessLocked || currentCustomerTabLocked) return;
@@ -2171,6 +2156,7 @@ export default function CustomerPage() {
     priceInfo.troGiaHang,
     priceInfo.troGiaMWG,
     priceInfo.tongTien,
+    sendCustomerQuoteLog,
   ]);
 
   useEffect(() => {

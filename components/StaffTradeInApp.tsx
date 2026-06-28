@@ -2932,6 +2932,8 @@ export default function StaffTradeInApp({
     if (!loai || !spCu || priceInfo.giaXac <= 0) return;
 
     sendQuoteLog("TRA_GIA");
+    // This effect is intentionally triggered only by lookupLogTick to avoid duplicate quote logs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lookupLogTick]);
 
   useEffect(() => {

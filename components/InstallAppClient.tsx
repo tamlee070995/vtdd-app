@@ -591,35 +591,21 @@ function isStandaloneMode() {
 export default function InstallAppClient() {
   const [profile, setProfile] = useState<BrowserProfile>(DEFAULT_PROFILE);
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
-  const [status, setStatus] = useState("Đang nhận biết thiết bị để hiển thị hướng dẫn phù hợp.");
 
   useEffect(() => {
     const current = detectProfile();
     const installed = isStandaloneMode();
 
     setProfile(installed ? { ...current, device: "installed" } : current);
-    setStatus(
-      installed
-        ? "VTDD App đang chạy ở chế độ app."
-        : current.device === "ios"
-          ? "Đã nhận biết Apple iOS. Hãy mở bằng Safari rồi thêm vào màn hình chính."
-          : current.device === "android"
-            ? "Đã nhận biết Android. Hãy mở bằng Chrome để cài VTDD App."
-            : current.device === "desktop"
-              ? "Đã nhận biết Desktop/PC/Laptop. Link cài VTDD App chỉ áp dụng cho điện thoại hoặc tablet."
-              : "Không nhận biết được hệ điều hành. Hãy mở link bằng Android Chrome hoặc iPhone Safari."
-    );
 
     const handlePrompt = (event: Event) => {
       event.preventDefault();
       setPromptEvent(event as InstallPromptEvent);
-      setStatus("Chrome đã sẵn sàng cài VTDD App. Bấm Cài VTDD App để mở popup cài app.");
     };
 
     const handleInstalled = () => {
       setProfile((prev) => ({ ...prev, device: "installed" }));
       setPromptEvent(null);
-      setStatus("VTDD App đã được cài trên thiết bị.");
     };
 
     window.addEventListener("beforeinstallprompt", handlePrompt);
@@ -641,22 +627,18 @@ export default function InstallAppClient() {
 
   async function installOnChrome() {
     if (profile.device === "installed") {
-      setStatus("Thiết bị này đang mở VTDD App ở dạng app.");
       return;
     }
 
     if (profile.device !== "android") {
-      setStatus("Nút cài trực tiếp chỉ dùng cho Android Chrome. Apple iOS cần mở Safari và chọn Thêm vào màn hình chính.");
       return;
     }
 
     if (!profile.isChrome) {
-      setStatus("Thiết bị Android cần mở bằng Chrome. Nếu chưa có Chrome, hãy tải Chrome trên CH Play.");
       return;
     }
 
     if (!promptEvent) {
-      setStatus("Chrome chưa trả về popup cài app. Hãy đợi trang tải xong hoặc tải lại trang trong Chrome rồi thử lại.");
       return;
     }
 
@@ -664,11 +646,7 @@ export default function InstallAppClient() {
     const choice = await promptEvent.userChoice.catch(() => null);
     setPromptEvent(null);
 
-    if (choice?.outcome === "accepted") {
-      setStatus("Đã gửi yêu cầu cài VTDD App. Nếu app chưa hiện, kiểm tra màn hình chính của thiết bị.");
-    } else {
-      setStatus("Bạn đã đóng popup cài app. Có thể tải lại trang bằng Chrome rồi bấm Cài VTDD App lại.");
-    }
+    void choice;
   }
 
   const iosActive = profile.device === "ios";
