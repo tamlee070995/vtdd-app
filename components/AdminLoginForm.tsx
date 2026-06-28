@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import PasswordInput from "@/components/PasswordInput";
 
 type AdminLoginFormProps = {
   initialError?: string;
@@ -139,11 +140,10 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
             />
 
             <label htmlFor="admin-password">Mật khẩu</label>
-            <input
+            <PasswordInput
               ref={passwordRef}
               id="admin-password"
               name="password"
-              type="password"
               placeholder="Nhập mật khẩu tài khoản"
               autoComplete="current-password"
               value={password}

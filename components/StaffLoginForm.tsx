@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import PasswordInput from "@/components/PasswordInput";
 
 type StaffLoginFormProps = {
   initialError?: string;
@@ -52,10 +53,9 @@ export default function StaffLoginForm({ initialError = "" }: StaffLoginFormProp
       />
 
       <label htmlFor="password">Mật khẩu</label>
-      <input
+      <PasswordInput
         id="password"
         name="password"
-        type="password"
         placeholder="Nhập mật khẩu"
         autoComplete="current-password"
         disabled={loading}

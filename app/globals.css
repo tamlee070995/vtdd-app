@@ -11313,3 +11313,31 @@ html {
     font-size: 16px !important;
   }
 }
+
+/* Password reveal buttons must use our icon, not text or browser defaults. */
+.profile-v3-password-field,
+.profile-v5-layer .profile-v3-password-field {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+}
+
+.profile-v3-eye,
+.profile-v5-layer .profile-v3-eye {
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  height: 42px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 0 !important;
+  letter-spacing: 0 !important;
+}
+
+.profile-v3-eye svg,
+.profile-v5-layer .profile-v3-eye svg {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+  fill: currentColor !important;
+  pointer-events: none !important;
+}

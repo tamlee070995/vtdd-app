@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import PasswordInput from "@/components/PasswordInput";
 
 const QUESTIONS = [
   "Tên thú cưng đầu tiên của bạn là gì?",
@@ -72,9 +73,9 @@ export default function AdminProfileButton() {
             <h2>Cập nhật thông tin</h2>
             <p>Đổi mật khẩu, Gmail nhận OTP và câu hỏi bảo mật cho tài khoản Admin.</p>
             <label>Mật khẩu hiện tại</label>
-            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Nhập mật khẩu hiện tại" />
+            <PasswordInput value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Nhập mật khẩu hiện tại" autoComplete="current-password" />
             <label className="admin-profile-check"><input type="checkbox" checked={changePassword} onChange={(e) => setChangePassword(e.target.checked)} /><b>Đổi mật khẩu đăng nhập</b></label>
-            {changePassword && <div className="admin-profile-2col"><div><label>Mật khẩu mới</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mật khẩu mới" /></div><div><label>Xác nhận mật khẩu</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Nhập lại mật khẩu" /></div></div>}
+            {changePassword && <div className="admin-profile-2col"><div><label>Mật khẩu mới</label><PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mật khẩu mới" autoComplete="new-password" /></div><div><label>Xác nhận mật khẩu</label><PasswordInput value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Nhập lại mật khẩu" autoComplete="new-password" /></div></div>}
             <label>Gmail nhận OTP</label><input type="email" value={gmail} onChange={(e) => setGmail(e.target.value)} placeholder="ten@gmail.com" />
             <label>Câu hỏi bảo mật</label><select value={question} onChange={(e) => setQuestion(e.target.value)}><option value="">Chọn câu hỏi bảo mật</option>{QUESTIONS.map((q) => <option key={q} value={q}>{q}</option>)}</select>
             <label>Câu trả lời bảo mật</label><textarea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Để trống nếu không đổi" rows={2} />

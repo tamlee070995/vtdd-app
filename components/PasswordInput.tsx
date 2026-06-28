@@ -1,30 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 
 type PasswordInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> & {
   wrapperClassName?: string;
 };
 
-export default function PasswordInput({
+const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(function PasswordInput({
   wrapperClassName = "",
   className = "",
+  disabled,
   ...props
-}: PasswordInputProps) {
+}, ref) {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className={`vtdd-password-wrap ${wrapperClassName}`}>
       <input
         {...props}
+        ref={ref}
         className={className}
         type={showPassword ? "text" : "password"}
+        disabled={disabled}
       />
 
       <button
         type="button"
         className="vtdd-password-eye"
         onClick={() => setShowPassword((v) => !v)}
+        disabled={disabled}
         aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
       >
         {showPassword ? (
@@ -39,4 +43,6 @@ export default function PasswordInput({
       </button>
     </div>
   );
-}
+});
+
+export default PasswordInput;
