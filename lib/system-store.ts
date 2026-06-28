@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 import { readSheetRange } from "@/lib/sheets";
 import { getQuoteLogs } from "@/lib/quote-log-store";
-import { insertRows, isSupabaseConfigured, selectAllRows } from "@/lib/supabase-rest";
+import { insertRows, isSupabaseConfigured, selectAllRows, selectRows } from "@/lib/supabase-rest";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
@@ -57,6 +57,11 @@ export const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
   TOOL_PMH_START_AT: "",
   TOOL_PMH_END_AT: "",
   TOOL_PMH_LOCK_REASON: "Công cụ PMH/Pincode đang tạm đóng.",
+  TOOL_CHECKIN_ENABLED: "1",
+  TOOL_CHECKIN_SCHEDULE_ENABLED: "0",
+  TOOL_CHECKIN_START_AT: "",
+  TOOL_CHECKIN_END_AT: "",
+  TOOL_CHECKIN_LOCK_REASON: "Công cụ Check-in đang tạm đóng.",
 
   TELEGRAM_CHIENGIA_ENABLED: "0",
   TELEGRAM_CHIENGIA_BOT_TOKEN: "",
@@ -65,6 +70,15 @@ export const DEFAULT_SYSTEM_SETTINGS: Record<string, string> = {
   TELEGRAM_NGOAIDS_BOT_TOKEN: "",
   TELEGRAM_NGOAIDS_CHAT_ID: "",
 };
+
+Object.assign(DEFAULT_SYSTEM_SETTINGS, {
+  SYSTEM_LOCK_MESSAGE: "HỆ THỐNG ĐANG CẬP NHẬT KHẨN.",
+  SYSTEM_LOCK_REASON: "Hệ thống tạm khóa theo lịch bảo trì đã cài đặt.",
+  FIREWALL_MESSAGE: "IP của bạn không được phép truy cập hệ thống tra giá.",
+  FIREWALL_USER_MESSAGE: "Tài khoản của bạn không được phép truy cập hệ thống tra giá.",
+  TOOL_PMH_LOCK_REASON: "Công cụ PMH/Pincode đang tạm đóng.",
+  TOOL_CHECKIN_LOCK_REASON: "Công cụ Check-in đang tạm đóng.",
+});
 
 const PUBLIC_SYSTEM_SETTING_KEYS = [
   "MARQUEE_MESSAGE",
@@ -99,6 +113,11 @@ const PUBLIC_SYSTEM_SETTING_KEYS = [
   "TOOL_PMH_START_AT",
   "TOOL_PMH_END_AT",
   "TOOL_PMH_LOCK_REASON",
+  "TOOL_CHECKIN_ENABLED",
+  "TOOL_CHECKIN_SCHEDULE_ENABLED",
+  "TOOL_CHECKIN_START_AT",
+  "TOOL_CHECKIN_END_AT",
+  "TOOL_CHECKIN_LOCK_REASON",
 ];
 
 let settingsWriteQueue: Promise<any> = Promise.resolve();
@@ -174,6 +193,21 @@ function settingType(key: string) {
 function boolValue(value: string) {
   const v = clean(value).toLowerCase();
   return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function isDuplicateKeyError(err: any) {
+  const message = clean(err?.message || err);
+  return /23505|duplicate key value|violates unique constraint/i.test(message);
+}
+
+async function getNextAdminAuditId() {
+  const rows = await selectRows<any>("admin_audit", {
+    select: "id",
+    order: "id.desc",
+    limit: 1,
+  });
+  const maxId = Number(rows?.[0]?.id || 0);
+  return Number.isFinite(maxId) ? maxId + 1 : 1;
 }
 
 function getColumnLetter(columnNumber: number) {
@@ -455,23 +489,35 @@ export async function appendAdminAudit(data: {
 }) {
   if (isSupabaseConfigured()) {
     try {
-      await insertRows(
-        "admin_audit",
-        [
-          {
-            time_text: nowVN(),
-            admin: clean(data.admin || "Admin"),
-            action: clean(data.action),
-            target: clean(data.target),
-            old_value: clean(data.oldValue),
-            new_value: clean(data.newValue),
-            ip: clean(data.ip),
-            note: clean(data.note),
-          },
-        ],
-        { returning: "minimal" }
-      );
-      return;
+      const row = {
+        time_text: nowVN(),
+        admin: clean(data.admin || "Admin"),
+        action: clean(data.action),
+        target: clean(data.target),
+        old_value: clean(data.oldValue),
+        new_value: clean(data.newValue),
+        ip: clean(data.ip),
+        note: clean(data.note),
+      };
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+          await insertRows(
+            "admin_audit",
+            [
+              {
+                id: await getNextAdminAuditId(),
+                ...row,
+              },
+            ],
+            { returning: "minimal" }
+          );
+          return;
+        } catch (err: any) {
+          if (attempt < 4 && isDuplicateKeyError(err)) continue;
+          throw err;
+        }
+      }
     } catch (err: any) {
       console.warn("SUPABASE_AUDIT_ERROR:", err?.message || err);
       throw err;

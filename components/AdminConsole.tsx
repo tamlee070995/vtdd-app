@@ -77,9 +77,11 @@ type AdminActionKey =
   | "reload-data"
   | "dashboard-view"
   | "tools-pmh"
-  | "tools-coming"
   | "tools-report"
-  | "tools-telegram";
+  | "tools-telegram"
+  | "tools-checkin";
+
+type TcdmConsoleScope = "tcdm" | "people";
 
 type AdminConsoleProps = {
   initialSettings: Record<string, string>;
@@ -197,6 +199,14 @@ const TAB_ITEMS: Array<{
   { key: "dashboard", label: "Dashboard", desc: "Tra giá & log", icon: "06" },
 ];
 
+const TCDM_TAB_ITEMS = TAB_ITEMS.filter((item) =>
+  ["overview", "notify", "system", "dashboard"].includes(item.key)
+).map((item, index) => ({ ...item, icon: String(index + 1).padStart(2, "0") }));
+
+const PEOPLE_TAB_ITEMS = TAB_ITEMS.filter((item) =>
+  ["staff", "permission"].includes(item.key)
+).map((item, index) => ({ ...item, icon: String(index + 1).padStart(2, "0") }));
+
 
 const ADMIN_MODULE_OPTIONS = [
   { key: "tcdm", label: "1.1 Tra giá TCDM" },
@@ -205,22 +215,31 @@ const ADMIN_MODULE_OPTIONS = [
   { key: "may-cu", label: "3 Trang máy cũ" },
   { key: "demo", label: "4 Trang demo" },
   { key: "tools", label: "5 Công cụ" },
+  { key: "people", label: "6 Quyền & Nhân sự" },
 ];
 
 const ADMIN_ACTION_PREFIX = "action:";
 
-const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
+const PERSONNEL_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
   { key: "staff-manage", label: "Quản lý nhân viên", desc: "Xem danh sách, Active và Standby tài khoản." },
   { key: "staff-delete", label: "Xóa nhân viên", desc: "Xóa tài khoản nhân viên khỏi hệ thống." },
   { key: "staff-security", label: "Reset bảo mật", desc: "Reset OTP, mật khẩu và thiết lập bảo mật." },
+];
+
+const TCDM_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
   { key: "settings-write", label: "Lưu cấu hình", desc: "Lưu thông báo, lock web và ngày áp dụng." },
   { key: "reload-data", label: "Reload data", desc: "Tăng Data version để nhân viên nhận dữ liệu mới." },
   { key: "dashboard-view", label: "Xem dashboard", desc: "Xem log tra giá, top máy và thống kê." },
 ];
 
+const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
+  ...PERSONNEL_ACTION_OPTIONS,
+  ...TCDM_ACTION_OPTIONS,
+];
+
 const TOOL_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
   { key: "tools-pmh", label: "PMH / Pincode", desc: "Duyệt hồ sơ, nạp kho PMH và cấu hình lịch chạy." },
-  { key: "tools-coming", label: "Công cụ sắp thêm", desc: "Cho phép nhìn thấy ô công cụ chờ gắn thêm." },
+  { key: "tools-checkin", label: "Check-in Event", desc: "Import danh sách khách, check-in và xem thứ tự khách đến." },
   { key: "tools-report", label: "Báo cáo hỗ trợ", desc: "Import/export CSV, xuất log và tạo file backup." },
   { key: "tools-telegram", label: "Thông báo Telegram", desc: "Cài bot, nhóm nhận tin và test bot cho từng công cụ." },
 ];
@@ -231,7 +250,8 @@ const ALL_ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc
 ];
 
 const TOOL_ACTION_KEYS = new Set(TOOL_ACTION_OPTIONS.map((item) => item.key));
-const TCDM_ACTION_KEYS = new Set(ADMIN_ACTION_OPTIONS.map((item) => item.key));
+const PERSONNEL_ACTION_KEYS = new Set(PERSONNEL_ACTION_OPTIONS.map((item) => item.key));
+const TCDM_ACTION_KEYS = new Set(TCDM_ACTION_OPTIONS.map((item) => item.key));
 
 const NOTICE_CONTENT_SETTING_KEYS = ["MARQUEE_MESSAGE", "FIXED_BANNER_MESSAGE"];
 const PUSH_NOTIFY_SETTING_KEYS = ["PUSH_NOTIFY_MESSAGE", "PUSH_NOTIFY_VERSION"];
@@ -248,6 +268,7 @@ const STAFF_POPUP_BUYONLY_SETTING_KEYS = [
   "STAFF_POPUP_BUYONLY_SECONDS",
   "STAFF_POPUP_BUYONLY_VERSION",
 ];
+const STAFF_CHECKIN_PERMISSION_TOKEN = "tool:checkin";
 
 const PRICE_SETTING_KEYS = ["PRICE_EFFECTIVE_FROM", "PRICE_EFFECTIVE_TO"];
 const RELOAD_SETTING_KEYS = ["DATA_VERSION"];
@@ -276,14 +297,20 @@ function stripHiddenClientSettings(values: Record<string, string>) {
 const PERMISSION_TREE = [
   {
     title: "Quản trị vận hành TCDM",
-    desc: "Các tab con trong module quản trị trang tra giá.",
+    desc: "Thông báo, lock web, reload data và dashboard tra giá.",
     module: "tcdm",
-    children: ADMIN_ACTION_OPTIONS,
+    children: TCDM_ACTION_OPTIONS,
+  },
+  {
+    title: "Quyền & Nhân sự",
+    desc: "Module 06 quản lý nhân viên, reset bảo mật và phân quyền.",
+    module: "people",
+    children: PERSONNEL_ACTION_OPTIONS,
   },
   {
     title: "Nội dung trang chủ",
     desc: "Các trang CMS gắn ngoài trang chủ.",
-    children: ADMIN_MODULE_OPTIONS.filter((item) => item.key !== "tcdm" && item.key !== "tools").map((item) => ({
+    children: ADMIN_MODULE_OPTIONS.filter((item) => !["tcdm", "tools", "people"].includes(item.key)).map((item) => ({
       module: item.key,
       label: item.label,
       desc: "Cho phép mở và chỉnh nội dung module này.",
@@ -403,14 +430,32 @@ function summarizeAdminAccess(value: any) {
     .join(" · ");
 }
 
+function parseStaffPermissionTokens(value: any) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter((item, index, arr) => Boolean(item) && arr.indexOf(item) === index);
+}
+
+function hasCheckinToolAccess(item: AdminStaff) {
+  if (item.permission === "admin") return true;
+  const tokens = new Set(parseStaffPermissionTokens(item.modulePermissions));
+  return tokens.has(STAFF_CHECKIN_PERMISSION_TOKEN) || tokens.has("action:tools-checkin");
+}
+
+function hasDirectCheckinGrant(item: AdminStaff) {
+  return parseStaffPermissionTokens(item.modulePermissions).includes(STAFF_CHECKIN_PERMISSION_TOKEN);
+}
+
 function TcdmAdminConsole({
   initialSettings,
   adminRole = "admin",
   adminModules = "",
   adminActions = "",
   adminHasExplicitActions = false,
-}: AdminConsoleProps) {
-  const [tab, setTab] = useState<TabKey>("overview");
+  scope = "tcdm",
+}: AdminConsoleProps & { scope?: TcdmConsoleScope }) {
+  const [tab, setTab] = useState<TabKey>(() => (scope === "people" ? "staff" : "overview"));
   const [settings, setSettings] = useState<Record<string, string>>(initialSettings);
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState<ToastState>(null);
@@ -455,14 +500,22 @@ function TcdmAdminConsole({
   const grantedModules = parseModuleList(adminModules);
   const grantedActions = parseAdminActionItems(adminActions);
   const legacyTcdmAccess = !adminHasExplicitActions && grantedModules.includes("tcdm");
+  const legacyPeopleAccess = !adminHasExplicitActions && grantedModules.includes("people");
+  const hasExplicitPeopleActions = grantedActions.some((action) => PERSONNEL_ACTION_KEYS.has(action));
 
   function canUseAction(action: AdminActionKey) {
-    return isFullAdmin || grantedActions.includes(action) || legacyTcdmAccess;
+    if (isFullAdmin || grantedActions.includes(action)) return true;
+    if (TCDM_ACTION_KEYS.has(action)) return legacyTcdmAccess;
+    if (PERSONNEL_ACTION_KEYS.has(action)) {
+      return legacyPeopleAccess || (grantedModules.includes("people") && !hasExplicitPeopleActions);
+    }
+    return false;
   }
 
-  const visibleTabs = TAB_ITEMS.filter((item) => {
+  const tabItems = scope === "people" ? PEOPLE_TAB_ITEMS : TCDM_TAB_ITEMS;
+  const visibleTabs = tabItems.filter((item) => {
     if (isFullAdmin) return true;
-    if (item.key === "overview") return true;
+    if (scope === "tcdm" && item.key === "overview") return true;
     if (item.key === "permission") return false;
     if (item.key === "staff") {
       return canUseAction("staff-manage") || canUseAction("staff-security") || canUseAction("staff-delete");
@@ -473,7 +526,7 @@ function TcdmAdminConsole({
     return false;
   });
   const activeTabAllowed = visibleTabs.some((item) => item.key === tab);
-  const firstVisibleTab = visibleTabs[0]?.key || "overview";
+  const firstVisibleTab = visibleTabs[0]?.key || (scope === "people" ? "staff" : "overview");
   const canManageStaff = canUseAction("staff-manage");
   const canDeleteStaff = canUseAction("staff-delete");
   const canResetStaffSecurity = canUseAction("staff-security");
@@ -849,7 +902,7 @@ function TcdmAdminConsole({
   }, [tab, dashboardLoaded, dashboardSource]);
 
   async function runStaffAction(
-    action: "ACTIVE" | "STANDBY" | "RESET_SECURITY" | "RESET_OTP_COUNT" | "DELETE",
+    action: "ACTIVE" | "STANDBY" | "RESET_SECURITY" | "RESET_OTP_COUNT" | "DELETE" | "UPDATE_CHECKIN_ACCESS",
     maNV: string,
     extra?: Record<string, unknown>
   ) {
@@ -1208,7 +1261,7 @@ function TcdmAdminConsole({
                 <div className={opsHealth?.backup?.lastError ? "warn" : opsHealth?.backup?.exists ? "ok" : "warn"}>
                   <span>Backup</span>
                   <b>{opsHealth?.backup?.exists ? "Đã có file" : "Chưa có file"}</b>
-                  <p>{opsHealth?.backup?.updatedAtVN || opsHealth?.backup?.nextRunAtVN || "Tự chạy lúc 23:00 mỗi ngày."}</p>
+                  <p>{opsHealth?.backup?.updatedAtVN || opsHealth?.backup?.nextRunAtVN || "Tự chạy từ 06:00 mỗi 3 giờ, chốt 23:00."}</p>
                   {opsHealth?.backup?.exists ? (
                     <button
                       type="button"
@@ -1435,6 +1488,11 @@ function TcdmAdminConsole({
                       <div className="adminx-staff-flags">
                         <span>OTP: {item.resetOtpCount || "0"}</span>
                         <span>SETUP: {item.needSetup || "0"}</span>
+                        {hasCheckinToolAccess(item) ? (
+                          <span>CHECK-IN: {item.permission === "admin" ? "ADMIN" : "ĐƯỢC CẤP"}</span>
+                        ) : (
+                          <span>CHECK-IN: —</span>
+                        )}
                         {item.gmail ? <span>{item.gmail}</span> : null}
                         {item.permission ? <span>QUYỀN: {item.permission.toUpperCase()}</span> : <span>QUYỀN: —</span>}
                         {item.permission === "mod" ? <span>PHẠM VI: {summarizeAdminAccess(item.modulePermissions)}</span> : null}
@@ -1499,6 +1557,31 @@ function TcdmAdminConsole({
                       >
                         Reset OTP
                       </button>
+                      {isFullAdmin ? (
+                        <button
+                          type="button"
+                          className={hasCheckinToolAccess(item) ? "primary" : ""}
+                          disabled={item.permission === "admin" || busy === `UPDATE_CHECKIN_ACCESS-${item.maNV}`}
+                          onClick={() => {
+                            const enabled = !hasDirectCheckinGrant(item);
+                            openConfirmDialog({
+                              title: enabled ? "Cấp quyền Check-in" : "Tắt quyền Check-in",
+                              message: enabled
+                                ? `Cấp quyền truy cập công cụ Check-in cho NV ${item.maNV}?`
+                                : `Thu hồi quyền truy cập công cụ Check-in của NV ${item.maNV}?`,
+                              confirmText: enabled ? "Cấp quyền" : "Thu hồi",
+                              danger: !enabled,
+                              onConfirm: () => runStaffAction("UPDATE_CHECKIN_ACCESS", item.maNV, { enabled }),
+                            });
+                          }}
+                        >
+                          {item.permission === "admin"
+                            ? "Check-in Admin"
+                            : hasDirectCheckinGrant(item)
+                              ? "Tắt Check-in"
+                              : "Cấp Check-in"}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="danger"
@@ -5254,8 +5337,8 @@ function StaffAdminAccessBox({
   function toggleModule(key: string) {
     setAccessItems((current) => {
       if (!current.includes(key)) return [...current, key];
-      if (key === "tcdm" || key === "tools") {
-        const actionKeys = key === "tools" ? TOOL_ACTION_KEYS : TCDM_ACTION_KEYS;
+      if (key === "tcdm" || key === "tools" || key === "people") {
+        const actionKeys = key === "tools" ? TOOL_ACTION_KEYS : key === "people" ? PERSONNEL_ACTION_KEYS : TCDM_ACTION_KEYS;
         return current.filter((item) => {
           if (item === key) return false;
           if (!item.startsWith(ADMIN_ACTION_PREFIX)) return true;
@@ -5273,7 +5356,7 @@ function StaffAdminAccessBox({
     setAccessItems((current) => {
       if (current.includes(token)) return current.filter((item) => item !== token);
 
-      const parentModule = TOOL_ACTION_KEYS.has(key) ? "tools" : "tcdm";
+      const parentModule = TOOL_ACTION_KEYS.has(key) ? "tools" : PERSONNEL_ACTION_KEYS.has(key) ? "people" : "tcdm";
       const next = current.includes(parentModule)
         ? [...current, token]
         : [parentModule, ...current, token];
@@ -5395,8 +5478,8 @@ function StaffAdminAccessBox({
           </div>
 
           <div className="adminx-permission-section-title">
-            <span>Quyền thao tác trong TCDM</span>
-            <small>Nếu bỏ trống, Mod TCDM cũ vẫn dùng theo quyền module.</small>
+            <span>Quyền thao tác chi tiết</span>
+            <small>Chọn đúng quyền theo từng module. Module 06 dùng cho Nhân viên và Phân quyền.</small>
           </div>
           <div className="adminx-module-buttons adminx-action-buttons">
             {ADMIN_ACTION_OPTIONS.map((action) => {
@@ -5424,7 +5507,7 @@ function StaffAdminAccessBox({
   );
 }
 type CmsSlug = "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo";
-type AdminModuleKey = "tcdm" | CmsSlug | "tools";
+type AdminModuleKey = "tcdm" | CmsSlug | "tools" | "people";
 
 type CmsItem = {
   slug: CmsSlug;
@@ -5452,7 +5535,7 @@ const ADMIN_MODULES: Array<{
     key: "tcdm",
     no: "01",
     title: "Quản trị: Trang tra giá TCDM",
-    desc: "Tài khoản nhân viên, thông báo, lock web, dashboard và reload data.",
+    desc: "Thông báo, lock web, dashboard và reload data cho luồng tra giá.",
     badge: "Đang hoạt động",
   },
   {
@@ -5489,6 +5572,13 @@ const ADMIN_MODULES: Array<{
     title: "Quản trị: Công cụ hỗ trợ",
     desc: "Quản trị PMH, Pincode và hồ sơ thẩm định nhân viên gửi lên.",
     badge: "PMH / thẩm định",
+  },
+  {
+    key: "people",
+    no: "06",
+    title: "Quản trị: Quyền & Nhân sự",
+    desc: "Duyệt tài khoản, reset bảo mật, phân quyền Admin / Mod / User.",
+    badge: "Nhân sự / phân quyền",
   },
 ];
 
@@ -5840,14 +5930,25 @@ export default function AdminConsole({
 
   const isAdmin = adminRole === "admin";
   const allowedModules = parseModuleList(adminModules);
+  const allowedActions = parseAdminActionItems(adminActions);
+  const canUseRootAction = (action: AdminActionKey) => isAdmin || allowedActions.includes(action);
+  const hasAnyRootAction = (keys: Set<AdminActionKey>) => Array.from(keys).some((key) => canUseRootAction(key));
+  const hasTcdmRootAccess =
+    allowedModules.includes("tcdm") || hasAnyRootAction(TCDM_ACTION_KEYS) || (!adminHasExplicitActions && allowedModules.includes("tcdm"));
+  const hasPeopleRootAccess =
+    allowedModules.includes("people") || hasAnyRootAction(PERSONNEL_ACTION_KEYS) || (!adminHasExplicitActions && allowedModules.includes("people"));
+  const hasToolsRootAccess = allowedModules.includes("tools") || hasAnyRootAction(TOOL_ACTION_KEYS);
   const visibleAdminModules = isAdmin
     ? ADMIN_MODULES
-    : ADMIN_MODULES.filter((item) => allowedModules.includes(item.key));
+    : ADMIN_MODULES.filter((item) => canAccess(item.key));
   const activeModuleAllowed = visibleAdminModules.some((item) => item.key === module);
   const firstVisibleModule = visibleAdminModules[0]?.key || "tcdm";
 
   function canAccess(key: AdminModuleKey) {
     if (isAdmin) return true;
+    if (key === "tcdm") return hasTcdmRootAccess;
+    if (key === "people") return hasPeopleRootAccess;
+    if (key === "tools") return hasToolsRootAccess;
     return allowedModules.includes(key);
   }
 
@@ -5935,6 +6036,27 @@ export default function AdminConsole({
               </div>
             </div>
             <TcdmAdminConsole
+              key="tcdm"
+              scope="tcdm"
+              initialSettings={initialSettings}
+              adminRole={adminRole}
+              adminName={adminName}
+              adminModules={adminModules}
+              adminActions={adminActions}
+              adminHasExplicitActions={adminHasExplicitActions}
+            />
+          </>
+        ) : module === "people" ? (
+          <>
+            <div className="admin-cms-module-title-v5">
+              <span>06</span>
+              <div>
+                <h3>Quản trị: Quyền & Nhân sự</h3>
+              </div>
+            </div>
+            <TcdmAdminConsole
+              key="people"
+              scope="people"
               initialSettings={initialSettings}
               adminRole={adminRole}
               adminName={adminName}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import StaffLoginForm from "@/components/StaffLoginForm";
 
 type PageProps = {
-  searchParams?: Promise<{ error?: string }> | { error?: string };
+  searchParams?: Promise<{ error?: string; next?: string }> | { error?: string; next?: string };
 };
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({ searchParams }: PageProps) {
   const params = searchParams ? await searchParams : {};
   const error = typeof params?.error === "string" ? params.error : "";
+  const next = typeof params?.next === "string" ? params.next : "";
 
   return (
     <main className="staff-auth-page">
@@ -34,12 +35,12 @@ export default async function LoginPage({ searchParams }: PageProps) {
           <div className="staff-auth-hero-copy">
             <span className="staff-auth-kicker">EMPLOYEE ACCESS</span>
             <h1>
-              Tra cứu nhanh,
-              <span>vào ca gọn hơn.</span>
+              Truy cập nội bộ,
+              <span>thao tác nhanh hơn.</span>
             </h1>
             <p>
-              Đăng nhập bằng mã nhân viên để tra bảng giá TCDM, xem lịch sử báo giá
-              và thao tác các công cụ nội bộ.
+              Đăng nhập bằng mã nhân viên để sử dụng các công cụ được cấp quyền
+              và theo dõi thông tin phục vụ vận hành.
             </p>
           </div>
 
@@ -49,7 +50,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
           </div>
         </section>
 
-        <StaffLoginForm initialError={error} />
+        <StaffLoginForm initialError={error} next={next} />
 
         <footer className="staff-auth-footer">
           <span>VTDD Internal</span>

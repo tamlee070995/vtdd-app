@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useState } from "react";
 import type { ToolAvailability } from "@/lib/tool-settings";
 
-const ROUTES = [
+const PMH_ROUTES = [
   {
     href: "/cong-cu-ho-tro/chien-gia",
     no: "01",
@@ -21,13 +21,31 @@ const ROUTES = [
   },
 ];
 
-type SupportToolsPortalProps = {
-  pmhAvailability: ToolAvailability;
+const CHECKIN_TOOL = {
+  href: "/cong-cu-ho-tro/check-in",
+  no: "01",
+  title: "Check-in khách hàng",
+  desc: "Tìm khách tham gia event, check-in và xếp thứ tự đến tự động.",
+  tone: "blue",
 };
 
-export default function SupportToolsPortal({ pmhAvailability }: SupportToolsPortalProps) {
+type SupportToolsPortalProps = {
+  pmhAvailability: ToolAvailability;
+  checkinAvailability: ToolAvailability;
+  checkinAccess?: boolean;
+  checkinSignedIn?: boolean;
+};
+
+export default function SupportToolsPortal({
+  pmhAvailability,
+  checkinAvailability,
+  checkinAccess = false,
+  checkinSignedIn = false,
+}: SupportToolsPortalProps) {
   const [open, setOpen] = useState(false);
+  const [checkinOpen, setCheckinOpen] = useState(false);
   const enabled = pmhAvailability.enabled;
+  const checkinEnabled = checkinAvailability.enabled;
 
   return (
     <main className="support-page">
@@ -57,18 +75,16 @@ export default function SupportToolsPortal({ pmhAvailability }: SupportToolsPort
             <h1>Event Thu Cũ Đổi Mới</h1>
           </div>
 
-          {enabled ? (
-            <button type="button" className="support-collapse-button" onClick={() => setOpen((current) => !current)}>
-              {open ? "Thu gọn" : "Mở rộng"}
-            </button>
-          ) : null}
+          <button type="button" className="support-collapse-button" onClick={() => setOpen((current) => !current)}>
+            {open ? "Thu gọn" : "Mở rộng"}
+          </button>
         </div>
 
         {!enabled ? <div className="support-lock-reason">{pmhAvailability.reason}</div> : null}
 
-        {enabled && open ? (
+        {open ? (
           <div className="support-tools-grid" aria-label="Công cụ PMH">
-            {ROUTES.map((item) => {
+            {PMH_ROUTES.map((item) => {
               const content = (
                 <>
                   <div className="support-tool-no">{item.no}</div>
@@ -95,9 +111,68 @@ export default function SupportToolsPortal({ pmhAvailability }: SupportToolsPort
         ) : null}
       </section>
 
+      <section className={`support-module support-checkin-module ${checkinOpen ? "open" : "collapsed"} ${checkinEnabled ? "" : "tool-off"}`}>
+        <div className="support-module-head">
+          <div className="support-title-block">
+            <h1>Check-in Event</h1>
+          </div>
+
+          <button type="button" className="support-collapse-button" onClick={() => setCheckinOpen((current) => !current)}>
+            {checkinOpen ? "Thu gọn" : "Mở rộng"}
+          </button>
+        </div>
+
+        {!checkinEnabled ? <div className="support-lock-reason">{checkinAvailability.reason}</div> : null}
+
+        {checkinOpen ? (
+          <div className="support-tools-grid support-checkin-grid" aria-label="Công cụ Check-in">
+            {!checkinEnabled ? (
+              <button type="button" className={`support-tool-card disabled ${CHECKIN_TOOL.tone}`}>
+                <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
+                <span>
+                  <b>{CHECKIN_TOOL.title}</b>
+                  <small>{CHECKIN_TOOL.desc}</small>
+                  <em>{checkinAvailability.reason || "Công cụ Check-in đang tạm đóng."}</em>
+                </span>
+                <i>×</i>
+              </button>
+            ) : checkinAccess ? (
+              <Link href={CHECKIN_TOOL.href} className={`support-tool-card ${CHECKIN_TOOL.tone}`}>
+                <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
+                <span>
+                  <b>{CHECKIN_TOOL.title}</b>
+                  <small>{CHECKIN_TOOL.desc}</small>
+                </span>
+                <i>›</i>
+              </Link>
+            ) : !checkinSignedIn ? (
+              <Link href="/login?next=/cong-cu-ho-tro/check-in" className={`support-tool-card ${CHECKIN_TOOL.tone}`}>
+                <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
+                <span>
+                  <b>{CHECKIN_TOOL.title}</b>
+                  <small>Đăng nhập tài khoản được cấp quyền để mở công cụ.</small>
+                  <em>Yêu cầu đăng nhập nội bộ</em>
+                </span>
+                <i>›</i>
+              </Link>
+            ) : (
+              <button type="button" className={`support-tool-card disabled ${CHECKIN_TOOL.tone}`}>
+                <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
+                <span>
+                  <b>{CHECKIN_TOOL.title}</b>
+                  <small>{CHECKIN_TOOL.desc}</small>
+                  <em>Công cụ nội bộ, chỉ tài khoản được Admin cấp quyền mới truy cập.</em>
+                </span>
+                <i>×</i>
+              </button>
+            )}
+          </div>
+        ) : null}
+      </section>
+
       <footer className="support-footer">
         <span />
-        <b>Copyright © - Vien Thong Di Dong</b>
+        <b>Copyright © - Viễn Thông Di Động</b>
         <span />
       </footer>
     </main>
@@ -202,6 +277,12 @@ const STYLE = `
 }
 .support-module.tool-off {
   background: radial-gradient(circle at 100% 0%, rgba(148, 163, 184, .18), transparent 40%), rgba(255,255,255,.84);
+}
+.support-checkin-module {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(59, 130, 246, .18), transparent 42%),
+    radial-gradient(circle at 0% 100%, rgba(16, 185, 129, .12), transparent 34%),
+    rgba(255,255,255,.92);
 }
 .support-module.collapsed {
   padding-bottom: 24px;
@@ -309,6 +390,10 @@ const STYLE = `
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
+.support-checkin-grid {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 720px;
+}
 .support-tool-card {
   min-height: 132px;
   padding: 16px;
@@ -328,6 +413,9 @@ const STYLE = `
 }
 .support-tool-card.green {
   background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(220,252,231,.72));
+}
+.support-tool-card.blue {
+  background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(219,234,254,.76));
 }
 .support-tool-card.disabled {
   cursor: not-allowed;
@@ -409,9 +497,12 @@ const STYLE = `
   .support-page {
     padding: 14px;
   }
-  .support-module-head,
   .support-tools-grid {
     grid-template-columns: 1fr;
+  }
+  .support-module-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
   }
   .support-module-no {
     width: 48px;
@@ -452,8 +543,19 @@ const STYLE = `
     padding: 16px;
     border-radius: 28px;
   }
+  .support-module-head {
+    gap: 10px;
+  }
   .support-title-block h1 {
-    font-size: 34px;
+    margin-top: 2px;
+    font-size: clamp(30px, 8.2vw, 34px);
+    line-height: 1.02;
+  }
+  .support-collapse-button {
+    justify-self: end;
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 11px;
   }
   .support-tool-card {
     min-height: 118px;

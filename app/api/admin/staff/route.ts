@@ -9,6 +9,7 @@ import {
   findStaffByMaNV,
   getAdminStaffPage,
   updateStaffAdminAccess,
+  updateStaffCheckinToolAccess,
   updateStaffStatus,
 } from "@/lib/staff-store";
 import { decryptText, hashPassword, normalizeCode } from "@/lib/staff-security";
@@ -44,7 +45,7 @@ function normalizeModules(value: any) {
 }
 
 function canRunAction(admin: any, action: AdminActionKey) {
-  return adminHasAction(admin, action, "tcdm");
+  return adminHasAction(admin, action, "people");
 }
 
 function denyModTouchingAdmin(admin: any, target: any) {
@@ -99,7 +100,7 @@ function getLoginUrl(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const { admin, response } = await requireAdminApi(req, { module: "tcdm" });
+  const { admin, response } = await requireAdminApi(req);
   if (response) return response;
 
   if (
@@ -171,7 +172,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { admin, response } = await requireAdminApi(req, { module: "tcdm" });
+  const { admin, response } = await requireAdminApi(req);
   if (response) return response;
 
   try {
@@ -247,6 +248,32 @@ export async function POST(req: NextRequest) {
             : `Đã xóa quyền Admin/Mod của NV ${target.maNV}. Tài khoản trở về user thường.`;
 
       return NextResponse.json({ success: true, message });
+    }
+
+    if (action === "UPDATE_CHECKIN_ACCESS") {
+      if (!(await isFullAdmin(admin))) {
+        return NextResponse.json(
+          { success: false, message: "Chỉ Admin mới được cấp hoặc thu hồi quyền Check-in." },
+          { status: 403 }
+        );
+      }
+
+      if (normalizePermission(target.permission) === "admin") {
+        return NextResponse.json({
+          success: true,
+          message: `Tài khoản Admin ${target.maNV} mặc định có quyền truy cập Check-in.`,
+        });
+      }
+
+      const enabled = Boolean(body.enabled);
+      await updateStaffCheckinToolAccess(target.rowNumber, { maNV: target.maNV, enabled });
+
+      return NextResponse.json({
+        success: true,
+        message: enabled
+          ? `Đã cấp quyền Check-in cho NV ${target.maNV}.`
+          : `Đã thu hồi quyền Check-in của NV ${target.maNV}.`,
+      });
     }
 
     if (action === "ACTIVE") {

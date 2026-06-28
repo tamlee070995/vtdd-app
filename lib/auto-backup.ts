@@ -5,13 +5,15 @@ import { exportSyncTarget } from "@/lib/data-sync-store";
 
 const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const BACKUP_HOUR_VN = 23;
+const BACKUP_SCHEDULE_HOURS_VN = [6, 9, 12, 15, 18, 21, 23];
+const FINAL_BACKUP_HOUR_VN = 23;
 const BACKUP_MINUTE_VN = 0;
 const BACKUP_DIR = getBackupDir();
 const BACKUP_FILE_NAME = "vtdd-backup.json";
 const BACKUP_META_FILE_NAME = "vtdd-backup.meta.json";
 const BACKUP_HISTORY_FILE_NAME = "vtdd-backup.history.json";
 const BACKUP_HISTORY_DAYS = 7;
+const BACKUP_SCHEDULE_LABEL = "06:00, 09:00, 12:00, 15:00, 18:00, 21:00 và chốt 23:00 mỗi ngày";
 
 type AutoBackupRuntime = {
   started: boolean;
@@ -90,6 +92,30 @@ function dailyBackupFileName(date: Date) {
   return `vtdd-backup-${toVnDateKey(date)}.json`;
 }
 
+function vnHour(date: Date) {
+  return new Date(date.getTime() + VN_OFFSET_MS).getUTCHours();
+}
+
+function isFinalBackupRun(date: Date, trigger: AutoBackupResult["trigger"]) {
+  return trigger === "schedule" && vnHour(date) === FINAL_BACKUP_HOUR_VN;
+}
+
+function slotBackupFileName(date: Date) {
+  const hour = String(vnHour(date)).padStart(2, "0");
+  return `vtdd-backup-${toVnDateKey(date)}-${hour}00.json`;
+}
+
+function archiveBackupFileName(date: Date, trigger: AutoBackupResult["trigger"]) {
+  if (isFinalBackupRun(date, trigger)) return dailyBackupFileName(date);
+  if (trigger === "schedule") return slotBackupFileName(date);
+
+  const vn = new Date(date.getTime() + VN_OFFSET_MS);
+  const hour = String(vn.getUTCHours()).padStart(2, "0");
+  const minute = String(vn.getUTCMinutes()).padStart(2, "0");
+  const second = String(vn.getUTCSeconds()).padStart(2, "0");
+  return `vtdd-backup-${toVnDateKey(date)}-manual-${hour}${minute}${second}.json`;
+}
+
 function formatVN(date: Date) {
   return new Intl.DateTimeFormat("vi-VN", {
     timeZone: "Asia/Ho_Chi_Minh",
@@ -106,17 +132,32 @@ function formatVN(date: Date) {
 function msUntilNextBackup(now = new Date()) {
   const nowMs = now.getTime();
   const nowVN = new Date(nowMs + VN_OFFSET_MS);
-  let targetMs = Date.UTC(
-    nowVN.getUTCFullYear(),
-    nowVN.getUTCMonth(),
-    nowVN.getUTCDate(),
-    BACKUP_HOUR_VN,
-    BACKUP_MINUTE_VN,
-    0,
-    0
-  ) - VN_OFFSET_MS;
+  const todayTargets = BACKUP_SCHEDULE_HOURS_VN
+    .map((hour) =>
+      Date.UTC(
+        nowVN.getUTCFullYear(),
+        nowVN.getUTCMonth(),
+        nowVN.getUTCDate(),
+        hour,
+        BACKUP_MINUTE_VN,
+        0,
+        0
+      ) - VN_OFFSET_MS
+    )
+    .filter((targetMs) => targetMs > nowMs);
 
-  if (targetMs <= nowMs) targetMs += DAY_MS;
+  const targetMs = todayTargets[0] ?? (
+    Date.UTC(
+      nowVN.getUTCFullYear(),
+      nowVN.getUTCMonth(),
+      nowVN.getUTCDate() + 1,
+      BACKUP_SCHEDULE_HOURS_VN[0],
+      BACKUP_MINUTE_VN,
+      0,
+      0
+    ) - VN_OFFSET_MS
+  );
+
   return targetMs - nowMs;
 }
 
@@ -136,6 +177,26 @@ async function replaceFileAtomic(targetPath: string, body: string) {
   }
 }
 
+function isBackupArchiveFileName(name: string) {
+  return /^vtdd-backup-\d{4}-\d{2}-\d{2}(?:-\d{4}|-manual-\d{6})?\.json$/i.test(name);
+}
+
+function isIntradayBackupFileName(name: string, dateKey?: string) {
+  const escapedDateKey = dateKey ? dateKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : "\\d{4}-\\d{2}-\\d{2}";
+  return new RegExp(`^vtdd-backup-${escapedDateKey}-\\d{4}\\.json$`, "i").test(name);
+}
+
+async function deleteIntradayBackupsForDate(date: Date) {
+  const dateKey = toVnDateKey(date);
+  const files = await readdir(BACKUP_DIR).catch(() => []);
+
+  await Promise.all(
+    files
+      .filter((name) => isIntradayBackupFileName(name, dateKey))
+      .map((name) => unlink(path.join(BACKUP_DIR, name)).catch(() => undefined))
+  );
+}
+
 async function updateBackupHistory(result: AutoBackupResult) {
   await mkdir(BACKUP_DIR, { recursive: true });
 
@@ -147,9 +208,17 @@ async function updateBackupHistory(result: AutoBackupResult) {
     history = [];
   }
 
+  const resultDateKey = toVnDateKey(new Date(result.createdAt));
+  const finalRun = result.trigger === "schedule" && result.dailyFileName === dailyBackupFileName(new Date(result.createdAt));
+
   const merged = [
     result,
-    ...history.filter((item) => item.dailyFileName !== result.dailyFileName && item.fileName !== result.dailyFileName),
+    ...history.filter((item) => {
+      const itemFile = item.dailyFileName || item.fileName || "";
+      if (itemFile === result.dailyFileName || item.fileName === result.dailyFileName) return false;
+      if (finalRun && isIntradayBackupFileName(itemFile, resultDateKey)) return false;
+      return true;
+    }),
   ]
     .filter((item) => item && item.createdAt)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
@@ -167,7 +236,7 @@ async function updateBackupHistory(result: AutoBackupResult) {
   const files = await readdir(BACKUP_DIR).catch(() => []);
   await Promise.all(
     files
-      .filter((name) => /^vtdd-backup-\d{4}-\d{2}-\d{2}\.json$/i.test(name) && !keepFiles.has(name))
+      .filter((name) => isBackupArchiveFileName(name) && !keepFiles.has(name))
       .map((name) => unlink(path.join(BACKUP_DIR, name)).catch(() => undefined))
   );
 
@@ -182,7 +251,7 @@ export async function createAutoBackup(trigger: "schedule" | "manual" = "manual"
     const exported = await exportSyncTarget("backup");
     const body = exported.body;
     const createdAt = new Date();
-    const dailyFileName = dailyBackupFileName(createdAt);
+    const dailyFileName = archiveBackupFileName(createdAt, trigger);
     const dailyPath = path.join(BACKUP_DIR, dailyFileName);
     const result: AutoBackupResult = {
       success: true,
@@ -197,6 +266,9 @@ export async function createAutoBackup(trigger: "schedule" | "manual" = "manual"
     };
 
     await replaceFileAtomic(backupPath(), body);
+    if (isFinalBackupRun(createdAt, trigger)) {
+      await deleteIntradayBackupsForDate(createdAt);
+    }
     await replaceFileAtomic(dailyPath, body);
     await replaceFileAtomic(backupMetaPath(), JSON.stringify(result, null, 2));
     await updateBackupHistory(result);
@@ -271,7 +343,7 @@ export async function getAutoBackupStatus() {
 
   return {
     enabled: true,
-    schedule: "23:00 mỗi ngày",
+    schedule: BACKUP_SCHEDULE_LABEL,
     fileName: BACKUP_FILE_NAME,
     backupPath: filePath,
     dailyFileName: meta.dailyFileName || "",
@@ -295,7 +367,7 @@ function normalizeBackupFileName(fileName?: string | null) {
     throw new Error("Tên file backup không hợp lệ.");
   }
 
-  if (cleanName !== BACKUP_FILE_NAME && !/^vtdd-backup-\d{4}-\d{2}-\d{2}\.json$/i.test(cleanName)) {
+  if (cleanName !== BACKUP_FILE_NAME && !isBackupArchiveFileName(cleanName)) {
     throw new Error("Tên file backup không hợp lệ.");
   }
 

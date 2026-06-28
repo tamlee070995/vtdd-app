@@ -10,6 +10,11 @@ const ALLOWED_TOOL_SETTING_KEYS = new Set([
   "TOOL_PMH_START_AT",
   "TOOL_PMH_END_AT",
   "TOOL_PMH_LOCK_REASON",
+  "TOOL_CHECKIN_ENABLED",
+  "TOOL_CHECKIN_SCHEDULE_ENABLED",
+  "TOOL_CHECKIN_START_AT",
+  "TOOL_CHECKIN_END_AT",
+  "TOOL_CHECKIN_LOCK_REASON",
   "TELEGRAM_CHIENGIA_ENABLED",
   "TELEGRAM_CHIENGIA_BOT_TOKEN",
   "TELEGRAM_CHIENGIA_CHAT_ID",
@@ -33,6 +38,14 @@ const TELEGRAM_SETTING_KEYS = new Set([
   "TELEGRAM_NGOAIDS_ENABLED",
   "TELEGRAM_NGOAIDS_BOT_TOKEN",
   "TELEGRAM_NGOAIDS_CHAT_ID",
+]);
+
+const CHECKIN_SETTING_KEYS = new Set([
+  "TOOL_CHECKIN_ENABLED",
+  "TOOL_CHECKIN_SCHEDULE_ENABLED",
+  "TOOL_CHECKIN_START_AT",
+  "TOOL_CHECKIN_END_AT",
+  "TOOL_CHECKIN_LOCK_REASON",
 ]);
 
 function clean(value: unknown) {
@@ -90,6 +103,7 @@ export async function POST(req: NextRequest) {
     const updateKeys = Object.keys(updates);
     const needsPmhPermission = updateKeys.some((key) => PMH_SETTING_KEYS.has(key));
     const needsTelegramPermission = updateKeys.some((key) => TELEGRAM_SETTING_KEYS.has(key));
+    const needsCheckinPermission = updateKeys.some((key) => CHECKIN_SETTING_KEYS.has(key));
 
     if (needsPmhPermission && !adminCanUsePmhTool(admin)) {
       return NextResponse.json({ success: false, message: "Không có quyền cấu hình PMH/Pincode." }, { status: 403 });
@@ -99,7 +113,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "Không có quyền cấu hình Telegram." }, { status: 403 });
     }
 
-    ["TOOL_PMH_START_AT", "TOOL_PMH_END_AT"].forEach((key) => {
+    if (needsCheckinPermission && !adminHasAction(admin, "tools-checkin")) {
+      return NextResponse.json({ success: false, message: "Không có quyền cấu hình Check-in." }, { status: 403 });
+    }
+
+    ["TOOL_PMH_START_AT", "TOOL_PMH_END_AT", "TOOL_CHECKIN_START_AT", "TOOL_CHECKIN_END_AT"].forEach((key) => {
       const value = clean(updates[key]);
       if (value && !value.startsWith("'")) updates[key] = `'${value}`;
     });

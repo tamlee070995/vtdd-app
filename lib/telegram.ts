@@ -196,16 +196,16 @@ export async function notifyPincodeSlaTelegram(
   const config = getTelegramConfig(settings, request.flow);
 
   if (!config.enabled) {
-    return { skipped: true, message: "Telegram chÆ°a báº­t cho tool nÃ y." };
+    return { skipped: true, message: "Telegram chưa bật cho tool này." };
   }
 
   const reviewUrl = getReviewUrl(request);
-  const title = data.level === "danger" ? "Há»“ sÆ¡ PMH chá» quÃ¡ 10 phÃºt" : "Há»“ sÆ¡ PMH chá» quÃ¡ 5 phÃºt";
+  const title = data.level === "danger" ? "Hồ sơ PMH chờ quá 10 phút" : "Hồ sơ PMH chờ quá 5 phút";
   const message = [
-    `${TELEGRAM_GROUP_TAG_ALL} â± <b>${escapeHtml(title)}</b>`,
-    `Thá»i gian chá»: <b>${escapeHtml(data.ageMinutes)} phÃºt</b>`,
+    `${TELEGRAM_GROUP_TAG_ALL} ⏱ <b>${escapeHtml(title)}</b>`,
+    `Thời gian chờ: <b>${escapeHtml(data.ageMinutes)} phút</b>`,
     ...requestSummaryLines(request),
-    reviewUrl ? `Kiá»ƒm duyá»‡t: ${escapeHtml(reviewUrl)}` : "",
+    reviewUrl ? `Kiểm duyệt: ${escapeHtml(reviewUrl)}` : "",
   ].filter(Boolean).join("\n");
 
   return sendTelegramMessage(config, message);

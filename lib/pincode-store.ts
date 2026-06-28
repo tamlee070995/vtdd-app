@@ -814,7 +814,7 @@ function dbRequestPatchFromInput(data: {
 
 async function updateDbPincodeRequest(requestId: string, patch: Record<string, unknown>) {
   const id = clean(requestId);
-  if (!id) throw new Error("Thiáº¿u mÃ£ há»“ sÆ¡ PMH Ä‘á»ƒ cáº­p nháº­t.");
+  if (!id) throw new Error("Thiếu mã hồ sơ PMH để cập nhật.");
 
   const filters: Array<Record<string, string>> = [];
 
@@ -855,7 +855,7 @@ async function updateDbPincodeRequest(requestId: string, patch: Record<string, u
     if (Array.isArray(rows) && rows.length > 0) return rows;
   }
 
-  throw new Error("KhÃ´ng tÃ¬m tháº¥y há»“ sÆ¡ PMH trong Database Ä‘á»ƒ cáº­p nháº­t.");
+  throw new Error("Không tìm thấy hồ sơ PMH trong Database để cập nhật.");
 }
 
 function isMainRequestRow(row: any[]) {

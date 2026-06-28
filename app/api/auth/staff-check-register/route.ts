@@ -10,6 +10,10 @@ import {
 import { verifyCaptchaAnswer } from "@/lib/captcha";
 import { getPublicMailError, sendNewStaffAccountMail } from "@/lib/mail";
 import {
+  clearRegisterEmailOtpCookie,
+  verifyRegisterEmailOtp,
+} from "@/lib/register-email-otp";
+import {
   checkRegisterRateLimit,
   checkRegisterTrap,
   getRegisterClientIp,
@@ -96,6 +100,7 @@ export async function POST(req: NextRequest) {
     const customQuestion = normalizeText(body.customQuestion);
     const answer = normalizeText(body.answer);
     const gmail = normalizeText(body.gmail).toLowerCase();
+    const emailOtp = normalizeText(body.emailOtp);
     const captchaToken = normalizeText(body.captchaToken);
     const captchaAnswer = normalizeText(body.captchaAnswer);
     const formStartedAt = normalizeText(body.formStartedAt);
@@ -124,7 +129,7 @@ export async function POST(req: NextRequest) {
       return jsonError("Mã nhân viên chỉ được nhập số.");
     }
 
-    if (!maST || !staffName || !password || !confirmPassword || !question || !answer || !gmail) {
+    if (!maST || !staffName || !password || !confirmPassword || !question || !answer || !gmail || !emailOtp) {
       return jsonError("Vui lòng nhập đầy đủ thông tin tạo tài khoản.");
     }
 
@@ -137,6 +142,14 @@ export async function POST(req: NextRequest) {
 
     const gmailRuleError = checkGmailRule(gmail);
     if (gmailRuleError) return jsonError(gmailRuleError);
+
+    if (!/^\d{6}$/.test(emailOtp)) {
+      return jsonError("Vui lòng nhập đúng mã OTP Gmail gồm 6 số.");
+    }
+
+    if (!verifyRegisterEmailOtp(req, { email: gmail, maNV, maST, otp: emailOtp })) {
+      return jsonError("OTP Gmail không đúng, đã hết hạn hoặc không khớp với thông tin đăng ký.");
+    }
 
     if (await findStaffByMaNV(maNV)) {
       return jsonError("Bạn đã có tài khoản, chờ thông tin hướng dẫn sử dụng từ admin.");
@@ -172,18 +185,22 @@ export async function POST(req: NextRequest) {
       });
     } catch (mailErr) {
       console.error("STAFF_CHECK_REGISTER_MAIL_ERROR:", mailErr);
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         mailSent: false,
         message: `Đã tạo tài khoản. Chờ thông tin hướng dẫn sử dụng từ admin. ${getPublicMailError(mailErr)}`,
       });
+      clearRegisterEmailOtpCookie(response);
+      return response;
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       mailSent: true,
       message: "Đã tạo tài khoản. Chờ thông tin hướng dẫn sử dụng từ admin.",
     });
+    clearRegisterEmailOtpCookie(response);
+    return response;
   } catch (err: any) {
     console.error("STAFF_CHECK_REGISTER_ERROR:", err?.message || err);
     return jsonError("Không tạo được tài khoản. Vui lòng thử lại sau.", 500);

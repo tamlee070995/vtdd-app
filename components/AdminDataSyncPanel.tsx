@@ -152,9 +152,11 @@ export default function AdminDataSyncPanel() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [quality, setQuality] = useState<DataQualityReport | null>(null);
   const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+  const [backupImportFile, setBackupImportFile] = useState<File | null>(null);
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const backupFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedImport = useMemo(
     () => IMPORT_OPTIONS.find((item) => item.key === importTarget) || IMPORT_OPTIONS[0],
@@ -364,6 +366,39 @@ export default function AdminDataSyncPanel() {
     }
   }
 
+  async function runBackupRestore() {
+    try {
+      if (!backupImportFile) {
+        showToast("Chưa chọn file backup JSON.");
+        return;
+      }
+
+      setBusy("backup-restore");
+      const form = new FormData();
+      form.set("target", "backup_restore");
+      form.set("file", backupImportFile);
+
+      const res = await fetch("/api/admin/tools/sync", {
+        method: "POST",
+        cache: "no-store",
+        body: form,
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) throw new Error(data?.message || "Không khôi phục được backup.");
+
+      setBusy("");
+      setBackupImportFile(null);
+      if (backupFileInputRef.current) backupFileInputRef.current.value = "";
+      showToast(data.message || "Đã khôi phục dữ liệu từ backup.");
+      await loadSummary({ silent: true });
+      await loadBackupStatus();
+    } catch (err: any) {
+      setBusy("");
+      showToast(err?.message || "Không khôi phục được backup.");
+    }
+  }
+
   return (
     <section className="admin-sync-panel">
       <style>{STYLE}</style>
@@ -487,13 +522,13 @@ export default function AdminDataSyncPanel() {
           <div className="sync-auto-backup">
             <div className="sync-auto-backup-head">
               <span>Auto backup</span>
-              <b>23:00 mỗi ngày</b>
+              <b>{backupStatus?.schedule || "06:00 - mỗi 3 giờ - chốt 23:00"}</b>
             </div>
-            <p>Hệ thống giữ file mới nhất và 7 bản gần đây: <strong>{backupStatus?.fileName || "vtdd-backup.json"}</strong></p>
+            <p>Backup JSON lưu đầy đủ dữ liệu, gồm tài khoản nhân viên, Gmail, mật khẩu mã hóa và cấu hình hệ thống: <strong>{backupStatus?.fileName || "vtdd-backup.json"}</strong></p>
             <small>
               {backupStatus?.exists
                 ? `Lần gần nhất: ${backupStatus.updatedAtVN || "-"} • ${formatBytes(backupStatus.bytes)}`
-                : "Chưa có file backup tự động. File sẽ được tạo lúc 23:00."}
+                : "Chưa có file backup tự động. File sẽ được tạo theo lịch từ 06:00 và chốt lúc 23:00."}
             </small>
             <div className="sync-backup-actions">
               <button
@@ -515,8 +550,28 @@ export default function AdminDataSyncPanel() {
                 </button>
               ) : null}
             </div>
-            <small>Lần kế tiếp: {backupStatus?.nextRunAtVN || "23:00 hôm nay/ngày mai"}</small>
+            <small>Lần kế tiếp: {backupStatus?.nextRunAtVN || "Theo lịch 06:00, mỗi 3 giờ và chốt 23:00"}</small>
             {backupStatus?.lastError ? <em>{backupStatus.lastError}</em> : null}
+            <div className="sync-backup-restore">
+              <label>
+                <span>Import lại file backup JSON</span>
+                <input
+                  ref={backupFileInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(event) => setBackupImportFile(event.target.files?.[0] || null)}
+                />
+              </label>
+              <button
+                type="button"
+                className="sync-backup-restore-button"
+                onClick={runBackupRestore}
+                disabled={busy === "backup-restore" || !backupImportFile}
+              >
+                {busy === "backup-restore" ? "Đang khôi phục..." : "Import backup JSON"}
+              </button>
+              <small>Thao tác này sẽ thay dữ liệu hiện tại bằng dữ liệu trong file backup.</small>
+            </div>
             {backupStatus?.history?.length ? (
               <div className="sync-backup-history">
                 {backupStatus.history.slice(0, 7).map((item) => {
@@ -929,6 +984,36 @@ const STYLE = `
 .sync-backup-latest {
   background: #07111f;
   color: #ffd400;
+}
+.sync-backup-restore {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .76);
+  border: 1px solid #dbe4ef;
+}
+.sync-backup-restore label {
+  display: grid;
+  gap: 6px;
+}
+.sync-backup-restore input {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 13px;
+  border: 1px solid #cbd8e6;
+  background: #f8fafc;
+  color: #07111f;
+  font-size: 12px;
+  font-weight: 850;
+}
+.sync-backup-restore-button {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 13px;
+  background: #dc2626 !important;
+  color: #fff !important;
 }
 .sync-backup-history {
   margin-top: 8px;

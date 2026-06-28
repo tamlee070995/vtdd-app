@@ -1,6 +1,6 @@
 import { readSheetRange } from "@/lib/sheets";
 import { packQuoteClientMeta, parseQuoteClientMeta } from "@/lib/quote-client-meta";
-import { insertRows, isSupabaseConfigured, selectAllRows } from "@/lib/supabase-rest";
+import { insertRows, isSupabaseConfigured, selectAllRows, selectRows } from "@/lib/supabase-rest";
 
 const LOG_SHEET = "Log_search";
 
@@ -49,6 +49,21 @@ function clean(value: unknown) {
 function money(value: unknown) {
   const n = Number(value || 0);
   return Number.isFinite(n) ? n : 0;
+}
+
+function isDuplicateKeyError(err: any) {
+  const message = clean(err?.message || err);
+  return /23505|duplicate key value|violates unique constraint/i.test(message);
+}
+
+async function getNextQuoteLogId() {
+  const rows = await selectRows<any>("quote_logs", {
+    select: "id",
+    order: "id.desc",
+    limit: 1,
+  });
+  const maxId = Number(rows?.[0]?.id || 0);
+  return Number.isFinite(maxId) ? maxId + 1 : 1;
 }
 
 function mapQuoteLogRow(row: unknown[]): QuoteLogRow {
@@ -146,35 +161,49 @@ export async function appendQuoteLog(row: QuoteLogRow) {
   if (!isSupabaseConfigured()) return false;
 
   try {
-    await insertRows(
-      "quote_logs",
-      [
-        {
-          time_text: clean(row.time),
-          action: clean(row.action),
-          ma_nv: clean(row.maNV),
-          ma_st: clean(row.maST),
-          staff_name: clean(row.staffName),
-          flow: clean(row.mode),
-          product_new: clean(row.spMoi),
-          product_old: clean(row.spCu),
-          storage: clean(row.memory),
-          device_type: clean(row.loai),
-          old_price: String(money(row.giaXac)),
-          subsidy_brand: String(money(row.troGiaHang)),
-          subsidy_mwg: String(money(row.troGiaMWG)),
-          customer_total: String(money(row.tongTien)),
-          customer_need_pay: String(money(row.khachCanBu)),
-          ip: clean(row.ip),
-          user_agent: packQuoteClientMeta({
-            userAgent: row.userAgent,
-            deviceLabel: row.deviceLabel,
-            networkType: row.networkType,
-          }),
-        },
-      ],
-      { returning: "minimal" }
-    );
+    const payload = {
+      time_text: clean(row.time),
+      action: clean(row.action),
+      ma_nv: clean(row.maNV),
+      ma_st: clean(row.maST),
+      staff_name: clean(row.staffName),
+      flow: clean(row.mode),
+      product_new: clean(row.spMoi),
+      product_old: clean(row.spCu),
+      storage: clean(row.memory),
+      device_type: clean(row.loai),
+      old_price: String(money(row.giaXac)),
+      subsidy_brand: String(money(row.troGiaHang)),
+      subsidy_mwg: String(money(row.troGiaMWG)),
+      customer_total: String(money(row.tongTien)),
+      customer_need_pay: String(money(row.khachCanBu)),
+      ip: clean(row.ip),
+      user_agent: packQuoteClientMeta({
+        userAgent: row.userAgent,
+        deviceLabel: row.deviceLabel,
+        networkType: row.networkType,
+      }),
+    };
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        await insertRows(
+          "quote_logs",
+          [
+            {
+              id: await getNextQuoteLogId(),
+              ...payload,
+            },
+          ],
+          { returning: "minimal" }
+        );
+        return true;
+      } catch (err: any) {
+        if (attempt < 4 && isDuplicateKeyError(err)) continue;
+        throw err;
+      }
+    }
+
     return true;
   } catch (err: any) {
     console.warn("SUPABASE_APPEND_QUOTE_LOG_ERROR:", err?.message || err);

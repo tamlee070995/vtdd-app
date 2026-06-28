@@ -64,7 +64,9 @@ function normalizeStaffCodeSearch(value: any) {
 }
 
 export type StaffPermission = "admin" | "mod" | "";
-export type StaffAdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools";
+export type StaffAdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools" | "people";
+export const STAFF_TOOL_CHECKIN_PERMISSION = "tool:checkin";
+const STAFF_TOOL_PERMISSION_KEYS = new Set([STAFF_TOOL_CHECKIN_PERMISSION]);
 
 export type StaffRow = {
   rowNumber: number;
@@ -161,16 +163,20 @@ async function updateDbStaffByRowNumber(rowNumber: number, patch: Record<string,
   if (!isSupabaseConfigured()) return false;
 
   try {
-    let rows = await updateRows<any>(
-      "staff",
-      { source_row: eq(String(rowNumber)) },
-      patch
-    );
+    let rows: any[] = [];
 
-    if ((!Array.isArray(rows) || rows.length === 0) && cleanCode(maNV)) {
+    if (cleanCode(maNV)) {
       rows = await updateRows<any>(
         "staff",
         { ma_nv: eq(cleanCode(maNV)) },
+        patch
+      );
+    }
+
+    if ((!Array.isArray(rows) || rows.length === 0) && Number.isFinite(rowNumber) && rowNumber > 0) {
+      rows = await updateRows<any>(
+        "staff",
+        { source_row: eq(String(rowNumber)) },
         patch
       );
     }
@@ -719,6 +725,32 @@ export async function updateStaffPermission(rowNumber: number, permission: "admi
 }
 
 
+function parsePermissionTokens(value: any) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter((item, index, arr) => Boolean(item) && arr.indexOf(item) === index);
+}
+
+function normalizeStaffToolPermissionTokens(value: any) {
+  return parsePermissionTokens(value).filter((item) => STAFF_TOOL_PERMISSION_KEYS.has(item));
+}
+
+function mergePermissionTokens(...groups: string[]) {
+  return groups
+    .flatMap((group) => parsePermissionTokens(group))
+    .filter((item, index, arr) => Boolean(item) && arr.indexOf(item) === index)
+    .join(",");
+}
+
+export function staffHasCheckinToolAccess(staff: Pick<StaffRow, "permission" | "modulePermissions"> | null | undefined) {
+  if (!staff) return false;
+  if (normalizePermission(staff.permission) === "admin") return true;
+
+  const tokens = new Set(parsePermissionTokens(staff.modulePermissions));
+  return tokens.has(STAFF_TOOL_CHECKIN_PERMISSION) || tokens.has("action:tools-checkin");
+}
+
 function normalizeModulePermissions(value: any) {
   const allowed = new Set([
     "tcdm",
@@ -727,6 +759,7 @@ function normalizeModulePermissions(value: any) {
     "may-cu",
     "demo",
     "tools",
+    "people",
     "action:staff-manage",
     "action:staff-delete",
     "action:staff-security",
@@ -737,6 +770,7 @@ function normalizeModulePermissions(value: any) {
     "action:tools-coming",
     "action:tools-report",
     "action:tools-telegram",
+    "action:tools-checkin",
   ]);
 
   return String(value || "")
@@ -752,7 +786,10 @@ export async function updateStaffAdminAccess(
 ) {
   await ensureStaffAdminHeaders();
   const permission = normalizePermission(data.permission);
-  const modules = permission === "mod" ? normalizeModulePermissions(data.modules) : "";
+  const current = data.maNV ? await findStaffByMaNV(data.maNV) : null;
+  const staffToolModules = normalizeStaffToolPermissionTokens(current?.modulePermissions || "").join(",");
+  const adminModules = permission === "mod" ? normalizeModulePermissions(data.modules) : "";
+  const modules = mergePermissionTokens(adminModules, staffToolModules);
 
   if (await updateDbStaffByRowNumber(rowNumber, {
     permission,
@@ -770,6 +807,36 @@ export async function updateStaffAdminAccess(
       range: `${SHEET_NAME}!P${rowNumber}:Q${rowNumber}`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [[permission, modules]] },
+    });
+  });
+}
+
+export async function updateStaffCheckinToolAccess(
+  rowNumber: number,
+  data: { maNV?: string; enabled: boolean }
+) {
+  await ensureStaffAdminHeaders();
+
+  const current = data.maNV ? await findStaffByMaNV(data.maNV) : null;
+  const tokens = parsePermissionTokens(current?.modulePermissions || "");
+  const nextTokens = data.enabled
+    ? [...tokens, STAFF_TOOL_CHECKIN_PERMISSION]
+    : tokens.filter((item) => item !== STAFF_TOOL_CHECKIN_PERMISSION);
+  const modules = nextTokens.filter((item, index, arr) => Boolean(item) && arr.indexOf(item) === index).join(",");
+
+  if (await updateDbStaffByRowNumber(rowNumber, { module_permissions: modules }, data.maNV)) {
+    return;
+  }
+
+  const sheets = await getSheetsClient();
+  const spreadsheetId = getSpreadsheetId();
+
+  return enqueueStaffWrite(async () => {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${SHEET_NAME}!Q${rowNumber}:Q${rowNumber}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[modules]] },
     });
   });
 }

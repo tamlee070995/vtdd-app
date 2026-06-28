@@ -6,9 +6,10 @@ import PasswordInput from "@/components/PasswordInput";
 
 type StaffLoginFormProps = {
   initialError?: string;
+  next?: string;
 };
 
-export default function StaffLoginForm({ initialError = "" }: StaffLoginFormProps) {
+export default function StaffLoginForm({ initialError = "", next = "" }: StaffLoginFormProps) {
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
 
@@ -33,6 +34,8 @@ export default function StaffLoginForm({ initialError = "" }: StaffLoginFormProp
 
   return (
     <form className="staff-auth-form" action="/api/auth/staff-login" method="POST" noValidate onSubmit={handleSubmit}>
+      {next ? <input type="hidden" name="next" value={next} /> : null}
+
       <div className="staff-auth-form-head">
         <span>01</span>
         <div>
@@ -69,7 +72,7 @@ export default function StaffLoginForm({ initialError = "" }: StaffLoginFormProp
       ) : null}
 
       <button type="submit" disabled={loading} aria-busy={loading}>
-        {loading ? "Đang xác thực..." : "Vào trang tra cứu"}
+        {loading ? "Đang xác thực..." : "Đăng nhập hệ thống"}
       </button>
 
       <div className="staff-auth-actions">

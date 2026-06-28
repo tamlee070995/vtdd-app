@@ -51,6 +51,14 @@ const PMH_CLIENT_SETTING_KEYS = [
   "TOOL_PMH_LOCK_REASON",
 ];
 
+const CHECKIN_CLIENT_SETTING_KEYS = [
+  "TOOL_CHECKIN_ENABLED",
+  "TOOL_CHECKIN_SCHEDULE_ENABLED",
+  "TOOL_CHECKIN_START_AT",
+  "TOOL_CHECKIN_END_AT",
+  "TOOL_CHECKIN_LOCK_REASON",
+];
+
 const TELEGRAM_CLIENT_SETTING_KEYS = [
   "TELEGRAM_CHIENGIA_ENABLED",
   "TELEGRAM_NGOAIDS_ENABLED",
@@ -84,6 +92,10 @@ function buildClientSettings(settings: Record<string, string>, admin: Awaited<Re
 
   if (adminCanUsePmhTool(admin)) {
     PMH_CLIENT_SETTING_KEYS.forEach((key) => keys.add(key));
+  }
+
+  if (adminHasAction(admin, "tools-checkin")) {
+    CHECKIN_CLIENT_SETTING_KEYS.forEach((key) => keys.add(key));
   }
 
   if (adminHasAction(admin, "tools-telegram")) {

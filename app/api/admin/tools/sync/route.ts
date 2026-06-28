@@ -13,6 +13,7 @@ import {
   getSyncSummary,
   importSyncCsv,
   previewSyncCsv,
+  restoreBackupJson,
 } from "@/lib/data-sync-store";
 
 export const dynamic = "force-dynamic";
@@ -161,8 +162,37 @@ export async function POST(req: NextRequest) {
 
     if (!(file instanceof File)) {
       return NextResponse.json(
-        { success: false, message: "Chưa chọn file CSV." },
+        { success: false, message: target === "backup_restore" ? "Chưa chọn file backup JSON." : "Chưa chọn file CSV." },
         { status: 400, headers: noStoreHeaders() }
+      );
+    }
+
+    if (target === "backup_restore") {
+      if (admin?.permission !== "admin") {
+        return NextResponse.json(
+          { success: false, message: "Chỉ Admin được khôi phục file backup." },
+          { status: 403, headers: noStoreHeaders() }
+        );
+      }
+
+      const jsonText = await file.text();
+      const result = await restoreBackupJson(jsonText);
+
+      await appendAdminAudit({
+        admin: admin?.name || admin?.maNV || "Admin",
+        action: "BACKUP_RESTORE",
+        target: "backup",
+        newValue: JSON.stringify(result),
+        note: file.name,
+      });
+
+      return NextResponse.json(
+        {
+          success: true,
+          result,
+          message: "Đã khôi phục dữ liệu từ file backup.",
+        },
+        { headers: noStoreHeaders() }
       );
     }
 

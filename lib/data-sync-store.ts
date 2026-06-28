@@ -27,6 +27,12 @@ export type SyncExportTarget =
 
 type PreviewSample = Record<string, string>;
 
+type BackupTableConfig = {
+  table: string;
+  primaryKey: string;
+  optional?: boolean;
+};
+
 type DataQualityIssue = {
   label: string;
   value: number;
@@ -75,6 +81,19 @@ const EXPORT_FILE_NAMES: Record<SyncExportTarget, string> = {
   quote_logs: "Log_search.csv",
   backup: "vtdd-backup.json",
 };
+
+const BACKUP_TABLES: BackupTableConfig[] = [
+  { table: "stores", primaryKey: "ma_st" },
+  { table: "staff", primaryKey: "ma_nv" },
+  { table: "products_new", primaryKey: "id" },
+  { table: "products_old", primaryKey: "id" },
+  { table: "pmh_codes", primaryKey: "pincode" },
+  { table: "pincode_requests", primaryKey: "request_id" },
+  { table: "system_settings", primaryKey: "key" },
+  { table: "admin_audit", primaryKey: "id" },
+  { table: "quote_logs", primaryKey: "id" },
+  { table: "checkin_customers", primaryKey: "id", optional: true },
+];
 
 function assertDbReady() {
   if (!isSupabaseConfigured()) {
@@ -888,41 +907,135 @@ async function exportCsv(target: Exclude<SyncExportTarget, "backup">) {
 }
 
 async function exportBackupJson() {
-  const [
-    staff,
-    stores,
-    productsNew,
-    productsOld,
-    pmhCodes,
-    pincodeRequests,
-    systemSettings,
-    adminAudit,
-    quoteLogs,
-  ] = await Promise.all([
-    selectAllRows("staff"),
-    selectAllRows("stores"),
-    selectAllRows("products_new"),
-    selectAllRows("products_old"),
-    selectAllRows("pmh_codes"),
-    selectAllRows("pincode_requests"),
-    selectAllRows("system_settings"),
-    selectAllRows("admin_audit"),
-    selectAllRows("quote_logs"),
-  ]);
+  const entries = await Promise.all(
+    BACKUP_TABLES.map(async (item) => {
+      try {
+        return [item.table, await selectAllRows(item.table)] as const;
+      } catch (err) {
+        if (item.optional && isMissingOptionalTableError(err)) return [item.table, []] as const;
+        throw err;
+      }
+    })
+  );
 
   return {
+    backupVersion: 2,
     exportedAt: new Date().toISOString(),
-    tables: {
-      staff: (staff as any[]).map(redactStaffRow),
-      stores,
-      products_new: productsNew,
-      products_old: productsOld,
-      pmh_codes: pmhCodes,
-      pincode_requests: pincodeRequests,
-      system_settings: (systemSettings as any[]).map(redactSystemSettingRow),
-      admin_audit: adminAudit,
-      quote_logs: quoteLogs,
-    },
+    includesSensitiveAccountData: true,
+    tables: Object.fromEntries(entries),
+  };
+}
+
+function isMissingOptionalTableError(err: any) {
+  const message = clean(err?.message || err);
+  return /PGRST205|schema cache|Could not find the table/i.test(message);
+}
+
+async function deleteBackupTableRows(config: BackupTableConfig) {
+  try {
+    await deleteRows(config.table, { [config.primaryKey]: notIsNull() }, { returning: "minimal" });
+  } catch (err: any) {
+    if (config.optional && isMissingOptionalTableError(err)) return;
+    throw err;
+  }
+}
+
+async function insertBackupTableRows(config: BackupTableConfig, rows: Record<string, unknown>[]) {
+  if (!rows.length) return;
+
+  const batchSize = 500;
+  for (let index = 0; index < rows.length; index += batchSize) {
+    const batch = rows.slice(index, index + batchSize);
+    try {
+      await insertRows(config.table, batch, {
+        onConflict: config.primaryKey,
+        returning: "minimal",
+      });
+    } catch (err: any) {
+      if (config.optional && isMissingOptionalTableError(err)) return;
+      throw err;
+    }
+  }
+}
+
+export async function restoreBackupJson(jsonText: string) {
+  assertDbReady();
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    throw new Error("File backup JSON không hợp lệ.");
+  }
+
+  const tables = parsed?.tables;
+  if (!tables || typeof tables !== "object" || Array.isArray(tables)) {
+    throw new Error("File backup thiếu mục tables.");
+  }
+
+  const configs = BACKUP_TABLES.filter((item) => Object.prototype.hasOwnProperty.call(tables, item.table));
+  if (!configs.length) throw new Error("File backup không có bảng nào phù hợp để khôi phục.");
+
+  const result: Record<string, { before: number; restored: number; after: number }> = {};
+
+  for (const config of configs) {
+    const rows = tables[config.table];
+    if (!Array.isArray(rows)) throw new Error(`Bảng ${config.table} trong backup không hợp lệ.`);
+  }
+
+  const staffRows = tables.staff;
+  if (Array.isArray(staffRows) && staffRows.length > 0) {
+    const sampleStaff = staffRows.find((row: any) => row && typeof row === "object") || {};
+    const hasFullAccountColumns =
+      Object.prototype.hasOwnProperty.call(sampleStaff, "password_hash") &&
+      Object.prototype.hasOwnProperty.call(sampleStaff, "gmail") &&
+      Object.prototype.hasOwnProperty.call(sampleStaff, "security_question") &&
+      Object.prototype.hasOwnProperty.call(sampleStaff, "security_answer");
+
+    if (!hasFullAccountColumns) {
+      throw new Error("File backup này thiếu thông tin tài khoản nhân viên. Vui lòng dùng backup mới tạo sau khi đã cập nhật chức năng backup đầy đủ.");
+    }
+  }
+
+  const settingsRows = tables.system_settings;
+  if (Array.isArray(settingsRows) && settingsRows.some((row: any) => clean(row?.value) === "[REDACTED]")) {
+    throw new Error("File backup này có cấu hình hệ thống bị ẩn [REDACTED], không thể khôi phục đầy đủ.");
+  }
+
+  for (const config of [...configs].reverse()) {
+    let before = 0;
+    try {
+      before = await countRows(config.table);
+    } catch (err: any) {
+      if (!config.optional || !isMissingOptionalTableError(err)) throw err;
+    }
+
+    await deleteBackupTableRows(config);
+    result[config.table] = { before, restored: 0, after: 0 };
+  }
+
+  for (const config of configs) {
+    const rows = tables[config.table] as Record<string, unknown>[];
+    await insertBackupTableRows(config, rows);
+
+    let after = 0;
+    try {
+      after = await countRows(config.table);
+    } catch (err: any) {
+      if (!config.optional || !isMissingOptionalTableError(err)) throw err;
+    }
+
+    result[config.table] = {
+      ...(result[config.table] || { before: 0, restored: 0, after: 0 }),
+      restored: rows.length,
+      after,
+    };
+  }
+
+  return {
+    exportedAt: clean(parsed.exportedAt),
+    backupVersion: parsed.backupVersion || 1,
+    tables: result,
   };
 }
 

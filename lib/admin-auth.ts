@@ -4,7 +4,7 @@ import { createSignedSessionToken, verifySignedSessionToken } from "@/lib/auth-s
 import { findStaffByMaNV } from "@/lib/staff-store";
 
 export type AdminPermission = "admin" | "mod";
-export type AdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools";
+export type AdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools" | "people";
 export type AdminActionKey =
   | "staff-manage"
   | "staff-delete"
@@ -15,7 +15,8 @@ export type AdminActionKey =
   | "tools-pmh"
   | "tools-coming"
   | "tools-report"
-  | "tools-telegram";
+  | "tools-telegram"
+  | "tools-checkin";
 
 export const ADMIN_COOKIE = "vtdd_admin_token";
 export const ADMIN_NV_COOKIE = "vtdd_admin_nv";
@@ -23,7 +24,7 @@ export const ADMIN_NAME_COOKIE = "vtdd_admin_name";
 export const ADMIN_PERMISSION_COOKIE = "vtdd_admin_permission";
 export const ADMIN_MODULES_COOKIE = "vtdd_admin_modules";
 
-const MODULES: AdminModuleKey[] = ["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "tools"];
+const MODULES: AdminModuleKey[] = ["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "tools", "people"];
 const ACTIONS: AdminActionKey[] = [
   "staff-manage",
   "staff-delete",
@@ -35,6 +36,7 @@ const ACTIONS: AdminActionKey[] = [
   "tools-coming",
   "tools-report",
   "tools-telegram",
+  "tools-checkin",
 ];
 const ACTION_PREFIX = "action:";
 const ADMIN_SESSION_MAX_AGE = 60 * 60 * 8;

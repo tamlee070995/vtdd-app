@@ -426,6 +426,77 @@ export async function sendResetOtpMail(params: {
   return report;
 }
 
+export async function sendRegisterEmailOtpMail(params: {
+  to: string;
+  maNV: string;
+  maST?: string;
+  staffName?: string;
+  otp: string;
+}) {
+  const smtpUser = String(process.env.MAIL_USER || "").trim();
+  const staffName = params.staffName || "Nhân viên";
+  const otp = String(params.otp || "").trim();
+  const maST = String(params.maST || "").trim() || "Chưa nhập";
+
+  const html = buildEmailShell({
+    preheader: `Mã OTP xác thực Gmail tạo tài khoản của bạn là ${otp}. Mã có hiệu lực trong 10 phút.`,
+    statusLabel: "OTP 10 phút",
+    eyebrow: "Staff Register",
+    title: "Mã xác thực Gmail tạo tài khoản",
+    description: `Xin chào <b style="color:#ffffff;">${escapeHtml(staffName)}</b>, mã OTP này dùng để xác thực Gmail trước khi gửi yêu cầu tạo tài khoản nhân viên.`,
+    body: `
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="border-radius:24px;background:#fffbea;border:1px solid #fde68a;overflow:hidden;">
+        <tr>
+          <td align="center" style="padding:24px 18px;">
+            <div style="font-family:Roboto,Arial,sans-serif;color:#854d0e;font-size:10px;line-height:12px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;">
+              OTP tạo tài khoản
+            </div>
+            <div style="margin-top:10px;font-family:Roboto,Arial,sans-serif;color:#07111f;font-size:42px;line-height:48px;font-weight:900;letter-spacing:9px;">
+              ${escapeHtml(otp)}
+            </div>
+            <div style="margin-top:10px;font-family:Roboto,Arial,sans-serif;color:#92400e;font-size:13px;line-height:20px;font-weight:800;">
+              Mã này có hiệu lực trong 10 phút. Không chia sẻ mã này cho bất kỳ ai.
+            </div>
+          </td>
+        </tr>
+      </table>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="vtdd-card" style="margin-top:14px;border-radius:22px;border:1px solid #e5e7eb;background:#ffffff;overflow:hidden;">
+        ${buildInfoRows([
+          { label: "Mã nhân viên", value: params.maNV },
+          { label: "Mã siêu thị", value: maST },
+        ])}
+      </table>
+      ${buildWarningBox({
+        title: "Không phải bạn yêu cầu?",
+        desc: "Nếu bạn không tạo tài khoản trên hệ thống VTDD, vui lòng bỏ qua email này.",
+      })}
+    `,
+  });
+
+  const text = [
+    `Xin chào ${staffName},`,
+    `Mã OTP xác thực Gmail tạo tài khoản cho mã nhân viên ${params.maNV} là: ${otp}`,
+    `Mã siêu thị: ${maST}`,
+    "Mã này có hiệu lực trong 10 phút. Không chia sẻ mã này cho bất kỳ ai.",
+    "Email tự động từ hệ thống Viễn Thông Di Động.",
+  ].join("\n\n");
+
+  const info = await sendMailWithFallback({
+    from: getMailFrom(),
+    envelope: smtpUser ? { from: smtpUser, to: params.to } : undefined,
+    to: params.to,
+    subject: "Viễn Thông Di Động - Mã OTP tạo tài khoản",
+    headers: getAutoMailHeaders(),
+    text,
+    html,
+  });
+
+  const report = buildDeliveryReport(info);
+  ensureRecipientAccepted(report, params.to);
+
+  return report;
+}
+
 function isLikelyConnectionError(err: any) {
   const text = `${err?.code || ""} ${err?.command || ""} ${err?.message || ""}`;
   return /ETIMEDOUT|ECONNRESET|ECONNREFUSED|EHOSTUNREACH|ENOTFOUND|ESOCKET|ECONNECTION|ETLS|Greeting never received|Connection timeout|Timed out|timeout/i.test(text);

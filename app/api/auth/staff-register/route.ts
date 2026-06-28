@@ -10,6 +10,10 @@ import {
 import { verifyCaptchaAnswer } from "@/lib/captcha";
 import { getPublicMailError, sendNewStaffAccountMail } from "@/lib/mail";
 import {
+  clearRegisterEmailOtpCookie,
+  verifyRegisterEmailOtp,
+} from "@/lib/register-email-otp";
+import {
   checkRegisterRateLimit,
   checkRegisterTrap,
   getRegisterClientIp,
@@ -149,6 +153,7 @@ export async function POST(req: NextRequest) {
     const customQuestion = normalizeText(form.get("customQuestion"));
     const answer = normalizeText(form.get("answer"));
     const gmail = normalizeText(form.get("gmail")).toLowerCase();
+    const emailOtp = normalizeText(form.get("emailOtp"));
 
     const captchaToken = normalizeText(form.get("captchaToken"));
     const captchaAnswer = normalizeText(form.get("captchaAnswer"));
@@ -208,12 +213,13 @@ export async function POST(req: NextRequest) {
       !confirmPassword ||
       !question ||
       !answer ||
-      !gmail
+      !gmail ||
+      !emailOtp
     ) {
       return redirectRegister(
         req,
         "error",
-        "Vui lòng nhập đầy đủ Mã nhân viên, Mã siêu thị, Tên nhân viên, mật khẩu, câu hỏi bảo mật, câu trả lời và Gmail."
+        "Vui lòng nhập đầy đủ Mã nhân viên, Mã siêu thị, Tên nhân viên, mật khẩu, câu hỏi bảo mật, câu trả lời, Gmail và OTP Gmail."
       );
     }
 
@@ -239,6 +245,18 @@ export async function POST(req: NextRequest) {
 
     if (gmailRuleError) {
       return redirectRegister(req, "error", gmailRuleError);
+    }
+
+    if (!/^\d{6}$/.test(emailOtp)) {
+      return redirectRegister(req, "error", "Vui lòng nhập đúng mã OTP Gmail gồm 6 số.");
+    }
+
+    if (!verifyRegisterEmailOtp(req, { email: gmail, maNV, maST, otp: emailOtp })) {
+      return redirectRegister(
+        req,
+        "error",
+        "OTP Gmail không đúng, đã hết hạn hoặc không khớp với thông tin đăng ký."
+      );
     }
 
     const existedStaff = await findStaffByMaNV(maNV);
@@ -287,18 +305,22 @@ export async function POST(req: NextRequest) {
 
     } catch (mailErr) {
       console.error("SEND_NEW_STAFF_ACCOUNT_MAIL_ERROR", mailErr);
-      return redirectRegister(
+      const response = redirectRegister(
         req,
         "success",
         `Đã tạo tài khoản chờ duyệt, nhưng chưa gửi được mail báo Admin. ${getPublicMailError(mailErr)}`
       );
+      clearRegisterEmailOtpCookie(response);
+      return response;
     }
 
-    return redirectRegister(
+    const response = redirectRegister(
       req,
       "success",
       "Đã tạo tài khoản chờ duyệt. Vui lòng liên hệ Admin để được kích hoạt."
     );
+    clearRegisterEmailOtpCookie(response);
+    return response;
   } catch (err: any) {
     console.error("STAFF_REGISTER_ERROR:", err?.message || err);
     return redirectRegister(

@@ -78,7 +78,10 @@ export default function AccountCheckPage() {
     answer: "",
     gmail: "",
     captchaAnswer: "",
+    emailOtp: "",
   });
+  const [emailOtpMessage, setEmailOtpMessage] = useState("");
+  const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileScriptReady, setTurnstileScriptReady] = useState(false);
   const [turnstileError, setTurnstileError] = useState("");
@@ -258,6 +261,7 @@ export default function AccountCheckPage() {
     setMode("register");
     setFormStartedAt(String(Date.now()));
     setTurnstileToken("");
+    setEmailOtpMessage("");
     loadCaptcha();
   }
 
@@ -278,7 +282,53 @@ export default function AccountCheckPage() {
       answer: "",
       gmail: "",
       captchaAnswer: "",
+      emailOtp: "",
     });
+    setEmailOtpMessage("");
+  }
+
+  async function sendEmailOtp() {
+    const maNV = normalizeUserInput(checkedUser || userInput);
+
+    if (!maNV) return setError("Thiếu mã user cần gửi OTP.");
+    if (!form.maST.trim()) return setError("Vui lòng nhập mã siêu thị trước khi gửi OTP.");
+    if (!form.gmail.trim()) return setError("Vui lòng nhập Gmail xác thực trước khi gửi OTP.");
+    if (gmailError) return setError(gmailError);
+    if (!captcha.token || !form.captchaAnswer.trim()) {
+      return setError("Vui lòng nhập captcha trước khi gửi OTP Gmail.");
+    }
+
+    try {
+      setSendingEmailOtp(true);
+      setEmailOtpMessage("");
+      setError("");
+
+      const res = await fetch("/api/auth/register-email-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          maNV,
+          maST: form.maST,
+          staffName: form.staffName,
+          gmail: form.gmail,
+          captchaToken: captcha.token || "",
+          captchaAnswer: form.captchaAnswer,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Không gửi được OTP Gmail.");
+      }
+
+      updateForm("emailOtp", "");
+      setEmailOtpMessage(data.message || "Đã gửi OTP Gmail. Vui lòng kiểm tra hộp thư.");
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSendingEmailOtp(false);
+    }
   }
 
   async function submitRegister(event: FormEvent<HTMLFormElement>) {
@@ -295,6 +345,7 @@ export default function AccountCheckPage() {
     if (gmailError) return setError(gmailError);
     if (!form.gmail.trim()) return setError("Vui lòng nhập Gmail xác thực.");
     if (!form.captchaAnswer.trim()) return setError("Vui lòng nhập kết quả captcha.");
+    if (!/^\d{6}$/.test(form.emailOtp.trim())) return setError("OTP Gmail phải gồm đúng 6 số.");
     if (turnstileSiteKey && !turnstileToken) return setError("Vui lòng hoàn tất xác thực chống spam.");
 
     try {
@@ -315,6 +366,7 @@ export default function AccountCheckPage() {
           customQuestion: form.customQuestion,
           answer: form.answer,
           gmail: form.gmail,
+          emailOtp: form.emailOtp,
           captchaToken: captcha.token || "",
           captchaAnswer: form.captchaAnswer,
           formStartedAt,
@@ -550,7 +602,11 @@ export default function AccountCheckPage() {
                   <input
                     type="email"
                     value={form.gmail}
-                    onChange={(e) => updateForm("gmail", e.target.value)}
+                    onChange={(e) => {
+                      updateForm("gmail", e.target.value);
+                      updateForm("emailOtp", "");
+                      setEmailOtpMessage("");
+                    }}
                     placeholder="ten@gmail.com"
                     autoComplete="email"
                   />
@@ -574,6 +630,31 @@ export default function AccountCheckPage() {
                   inputMode="numeric"
                 />
               </label>
+
+              <div className="account-check-otp-box">
+                <div>
+                  <span>OTP Gmail</span>
+                  <p>Nhập captcha rồi bấm gửi OTP. Mã có hiệu lực trong 10 phút.</p>
+                </div>
+                <button type="button" onClick={sendEmailOtp} disabled={submitting || sendingEmailOtp}>
+                  {sendingEmailOtp ? "Đang gửi..." : "Gửi OTP Gmail"}
+                </button>
+              </div>
+
+              <label className="account-check-field">
+                <span>Mã OTP Gmail</span>
+                <input
+                  value={form.emailOtp}
+                  onChange={(e) => updateForm("emailOtp", e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="Nhập 6 số trong Gmail"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                />
+              </label>
+
+              {emailOtpMessage ? <div className="account-check-alert mini-ok">{emailOtpMessage}</div> : null}
 
               {turnstileSiteKey ? (
                 <div className="account-check-turnstile">
@@ -945,6 +1026,52 @@ const styles = `
   font-weight: 1000;
 }
 
+.account-check-otp-box {
+  padding: 12px;
+  border: 1px solid #fde68a;
+  border-radius: 18px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  background: linear-gradient(135deg, #fffbeb, #ffffff);
+}
+
+.account-check-otp-box span {
+  display: block;
+  color: #07111f;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.account-check-otp-box p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 850;
+}
+
+.account-check-otp-box button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 14px;
+  background: #07111f;
+  color: #ffd400;
+  font-size: 11px;
+  font-weight: 1000;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.account-check-otp-box button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
 .account-check-turnstile {
   min-height: 65px;
   display: grid;
@@ -1091,6 +1218,10 @@ const styles = `
   }
 
   .account-check-grid.two {
+    grid-template-columns: 1fr;
+  }
+
+  .account-check-otp-box {
     grid-template-columns: 1fr;
   }
 

@@ -59,6 +59,9 @@ export default function RegisterPage() {
   const [loadingCaptcha, setLoadingCaptcha] = useState(false);
   const [questionType, setQuestionType] = useState(SECURITY_QUESTIONS[0]);
   const [gmail, setGmail] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailOtpMessage, setEmailOtpMessage] = useState("");
+  const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -68,6 +71,7 @@ export default function RegisterPage() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileScriptReady, setTurnstileScriptReady] = useState(false);
   const [turnstileError, setTurnstileError] = useState("");
+  const formRef = useRef<HTMLFormElement | null>(null);
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
   const turnstileWidgetIdRef = useRef<string | null>(null);
   const turnstileSiteKey = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "").trim();
@@ -229,6 +233,56 @@ export default function RegisterPage() {
     }, 0);
   }
 
+  async function sendEmailOtp() {
+    const form = formRef.current;
+    if (!form) return;
+
+    const maNV = getFormText(form, "maNV");
+    const maST = getFormText(form, "maST");
+    const staffName = getFormText(form, "staffName");
+    const captchaAnswer = getFormText(form, "captchaAnswer");
+
+    if (!maNV) return stopSubmitWithMessage(form, "maNV", "Vui lòng nhập mã nhân viên trước khi gửi OTP.");
+    if (!maST) return stopSubmitWithMessage(form, "maST", "Vui lòng nhập mã siêu thị trước khi gửi OTP.");
+    if (!gmail.trim()) return stopSubmitWithMessage(form, "gmail", "Vui lòng nhập Gmail xác thực trước khi gửi OTP.");
+    if (gmailError) return stopSubmitWithMessage(form, "gmail", gmailError);
+    if (!captcha.token || !captchaAnswer) {
+      return stopSubmitWithMessage(form, "captchaAnswer", "Vui lòng nhập captcha trước khi gửi OTP Gmail.");
+    }
+
+    try {
+      setSendingEmailOtp(true);
+      setEmailOtpMessage("");
+      setError("");
+
+      const res = await fetch("/api/auth/register-email-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          maNV,
+          maST,
+          staffName,
+          gmail,
+          captchaToken: captcha.token || "",
+          captchaAnswer,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Không gửi được OTP Gmail.");
+      }
+
+      setEmailOtp("");
+      setEmailOtpMessage(data.message || "Đã gửi OTP Gmail. Vui lòng kiểm tra hộp thư.");
+    } catch (err: any) {
+      setError(err?.message || "Không gửi được OTP Gmail. Vui lòng thử lại.");
+    } finally {
+      setSendingEmailOtp(false);
+    }
+  }
+
   function handleRegisterSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
     const question = getFormText(form, "questionType");
@@ -242,6 +296,7 @@ export default function RegisterPage() {
       { name: "answer", message: "Vui lòng nhập câu trả lời bảo mật." },
       { name: "gmail", message: "Vui lòng nhập Gmail xác thực." },
       { name: "captchaAnswer", message: "Vui lòng nhập kết quả captcha." },
+      { name: "emailOtp", message: "Vui lòng nhập OTP Gmail đã được gửi." },
     ];
 
     for (const item of checks) {
@@ -261,6 +316,12 @@ export default function RegisterPage() {
     if (gmailError) {
       event.preventDefault();
       stopSubmitWithMessage(form, "gmail", gmailError);
+      return;
+    }
+
+    if (!/^\d{6}$/.test(emailOtp.trim())) {
+      event.preventDefault();
+      stopSubmitWithMessage(form, "emailOtp", "OTP Gmail phải gồm đúng 6 số.");
       return;
     }
 
@@ -300,6 +361,7 @@ export default function RegisterPage() {
 
         <form
           className="register-vtd-card"
+          ref={formRef}
           action="/api/auth/staff-register"
           method="POST"
           noValidate
@@ -416,7 +478,11 @@ export default function RegisterPage() {
               name="gmail"
               type="email"
               value={gmail}
-              onChange={(e) => setGmail(e.target.value)}
+              onChange={(e) => {
+                setGmail(e.target.value);
+                setEmailOtp("");
+                setEmailOtpMessage("");
+              }}
               placeholder="ten@gmail.com"
               autoComplete="email"
               required
@@ -441,6 +507,35 @@ export default function RegisterPage() {
               <input name="captchaAnswer" inputMode="numeric" placeholder="Nhập kết quả" required />
             </label>
           </div>
+
+          <div className="register-vtd-otp-box">
+            <div>
+              <span>OTP Gmail</span>
+              <p>Nhập captcha rồi bấm gửi OTP. Mã có hiệu lực trong 10 phút.</p>
+            </div>
+            <button type="button" onClick={sendEmailOtp} disabled={submitting || sendingEmailOtp}>
+              {sendingEmailOtp ? "Đang gửi..." : "Gửi OTP Gmail"}
+            </button>
+          </div>
+
+          <label className="register-vtd-field">
+            <span>Mã OTP Gmail</span>
+            <input
+              name="emailOtp"
+              value={emailOtp}
+              onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              placeholder="Nhập 6 số trong Gmail"
+              autoComplete="one-time-code"
+              required
+            />
+          </label>
+
+          {emailOtpMessage ? (
+            <div className="register-vtd-alert mini-ok">{emailOtpMessage}</div>
+          ) : null}
 
           {turnstileSiteKey ? (
             <div className="register-vtd-turnstile">
@@ -786,6 +881,53 @@ const styles = `
   font-weight: 1000;
 }
 
+.register-vtd-otp-box {
+  margin: 0 0 13px;
+  padding: 12px;
+  border: 1px solid #fde68a;
+  border-radius: 18px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  background: linear-gradient(135deg, #fffbeb, #ffffff);
+}
+
+.register-vtd-otp-box span {
+  display: block;
+  color: #07111f;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.register-vtd-otp-box p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 850;
+}
+
+.register-vtd-otp-box button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 14px;
+  background: #07111f;
+  color: #ffd400;
+  font-size: 11px;
+  font-weight: 1000;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.register-vtd-otp-box button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
 .register-vtd-turnstile {
   min-height: 65px;
   margin: 4px 0 14px;
@@ -1015,6 +1157,10 @@ const styles = `
   .register-vtd-grid.two {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+
+  .register-vtd-otp-box {
+    grid-template-columns: 1fr;
   }
 
   .register-vtd-hero {

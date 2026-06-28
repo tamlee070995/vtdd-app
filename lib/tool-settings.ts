@@ -1,7 +1,7 @@
 import { getSystemText, settingEnabled, type SystemSettingsRecord } from "@/lib/system-lock";
 
 export type ToolAvailability = {
-  key: "pmh";
+  key: "pmh" | "checkin";
   enabled: boolean;
   manualEnabled: boolean;
   scheduled: boolean;
@@ -12,6 +12,8 @@ export type ToolAvailability = {
 
 const DEFAULT_PMH_REASON = "Công cụ PMH/Pincode đang tạm đóng theo cài đặt Admin.";
 const DEFAULT_PMH_WINDOW_REASON = "Công cụ PMH/Pincode chưa đến thời gian chạy.";
+const DEFAULT_CHECKIN_REASON = "Công cụ Check-in đang tạm đóng theo cài đặt Admin.";
+const DEFAULT_CHECKIN_WINDOW_REASON = "Công cụ Check-in chưa đến thời gian chạy.";
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -54,15 +56,25 @@ function parseVietnamDateTimeMs(value: unknown) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
 }
 
-export function getPmhToolAvailability(
+function getScheduledToolAvailability(
   settings: SystemSettingsRecord,
+  options: {
+    key: ToolAvailability["key"];
+    enabledKey: string;
+    scheduleKey: string;
+    startKey: string;
+    endKey: string;
+    reasonKey: string;
+    defaultReason: string;
+    defaultWindowReason: string;
+  },
   now: Date = new Date()
 ): ToolAvailability {
-  const legacyManualEnabled = settingEnabled(settings, "TOOL_PMH_ENABLED");
-  const scheduleEnabled = settingEnabled(settings, "TOOL_PMH_SCHEDULE_ENABLED");
-  const startAt = getSystemText(settings, "TOOL_PMH_START_AT");
-  const endAt = getSystemText(settings, "TOOL_PMH_END_AT");
-  const reason = getSystemText(settings, "TOOL_PMH_LOCK_REASON") || DEFAULT_PMH_REASON;
+  const legacyManualEnabled = settingEnabled(settings, options.enabledKey);
+  const scheduleEnabled = settingEnabled(settings, options.scheduleKey);
+  const startAt = getSystemText(settings, options.startKey);
+  const endAt = getSystemText(settings, options.endKey);
+  const reason = getSystemText(settings, options.reasonKey) || options.defaultReason;
   const hasWindowInput = Boolean(clean(startAt) || clean(endAt));
   const scheduleApplies = scheduleEnabled || hasWindowInput;
 
@@ -88,12 +100,52 @@ export function getPmhToolAvailability(
   const scheduled = scheduleApplies && hasValidWindow && !activeInWindow;
 
   return {
-    key: "pmh",
+    key: options.key,
     enabled,
     manualEnabled: true,
     scheduled,
-    reason: enabled ? "" : reason || DEFAULT_PMH_WINDOW_REASON,
+    reason: enabled ? "" : reason || options.defaultWindowReason,
     startAt,
     endAt,
   };
+}
+
+export function getPmhToolAvailability(
+  settings: SystemSettingsRecord,
+  now: Date = new Date()
+): ToolAvailability {
+  return getScheduledToolAvailability(
+    settings,
+    {
+      key: "pmh",
+      enabledKey: "TOOL_PMH_ENABLED",
+      scheduleKey: "TOOL_PMH_SCHEDULE_ENABLED",
+      startKey: "TOOL_PMH_START_AT",
+      endKey: "TOOL_PMH_END_AT",
+      reasonKey: "TOOL_PMH_LOCK_REASON",
+      defaultReason: DEFAULT_PMH_REASON,
+      defaultWindowReason: DEFAULT_PMH_WINDOW_REASON,
+    },
+    now
+  );
+}
+
+export function getCheckinToolAvailability(
+  settings: SystemSettingsRecord,
+  now: Date = new Date()
+): ToolAvailability {
+  return getScheduledToolAvailability(
+    settings,
+    {
+      key: "checkin",
+      enabledKey: "TOOL_CHECKIN_ENABLED",
+      scheduleKey: "TOOL_CHECKIN_SCHEDULE_ENABLED",
+      startKey: "TOOL_CHECKIN_START_AT",
+      endKey: "TOOL_CHECKIN_END_AT",
+      reasonKey: "TOOL_CHECKIN_LOCK_REASON",
+      defaultReason: DEFAULT_CHECKIN_REASON,
+      defaultWindowReason: DEFAULT_CHECKIN_WINDOW_REASON,
+    },
+    now
+  );
 }

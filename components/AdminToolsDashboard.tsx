@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AdminDataSyncPanel from "@/components/AdminDataSyncPanel";
+import CheckinAdminTool from "@/components/CheckinAdminTool";
 import PincodeAdminTool from "@/components/PincodeAdminTool";
-import { getPmhToolAvailability } from "@/lib/tool-settings";
+import { getCheckinToolAvailability, getPmhToolAvailability } from "@/lib/tool-settings";
 
-type ToolKey = "pmh" | "coming-price" | "support-report" | "telegram";
+type ToolKey = "pmh" | "checkin" | "support-report" | "telegram";
 type TelegramToolKey = "ChienGia" | "NgoaiDS";
 type AdminRole = "admin" | "mod";
-type AdminToolActionKey = "tools-pmh" | "tools-coming" | "tools-report" | "tools-telegram";
+type AdminToolActionKey = "tools-pmh" | "tools-report" | "tools-telegram" | "tools-checkin";
 
 type AdminToolsDashboardProps = {
   initialSettings: Record<string, string>;
@@ -35,12 +36,12 @@ const TOOLS: Array<{
     configurable: true,
   },
   {
-    key: "coming-price",
+    key: "checkin",
     no: "02",
-    title: "Công cụ sắp thêm",
-    desc: "Khu vực chờ để gắn thêm tool vào mục số 5.",
-    status: "Chưa mở",
-    configurable: false,
+    title: "Check-in",
+    desc: "Import danh sách khách, check-in và xếp thứ tự khách đến event.",
+    status: "Đã mở",
+    configurable: true,
   },
   {
     key: "support-report",
@@ -82,7 +83,7 @@ const TELEGRAM_TOOLS: Array<{
 
 const TOOL_ACTIONS: Record<ToolKey, AdminToolActionKey> = {
   pmh: "tools-pmh",
-  "coming-price": "tools-coming",
+  checkin: "tools-checkin",
   "support-report": "tools-report",
   telegram: "tools-telegram",
 };
@@ -134,12 +135,18 @@ export default function AdminToolsDashboard({
 }: AdminToolsDashboardProps) {
   const [openTool, setOpenTool] = useState<ToolKey | "">("pmh");
   const [showPmhConfig, setShowPmhConfig] = useState(false);
+  const [showCheckinConfig, setShowCheckinConfig] = useState(false);
   const [settings, setSettings] = useState<Record<string, string>>({
     TOOL_PMH_ENABLED: "1",
     TOOL_PMH_SCHEDULE_ENABLED: "0",
     TOOL_PMH_START_AT: "",
     TOOL_PMH_END_AT: "",
     TOOL_PMH_LOCK_REASON: "Công cụ PMH/Pincode đang tạm đóng.",
+    TOOL_CHECKIN_ENABLED: "1",
+    TOOL_CHECKIN_SCHEDULE_ENABLED: "0",
+    TOOL_CHECKIN_START_AT: "",
+    TOOL_CHECKIN_END_AT: "",
+    TOOL_CHECKIN_LOCK_REASON: "Công cụ Check-in đang tạm đóng.",
     TELEGRAM_CHIENGIA_ENABLED: "0",
     TELEGRAM_CHIENGIA_BOT_TOKEN: "",
     TELEGRAM_CHIENGIA_CHAT_ID: "",
@@ -152,6 +159,7 @@ export default function AdminToolsDashboard({
   const [toast, setToast] = useState("");
 
   const pmhAvailability = useMemo(() => getPmhToolAvailability(settings), [settings]);
+  const checkinAvailability = useMemo(() => getCheckinToolAvailability(settings), [settings]);
   const isFullAdmin = String(adminRole || "").toLowerCase() === "admin";
   const grantedModules = useMemo(() => parseCsv(adminModules), [adminModules]);
   const grantedToolActions = useMemo(() => parseToolActions(adminActions), [adminActions]);
@@ -172,6 +180,7 @@ export default function AdminToolsDashboard({
     if (visibleTools.length === 0) {
       if (openTool) setOpenTool("");
       if (showPmhConfig) setShowPmhConfig(false);
+      if (showCheckinConfig) setShowCheckinConfig(false);
       return;
     }
 
@@ -179,8 +188,9 @@ export default function AdminToolsDashboard({
       const firstConfigurable = visibleTools.find((tool) => tool.configurable);
       setOpenTool(firstConfigurable?.key || "");
       setShowPmhConfig(false);
+      setShowCheckinConfig(false);
     }
-  }, [openTool, showPmhConfig, visibleTools]);
+  }, [openTool, showCheckinConfig, showPmhConfig, visibleTools]);
 
   function showToast(message: string) {
     setToast(message);
@@ -238,6 +248,24 @@ export default function AdminToolsDashboard({
         TOOL_PMH_LOCK_REASON: settings.TOOL_PMH_LOCK_REASON || "",
       },
       "pmh-schedule-save"
+    );
+  }
+
+  async function saveCheckinSchedule() {
+    if (!String(settings.TOOL_CHECKIN_START_AT || "").trim() && !String(settings.TOOL_CHECKIN_END_AT || "").trim()) {
+      showToast("Vui lòng cài ít nhất giờ bắt đầu hoặc giờ kết thúc chạy.");
+      return;
+    }
+
+    await saveToolSettings(
+      {
+        TOOL_CHECKIN_ENABLED: "1",
+        TOOL_CHECKIN_SCHEDULE_ENABLED: "1",
+        TOOL_CHECKIN_START_AT: settings.TOOL_CHECKIN_START_AT || "",
+        TOOL_CHECKIN_END_AT: settings.TOOL_CHECKIN_END_AT || "",
+        TOOL_CHECKIN_LOCK_REASON: settings.TOOL_CHECKIN_LOCK_REASON || "",
+      },
+      "checkin-schedule-save"
     );
   }
 
@@ -332,6 +360,51 @@ export default function AdminToolsDashboard({
     );
   }
 
+  function renderCheckinConfig() {
+    return (
+      <section className={`pmh-tool-config ${checkinAvailability.enabled ? "" : "off"}`}>
+        <div>
+          <span>Trạng thái công cụ</span>
+          <h4>{checkinAvailability.enabled ? "Check-in đang mở" : "Check-in đang tắt"}</h4>
+          <p>
+            {checkinAvailability.enabled
+              ? "Nhân sự được cấp quyền có thể mở công cụ Check-in và ghi nhận khách đến event."
+              : checkinAvailability.reason || "Công cụ Check-in đang tạm đóng."}
+          </p>
+        </div>
+        <div className="pmh-tool-config-grid">
+          <label>
+            <span>Giờ bắt đầu chạy</span>
+            <input
+              type="datetime-local"
+              value={toDatetimeLocalInput(settings.TOOL_CHECKIN_START_AT)}
+              onChange={(event) => setSetting("TOOL_CHECKIN_START_AT", event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Giờ kết thúc chạy</span>
+            <input
+              type="datetime-local"
+              value={toDatetimeLocalInput(settings.TOOL_CHECKIN_END_AT)}
+              onChange={(event) => setSetting("TOOL_CHECKIN_END_AT", event.target.value)}
+            />
+          </label>
+          <label className="wide">
+            <span>Nội dung hiển thị ngoài thời gian chạy</span>
+            <textarea
+              value={settings.TOOL_CHECKIN_LOCK_REASON || ""}
+              onChange={(event) => setSetting("TOOL_CHECKIN_LOCK_REASON", event.target.value)}
+              placeholder="VD: Công cụ Check-in chưa đến thời gian chạy."
+            />
+          </label>
+          <button type="button" onClick={saveCheckinSchedule} disabled={saving === "checkin-schedule-save"}>
+            {saving === "checkin-schedule-save" ? "Đang lưu..." : "Lưu lịch Check-in"}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   function renderTelegramConfig() {
     return (
       <section className="telegram-tool-panel">
@@ -419,15 +492,17 @@ export default function AdminToolsDashboard({
         {visibleTools.map((tool) => {
           const active = openTool === tool.key;
           const isPmh = tool.key === "pmh";
+          const isCheckin = tool.key === "checkin";
           const isTelegram = tool.key === "telegram";
           const telegramEnabled = TELEGRAM_TOOLS.some((item) => isSettingOn(`${item.prefix}_ENABLED`));
-          const toolEnabled = isPmh ? pmhAvailability.enabled : isTelegram ? telegramEnabled : false;
-          const scheduleActive = isPmh ? pmhAvailability.scheduled : false;
+          const availability = isPmh ? pmhAvailability : isCheckin ? checkinAvailability : null;
+          const toolEnabled = availability ? availability.enabled : isTelegram ? telegramEnabled : true;
+          const scheduleActive = Boolean(availability?.scheduled);
 
           return (
             <article
               key={tool.key}
-              className={`tools-v5-card ${active ? "active" : ""} ${tool.configurable ? "" : "disabled"} ${!toolEnabled && (isPmh || isTelegram) ? "off" : ""} ${showPmhConfig && isPmh ? "with-config" : ""}`}
+              className={`tools-v5-card ${active ? "active" : ""} ${tool.configurable ? "" : "disabled"} ${!toolEnabled && (isPmh || isCheckin || isTelegram) ? "off" : ""} ${(showPmhConfig && isPmh) || (showCheckinConfig && isCheckin) ? "with-config" : ""}`}
             >
               <button
                 type="button"
@@ -442,10 +517,10 @@ export default function AdminToolsDashboard({
                 </span>
               </button>
 
-              <strong>{isPmh ? "Theo lịch chạy" : isTelegram ? "Bot riêng" : tool.status}</strong>
+              <strong>{availability ? "Theo lịch chạy" : isTelegram ? "Bot riêng" : tool.status}</strong>
 
               <div className="tools-v5-status">
-                {isPmh
+                {availability
                   ? scheduleActive
                     ? "Ngoài giờ chạy"
                     : toolEnabled
@@ -464,6 +539,11 @@ export default function AdminToolsDashboard({
                     Cài đặt
                   </button>
                 ) : null}
+                {isCheckin ? (
+                  <button type="button" className="tools-v5-settings-btn" onClick={() => setShowCheckinConfig((current) => !current)}>
+                    Cài đặt
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="tools-v5-collapse"
@@ -475,6 +555,7 @@ export default function AdminToolsDashboard({
               </div>
 
               {isPmh && showPmhConfig ? renderPmhConfig() : null}
+              {isCheckin && showCheckinConfig ? renderCheckinConfig() : null}
             </article>
           );
         })}
@@ -491,6 +572,10 @@ export default function AdminToolsDashboard({
       ) : openTool === "telegram" && canUseOpenTool ? (
         <div className="tools-v5-panel">
           {renderTelegramConfig()}
+        </div>
+      ) : openTool === "checkin" && canUseOpenTool ? (
+        <div className="tools-v5-panel">
+          <CheckinAdminTool />
         </div>
       ) : (
         <div className="tools-v5-empty">
