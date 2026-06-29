@@ -26,7 +26,7 @@ function getEntryItems(settings: Record<string, string>): EntryItem[] {
   const staffPageLocked = settingEnabled(settings, "STAFF_PAGE_LOCKED");
   const customerPageLocked = settingEnabled(settings, "CUSTOMER_PAGE_LOCKED");
 
-  return [
+  const items: EntryItem[] = [
   {
     index: "01",
     badge: "INTERNAL",
@@ -56,6 +56,8 @@ function getEntryItems(settings: Record<string, string>): EntryItem[] {
     tone: "print",
   },
   ];
+
+  return items;
 }
 
 function cx(...classes: Array<string | false | null | undefined>) {

@@ -54,6 +54,7 @@ type DashboardLogRow = {
 };
 
 type DashboardSource = "staff" | "customer";
+type DashboardDeleteMode = "oldest-3" | "oldest-5" | "oldest-7" | "oldest-30" | "all";
 
 type AdminDashboard = {
   topOldProducts: Array<{ product: string; count: number }>;
@@ -152,6 +153,14 @@ const EMPTY_DASHBOARD: AdminDashboard = {
   totalLogs: 0,
   totalValue: 0,
 };
+
+const DASHBOARD_DELETE_OPTIONS: Array<{ value: DashboardDeleteMode; label: string }> = [
+  { value: "oldest-3", label: "Xóa 3 ngày xa nhất" },
+  { value: "oldest-5", label: "Xóa 5 ngày xa nhất" },
+  { value: "oldest-7", label: "Xóa 7 ngày xa nhất" },
+  { value: "oldest-30", label: "Xóa 30 ngày xa nhất" },
+  { value: "all", label: "Xóa tất cả" },
+];
 
 type TabKey = "overview" | "staff" | "permission" | "notify" | "system" | "dashboard";
 
@@ -470,6 +479,7 @@ function TcdmAdminConsole({
   const [opsLoading, setOpsLoading] = useState(false);
   const [commandInput, setCommandInput] = useState("");
   const [dashboardSource, setDashboardSource] = useState<DashboardSource>("staff");
+  const [dashboardDeleteMode, setDashboardDeleteMode] = useState<DashboardDeleteMode>("oldest-3");
   const [dashboardData, setDashboardData] = useState<AdminDashboard>(EMPTY_DASHBOARD);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
@@ -839,6 +849,55 @@ function TcdmAdminConsole({
     setDashboardSource(source);
     setDashboardData(EMPTY_DASHBOARD);
     setDashboardLoaded(false);
+  }
+
+  function getDashboardDeleteLabel(mode: DashboardDeleteMode = dashboardDeleteMode) {
+    return DASHBOARD_DELETE_OPTIONS.find((item) => item.value === mode)?.label || "Xóa lượt tìm kiếm";
+  }
+
+  async function runDashboardLogDelete(source: DashboardSource, mode: DashboardDeleteMode) {
+    try {
+      setBusy("DELETE_DASHBOARD_LOGS");
+
+      const res = await fetch("/api/admin/dashboard", {
+        method: "DELETE",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+        body: JSON.stringify({ source, mode }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Không xóa được lượt tìm kiếm.");
+      }
+
+      if (source === dashboardSource) {
+        setDashboardData(data.dashboard || EMPTY_DASHBOARD);
+        setDashboardLoaded(true);
+      }
+      setBusy("");
+      showToast("success", data.message || "Đã xóa lượt tìm kiếm.");
+    } catch (err: any) {
+      setBusy("");
+      showToast("error", getErrorMessage(err));
+    }
+  }
+
+  function openDashboardLogDeleteConfirm() {
+    const source = dashboardSource;
+    const mode = dashboardDeleteMode;
+    const sourceLabel = source === "customer" ? "khách hàng" : "nhân viên";
+
+    openConfirmDialog({
+      title: "Xóa lượt tìm kiếm",
+      message: `Bạn muốn ${getDashboardDeleteLabel(mode).toLowerCase()} trong dashboard ${sourceLabel}? Thao tác này không thể hoàn tác.`,
+      confirmText: "Xóa log",
+      danger: true,
+      onConfirm: () => runDashboardLogDelete(source, mode),
+    });
   }
 
   useEffect(() => {
@@ -1557,31 +1616,6 @@ function TcdmAdminConsole({
                       >
                         Reset OTP
                       </button>
-                      {isFullAdmin ? (
-                        <button
-                          type="button"
-                          className={hasCheckinToolAccess(item) ? "primary" : ""}
-                          disabled={item.permission === "admin" || busy === `UPDATE_CHECKIN_ACCESS-${item.maNV}`}
-                          onClick={() => {
-                            const enabled = !hasDirectCheckinGrant(item);
-                            openConfirmDialog({
-                              title: enabled ? "Cấp quyền Check-in" : "Tắt quyền Check-in",
-                              message: enabled
-                                ? `Cấp quyền truy cập công cụ Check-in cho NV ${item.maNV}?`
-                                : `Thu hồi quyền truy cập công cụ Check-in của NV ${item.maNV}?`,
-                              confirmText: enabled ? "Cấp quyền" : "Thu hồi",
-                              danger: !enabled,
-                              onConfirm: () => runStaffAction("UPDATE_CHECKIN_ACCESS", item.maNV, { enabled }),
-                            });
-                          }}
-                        >
-                          {item.permission === "admin"
-                            ? "Check-in Admin"
-                            : hasDirectCheckinGrant(item)
-                              ? "Tắt Check-in"
-                              : "Cấp Check-in"}
-                        </button>
-                      ) : null}
                       <button
                         type="button"
                         className="danger"
@@ -1696,6 +1730,19 @@ function TcdmAdminConsole({
                     item={item}
                     disabled={!isFullAdmin || busy === `UPDATE_PERMISSION-${item.maNV}`}
                     onSave={runStaffAdminAccess}
+                    checkinBusy={busy === `UPDATE_CHECKIN_ACCESS-${item.maNV}`}
+                    checkinDisabled={!isFullAdmin || busy === `UPDATE_CHECKIN_ACCESS-${item.maNV}`}
+                    onCheckinToggle={(target, enabled) => {
+                      openConfirmDialog({
+                        title: enabled ? "Cấp quyền Check-in" : "Tắt quyền Check-in",
+                        message: enabled
+                          ? `Cấp quyền truy cập công cụ Check-in cho NV ${target.maNV}?`
+                          : `Thu hồi quyền truy cập công cụ Check-in của NV ${target.maNV}?`,
+                        confirmText: enabled ? "Cấp quyền" : "Thu hồi",
+                        danger: !enabled,
+                        onConfirm: () => runStaffAction("UPDATE_CHECKIN_ACCESS", target.maNV, { enabled }),
+                      });
+                    }}
                   />
                 </article>
               ))
@@ -2267,6 +2314,29 @@ function TcdmAdminConsole({
                   Khách hàng
                 </button>
               </div>
+              {isFullAdmin && (
+                <div className="adminx-dashboard-delete-tools">
+                  <select
+                    value={dashboardDeleteMode}
+                    onChange={(event) => setDashboardDeleteMode(event.target.value as DashboardDeleteMode)}
+                    disabled={dashboardLoading || busy === "DELETE_DASHBOARD_LOGS"}
+                    aria-label="Chọn kiểu xóa lượt tìm kiếm"
+                  >
+                    {DASHBOARD_DELETE_OPTIONS.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={openDashboardLogDeleteConfirm}
+                    disabled={dashboardLoading || busy === "DELETE_DASHBOARD_LOGS" || dashboardData.totalLogs <= 0}
+                  >
+                    {busy === "DELETE_DASHBOARD_LOGS" ? "Đang xóa..." : "Xóa log"}
+                  </button>
+                </div>
+              )}
               <button className="adminx-action-btn" type="button" onClick={() => loadDashboard()} disabled={dashboardLoading}>
                 {dashboardLoading ? "Đang tải..." : dashboardLoaded ? "Tải lại" : "Tải dashboard"}
               </button>
@@ -2939,6 +3009,46 @@ const ADMINX_STYLE = `
 .adminx-dashboard-source-switch button:disabled {
   opacity: .55;
   cursor: wait;
+}
+
+.adminx-dashboard-delete-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 999px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+}
+
+.adminx-dashboard-delete-tools select {
+  min-height: 36px;
+  max-width: 180px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #9a3412;
+  font-size: 11px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.adminx-dashboard-delete-tools button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 11px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.adminx-dashboard-delete-tools select:disabled,
+.adminx-dashboard-delete-tools button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
 }
 
 .adminx-metric-grid,
@@ -5243,12 +5353,18 @@ const ADMINX_ONLINE_STYLE = `
   }
 
   .adminx-dashboard-head-actions,
-  .adminx-dashboard-source-switch {
+  .adminx-dashboard-source-switch,
+  .adminx-dashboard-delete-tools {
     width: 100%;
   }
 
   .adminx-dashboard-source-switch button {
     flex: 1;
+  }
+
+  .adminx-dashboard-delete-tools select {
+    flex: 1;
+    max-width: none;
   }
 
   .admin-saas-shell {
@@ -5316,10 +5432,16 @@ function StaffAdminAccessBox({
   item,
   disabled,
   onSave,
+  checkinBusy,
+  checkinDisabled,
+  onCheckinToggle,
 }: {
   item: AdminStaff;
   disabled: boolean;
   onSave: (maNV: string, permission: string, modules: string) => Promise<void>;
+  checkinBusy: boolean;
+  checkinDisabled: boolean;
+  onCheckinToggle: (item: AdminStaff, enabled: boolean) => void;
 }) {
   const [permission, setPermission] = useState(item.permission || "");
   const [accessItems, setAccessItems] = useState<string[]>(parseAdminAccessItems(item.modulePermissions));
@@ -5503,6 +5625,34 @@ function StaffAdminAccessBox({
       )}
       {permission === "admin" && <em>Admin có toàn quyền, không cần chọn hạng mục.</em>}
       {permission === "" && <em>User thường không được truy cập trang quản trị.</em>}
+
+      <div className="adminx-permission-section-title">
+        <span>Quyền Check-in nội bộ</span>
+        <small>Cấp quyền cho nhân sự được phép mở công cụ Check-in Event.</small>
+      </div>
+      <div className="adminx-module-buttons adminx-action-buttons">
+        <button
+          type="button"
+          disabled={checkinDisabled || item.permission === "admin"}
+          className={item.permission === "admin" || hasDirectCheckinGrant(item) ? "active" : ""}
+          onClick={() => onCheckinToggle(item, !hasDirectCheckinGrant(item))}
+        >
+          <span>
+            {item.permission === "admin"
+              ? "Check-in mặc định cho Admin"
+              : hasDirectCheckinGrant(item)
+                ? "Đã cấp Check-in"
+                : "Cấp quyền Check-in"}
+          </span>
+          <small>
+            {item.permission === "admin"
+              ? "Tài khoản Admin luôn có quyền dùng Check-in."
+              : checkinBusy
+                ? "Đang cập nhật quyền Check-in..."
+                : "Bật/tắt quyền công cụ Check-in cho tài khoản này."}
+          </small>
+        </button>
+      </div>
     </div>
   );
 }

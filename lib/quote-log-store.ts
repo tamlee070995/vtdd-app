@@ -1,8 +1,9 @@
 import { readSheetRange } from "@/lib/sheets";
 import { packQuoteClientMeta, parseQuoteClientMeta } from "@/lib/quote-client-meta";
-import { insertRows, isSupabaseConfigured, selectAllRows, selectRows } from "@/lib/supabase-rest";
+import { deleteRows, insertRows, isSupabaseConfigured, selectAllRows, selectRows } from "@/lib/supabase-rest";
 
 const LOG_SHEET = "Log_search";
+const DELETE_CHUNK_SIZE = 200;
 
 export type QuoteLogRow = {
   source: "staff" | "customer";
@@ -49,6 +50,52 @@ function clean(value: unknown) {
 function money(value: unknown) {
   const n = Number(value || 0);
   return Number.isFinite(n) ? n : 0;
+}
+
+function quoteDateKeyFromText(value: unknown) {
+  const text = clean(value);
+  if (!text) return "";
+
+  const dmy = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+  if (dmy) {
+    const [, day, month, year] = dmy;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const ymd = text.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+  if (ymd) {
+    const [, year, month, day] = ymd;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const parsed = Date.parse(text);
+  if (Number.isFinite(parsed)) return new Date(parsed).toISOString().slice(0, 10);
+
+  return "";
+}
+
+function normalizeDeleteMode(value: unknown) {
+  const mode = clean(value).toLowerCase();
+  if (mode === "all") return { kind: "all" as const, days: 0 };
+
+  const match = mode.match(/^oldest-(3|5|7|30)$/);
+  if (!match) throw new Error("Tùy chọn xóa log không hợp lệ.");
+
+  return { kind: "oldest-days" as const, days: Number(match[1]) };
+}
+
+async function deleteQuoteLogIds(ids: number[]) {
+  let deleted = 0;
+
+  for (let index = 0; index < ids.length; index += DELETE_CHUNK_SIZE) {
+    const chunk = ids.slice(index, index + DELETE_CHUNK_SIZE);
+    if (!chunk.length) continue;
+
+    await deleteRows("quote_logs", { id: `in.(${chunk.join(",")})` }, { returning: "minimal" });
+    deleted += chunk.length;
+  }
+
+  return deleted;
 }
 
 function isDuplicateKeyError(err: any) {
@@ -218,4 +265,57 @@ export async function getStaffQuoteHistory(maNV: string, limit = 20) {
   return rows
     .filter((row) => row.maNV === target)
     .slice(0, Math.max(1, Math.min(100, limit)));
+}
+
+export async function deleteQuoteLogsByDashboardFilter(
+  source: "staff" | "customer",
+  modeValue: string
+) {
+  if (!isSupabaseConfigured()) {
+    throw new Error("Chức năng xóa log chỉ hỗ trợ khi dùng Supabase.");
+  }
+
+  const mode = normalizeDeleteMode(modeValue);
+  const rows = await selectAllRows<any>("quote_logs", { order: "id.asc" });
+  const candidates = rows
+    .map((row) => {
+      const id = Number(row.id);
+      const mapped = mapDbQuoteLogRow(row);
+
+      return {
+        id,
+        source: mapped.source,
+        dateKey: quoteDateKeyFromText(mapped.time),
+      };
+    })
+    .filter((row) => Number.isFinite(row.id) && row.id > 0 && row.source === source);
+
+  if (mode.kind === "all") {
+    const deleted = await deleteQuoteLogIds(candidates.map((row) => row.id));
+
+    return {
+      deleted,
+      source,
+      mode: modeValue,
+      days: [] as string[],
+      totalBefore: candidates.length,
+    };
+  }
+
+  const selectedDays = Array.from(new Set(candidates.map((row) => row.dateKey).filter(Boolean)))
+    .sort((left, right) => left.localeCompare(right))
+    .slice(0, mode.days);
+  const selectedDaySet = new Set(selectedDays);
+  const targetIds = candidates
+    .filter((row) => selectedDaySet.has(row.dateKey))
+    .map((row) => row.id);
+  const deleted = await deleteQuoteLogIds(targetIds);
+
+  return {
+    deleted,
+    source,
+    mode: modeValue,
+    days: selectedDays,
+    totalBefore: candidates.length,
+  };
 }

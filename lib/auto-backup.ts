@@ -31,6 +31,8 @@ type AutoBackupResult = {
   dailyBackupPath?: string;
   createdAt: string;
   createdAtVN: string;
+  scheduledFor?: string;
+  scheduledForVN?: string;
   bytes: number;
   trigger: "schedule" | "manual";
 };
@@ -161,6 +163,43 @@ function msUntilNextBackup(now = new Date()) {
   return targetMs - nowMs;
 }
 
+function scheduleTargetAtVnHour(base: Date, hour: number) {
+  const baseVN = new Date(base.getTime() + VN_OFFSET_MS);
+  return new Date(
+    Date.UTC(
+      baseVN.getUTCFullYear(),
+      baseVN.getUTCMonth(),
+      baseVN.getUTCDate(),
+      hour,
+      BACKUP_MINUTE_VN,
+      0,
+      0
+    ) - VN_OFFSET_MS
+  );
+}
+
+function getLatestDueScheduleTarget(now = new Date()) {
+  const nowMs = now.getTime();
+  const dueTargets = BACKUP_SCHEDULE_HOURS_VN
+    .map((hour) => scheduleTargetAtVnHour(now, hour))
+    .filter((target) => target.getTime() <= nowMs)
+    .sort((a, b) => b.getTime() - a.getTime());
+
+  if (dueTargets[0]) return dueTargets[0];
+
+  const yesterday = new Date(now.getTime() - DAY_MS);
+  return scheduleTargetAtVnHour(yesterday, FINAL_BACKUP_HOUR_VN);
+}
+
+async function fileExists(filePath: string) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function replaceFileAtomic(targetPath: string, body: string) {
   await mkdir(path.dirname(targetPath), { recursive: true });
 
@@ -208,8 +247,9 @@ async function updateBackupHistory(result: AutoBackupResult) {
     history = [];
   }
 
-  const resultDateKey = toVnDateKey(new Date(result.createdAt));
-  const finalRun = result.trigger === "schedule" && result.dailyFileName === dailyBackupFileName(new Date(result.createdAt));
+  const archiveDate = new Date(result.scheduledFor || result.createdAt);
+  const resultDateKey = toVnDateKey(archiveDate);
+  const finalRun = result.trigger === "schedule" && result.dailyFileName === dailyBackupFileName(archiveDate);
 
   const merged = [
     result,
@@ -243,7 +283,7 @@ async function updateBackupHistory(result: AutoBackupResult) {
   return merged;
 }
 
-export async function createAutoBackup(trigger: "schedule" | "manual" = "manual") {
+export async function createAutoBackup(trigger: "schedule" | "manual" = "manual", scheduledFor?: Date) {
   const runtime = getRuntime();
   if (runtime.running) return runtime.running;
 
@@ -251,7 +291,8 @@ export async function createAutoBackup(trigger: "schedule" | "manual" = "manual"
     const exported = await exportSyncTarget("backup");
     const body = exported.body;
     const createdAt = new Date();
-    const dailyFileName = archiveBackupFileName(createdAt, trigger);
+    const archiveDate = scheduledFor || createdAt;
+    const dailyFileName = archiveBackupFileName(archiveDate, trigger);
     const dailyPath = path.join(BACKUP_DIR, dailyFileName);
     const result: AutoBackupResult = {
       success: true,
@@ -261,13 +302,15 @@ export async function createAutoBackup(trigger: "schedule" | "manual" = "manual"
       dailyBackupPath: dailyPath,
       createdAt: createdAt.toISOString(),
       createdAtVN: formatVN(createdAt),
+      scheduledFor: scheduledFor?.toISOString() || "",
+      scheduledForVN: scheduledFor ? formatVN(scheduledFor) : "",
       bytes: Buffer.byteLength(body, "utf8"),
       trigger,
     };
 
     await replaceFileAtomic(backupPath(), body);
-    if (isFinalBackupRun(createdAt, trigger)) {
-      await deleteIntradayBackupsForDate(createdAt);
+    if (isFinalBackupRun(archiveDate, trigger)) {
+      await deleteIntradayBackupsForDate(archiveDate);
     }
     await replaceFileAtomic(dailyPath, body);
     await replaceFileAtomic(backupMetaPath(), JSON.stringify(result, null, 2));
@@ -310,8 +353,24 @@ export function ensureAutoBackupScheduler() {
   scheduleNextBackup();
 }
 
-export async function getAutoBackupStatus() {
+export async function ensureDueAutoBackup() {
   ensureAutoBackupScheduler();
+
+  const dueTarget = getLatestDueScheduleTarget();
+  if (!dueTarget) return null;
+
+  const archiveName = archiveBackupFileName(dueTarget, "schedule");
+  const archivePath = path.join(BACKUP_DIR, archiveName);
+
+  if (await fileExists(archivePath)) {
+    return null;
+  }
+
+  return createAutoBackup("schedule", dueTarget);
+}
+
+export async function getAutoBackupStatus() {
+  await ensureDueAutoBackup();
 
   const runtime = getRuntime();
   const filePath = backupPath();

@@ -31,7 +31,7 @@ export default async function HomePage() {
   const staffPageLocked = settingEnabled(settings, "STAFF_PAGE_LOCKED");
   const customerPageLocked = settingEnabled(settings, "CUSTOMER_PAGE_LOCKED");
   const tradePriceHasPageLock = staffPageLocked || customerPageLocked;
-  const tradePriceFullyLocked = scheduleLockActive || (staffPageLocked && customerPageLocked);
+  const tradePriceFullyLocked = scheduleLockActive;
   const tradePriceLockText = scheduleLockActive
     ? "Cập nhật hệ thống"
     : staffPageLocked && customerPageLocked
@@ -41,6 +41,16 @@ export default async function HomePage() {
       : customerPageLocked
         ? "Trang khách hàng đang tạm khóa, luồng nhân viên vẫn truy cập được."
         : "";
+
+  const tradePriceNoticeText = scheduleLockActive
+    ? "Cập nhật hệ thống"
+    : staffPageLocked && customerPageLocked
+      ? "Luồng nhân viên và khách hàng đang tạm khóa, vẫn có thể vào công cụ in sticker."
+      : staffPageLocked
+        ? "Trang nhân viên đang tạm khóa, luồng khách hàng vẫn truy cập được."
+        : customerPageLocked
+          ? "Trang khách hàng đang tạm khóa, luồng nhân viên vẫn truy cập được."
+          : tradePriceLockText;
 
   const groups: ToolGroup[] = [
     {
@@ -55,7 +65,7 @@ export default async function HomePage() {
           locked: tradePriceFullyLocked,
           disabled: tradePriceFullyLocked,
           status: scheduleLockActive ? "Cập nhật hệ thống" : tradePriceFullyLocked ? "Tạm khóa" : undefined,
-          lockText: tradePriceLockText,
+          lockText: tradePriceNoticeText,
           notice: tradePriceHasPageLock && !tradePriceFullyLocked,
         },
         cms["quy-trinh-thu-cu"].published
