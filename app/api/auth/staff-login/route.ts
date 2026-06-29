@@ -97,11 +97,17 @@ export async function POST(req: NextRequest) {
       return redirectLogin(req, "Mật khẩu không đúng. Vui lòng kiểm tra lại.", nextPath);
     }
 
-    const settings = await getSystemSettings();
-    const userFirewall = checkFirewallUserAccess(settings, staff.maNV, getClientIpFromHeaders(req.headers));
+    if (!isCheckinNextPath(nextPath)) {
+      const settings = await getSystemSettings();
+      const userFirewall = checkFirewallUserAccess(
+        settings,
+        staff.maNV,
+        getClientIpFromHeaders(req.headers)
+      );
 
-    if (!userFirewall.allowed) {
-      return redirectLogin(req, userFirewall.reason, nextPath);
+      if (!userFirewall.allowed) {
+        return redirectLogin(req, userFirewall.reason, nextPath);
+      }
     }
 
     if (!staff.maST) {
