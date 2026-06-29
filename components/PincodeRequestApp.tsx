@@ -921,6 +921,7 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
     ? currentRequirements.filter((_, index) => reviewFeedback.slots.includes(String(index + 1)))
     : [];
   const recaptureReady = recaptureRequirements.length > 0 && recaptureRequirements.every((item) => uploads[item.id]?.file);
+  const guideHref = flow === "ChienGia" ? "/huong-dan-noi-bo#chien-gia" : "/huong-dan-noi-bo#may-ngoai-danh-sach";
 
   return (
     <main className="pincode-page" style={{ "--pmh-accent": meta.accent } as CSSProperties}>
@@ -934,9 +935,14 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
             <small>Công cụ hỗ trợ</small>
           </span>
         </Link>
-        <Link href="/cong-cu-ho-tro" className="pmh-back">
-          Danh mục
-        </Link>
+        <div className="pmh-topbar-actions">
+          <Link href={guideHref} className="vtdd-guide-link dark">
+            Hướng dẫn
+          </Link>
+          <Link href="/cong-cu-ho-tro" className="pmh-back">
+            Danh mục
+          </Link>
+        </div>
       </header>
 
       <section className="pmh-request-layout">
@@ -1503,6 +1509,12 @@ const STYLE = `
   display: inline-flex;
   align-items: center;
   text-decoration: none;
+}
+.pmh-topbar-actions {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
 }
 .pmh-brand {
   min-width: 0;

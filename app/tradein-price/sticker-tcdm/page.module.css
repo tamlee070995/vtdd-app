@@ -62,7 +62,15 @@
   font-weight: 850;
 }
 
+.headerActions {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
 .backButton,
+.guideButton,
 .printButton,
 .clearButton {
   min-height: 44px;
@@ -84,6 +92,11 @@
   background: rgba(255, 255, 255, .1);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, .16);
+}
+
+.guideButton {
+  background: #ffd400;
+  color: #07111f;
 }
 
 .printButton {
@@ -797,6 +810,10 @@
     display: none;
   }
 
+  .headerActions {
+    gap: 6px;
+  }
+
   .hero {
     min-height: 240px;
     border-radius: 26px;
@@ -1254,6 +1271,11 @@
     display: none;
   }
 
+  .headerActions {
+    gap: 6px;
+  }
+
+  .guideButton,
   .backButton {
     flex: 0 0 auto;
     min-height: 42px;

@@ -4222,6 +4222,9 @@ function renderSystemLock() {
           </button>
 
           <div className="staff-hero-actions">
+            <Link href="/huong-dan-noi-bo#tra-gia-nhan-vien" className="vtdd-guide-link dark">
+              Hướng dẫn
+            </Link>
             <button
               type="button"
               className="staff-profile-trigger"

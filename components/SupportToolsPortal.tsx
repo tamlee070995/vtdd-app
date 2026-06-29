@@ -11,6 +11,7 @@ const PMH_ROUTES = [
     title: "Tổng giá TCDM thấp hơn đối thủ",
     desc: "Gửi hồ sơ xác thực giá đối thủ, thông tin máy và ghi chú thẩm định.",
     tone: "gold",
+    guideId: "chien-gia",
   },
   {
     href: "/cong-cu-ho-tro/may-ngoai-danh-sach",
@@ -18,6 +19,7 @@ const PMH_ROUTES = [
     title: "Máy ngoài danh sách",
     desc: "Gửi yêu cầu hỗ trợ sản phẩm không có trong danh sách thu.",
     tone: "green",
+    guideId: "may-ngoai-danh-sach",
   },
 ];
 
@@ -97,14 +99,21 @@ export default function SupportToolsPortal({
                 </>
               );
 
-              return enabled ? (
-                <Link href={item.href} className={`support-tool-card ${item.tone}`} key={item.href}>
-                  {content}
-                </Link>
-              ) : (
-                <button type="button" className={`support-tool-card disabled ${item.tone}`} key={item.href}>
-                  {content}
-                </button>
+              return (
+                <div className="support-tool-shell" key={item.href}>
+                  {enabled ? (
+                    <Link href={item.href} className={`support-tool-card ${item.tone}`}>
+                      {content}
+                    </Link>
+                  ) : (
+                    <button type="button" className={`support-tool-card disabled ${item.tone}`}>
+                      {content}
+                    </button>
+                  )}
+                  <Link href={`/huong-dan-noi-bo#${item.guideId}`} className="support-tool-guide">
+                    Hướng dẫn
+                  </Link>
+                </div>
               );
             })}
           </div>
@@ -126,46 +135,48 @@ export default function SupportToolsPortal({
 
         {checkinOpen ? (
           <div className="support-tools-grid support-checkin-grid" aria-label="Công cụ Check-in">
-            {!checkinEnabled ? (
-              <button type="button" className={`support-tool-card disabled ${CHECKIN_TOOL.tone}`}>
-                <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
-                <span>
-                  <b>{CHECKIN_TOOL.title}</b>
-                  <small>{CHECKIN_TOOL.desc}</small>
-                  <em>{checkinAvailability.reason || "Công cụ Check-in đang tạm đóng."}</em>
-                </span>
-                <i>×</i>
-              </button>
-            ) : checkinAccess ? (
-              <Link href={CHECKIN_TOOL.href} className={`support-tool-card ${CHECKIN_TOOL.tone}`}>
-                <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
-                <span>
-                  <b>{CHECKIN_TOOL.title}</b>
-                  <small>{CHECKIN_TOOL.desc}</small>
-                </span>
-                <i>›</i>
-              </Link>
-            ) : !checkinSignedIn ? (
-              <Link href="/login?next=/cong-cu-ho-tro/check-in" className={`support-tool-card ${CHECKIN_TOOL.tone}`}>
-                <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
-                <span>
-                  <b>{CHECKIN_TOOL.title}</b>
-                  <small>Đăng nhập tài khoản được cấp quyền để mở công cụ.</small>
-                  <em>Yêu cầu đăng nhập nội bộ</em>
-                </span>
-                <i>›</i>
-              </Link>
-            ) : (
-              <button type="button" className={`support-tool-card disabled ${CHECKIN_TOOL.tone}`}>
-                <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
-                <span>
-                  <b>{CHECKIN_TOOL.title}</b>
-                  <small>{CHECKIN_TOOL.desc}</small>
-                  <em>Công cụ nội bộ, chỉ tài khoản được Admin cấp quyền mới truy cập.</em>
-                </span>
-                <i>×</i>
-              </button>
-            )}
+            <div className="support-tool-shell">
+              {!checkinEnabled ? (
+                <button type="button" className={`support-tool-card disabled ${CHECKIN_TOOL.tone}`}>
+                  <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
+                  <span>
+                    <b>{CHECKIN_TOOL.title}</b>
+                    <small>{CHECKIN_TOOL.desc}</small>
+                    <em>{checkinAvailability.reason || "Công cụ Check-in đang tạm đóng."}</em>
+                  </span>
+                  <i>×</i>
+                </button>
+              ) : checkinAccess ? (
+                <Link href={CHECKIN_TOOL.href} className={`support-tool-card ${CHECKIN_TOOL.tone}`}>
+                  <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
+                  <span>
+                    <b>{CHECKIN_TOOL.title}</b>
+                    <small>{CHECKIN_TOOL.desc}</small>
+                  </span>
+                  <i>›</i>
+                </Link>
+              ) : !checkinSignedIn ? (
+                <Link href="/login?next=/cong-cu-ho-tro/check-in" className={`support-tool-card ${CHECKIN_TOOL.tone}`}>
+                  <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
+                  <span>
+                    <b>{CHECKIN_TOOL.title}</b>
+                    <small>Đăng nhập tài khoản được cấp quyền để mở công cụ.</small>
+                    <em>Yêu cầu đăng nhập nội bộ</em>
+                  </span>
+                  <i>›</i>
+                </Link>
+              ) : (
+                <button type="button" className={`support-tool-card disabled ${CHECKIN_TOOL.tone}`}>
+                  <div className="support-tool-no">{CHECKIN_TOOL.no}</div>
+                  <span>
+                    <b>{CHECKIN_TOOL.title}</b>
+                    <small>{CHECKIN_TOOL.desc}</small>
+                    <em>Công cụ nội bộ, chỉ tài khoản được Admin cấp quyền mới truy cập.</em>
+                  </span>
+                  <i>×</i>
+                </button>
+              )}
+            </div>
           </div>
         ) : null}
       </section>
@@ -394,6 +405,11 @@ const STYLE = `
   grid-template-columns: minmax(0, 1fr);
   max-width: 720px;
 }
+.support-tool-shell {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
 .support-tool-card {
   min-height: 132px;
   padding: 16px;
@@ -466,6 +482,23 @@ const STYLE = `
 }
 .support-tool-card em {
   color: #9a3412;
+}
+.support-tool-guide {
+  justify-self: end;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,212,0,.55);
+  background: #fff7cc;
+  color: #07111f;
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .05em;
+  text-transform: uppercase;
 }
 .support-footer {
   width: min(100%, 1480px);

@@ -174,9 +174,14 @@ export default function StickerTcdmPage() {
           </span>
         </Link>
 
-        <Link href="/tradein-price" className={styles.backButton}>
-          Quay lại
-        </Link>
+        <div className={styles.headerActions}>
+          <Link href="/huong-dan-noi-bo#in-sticker" className={styles.guideButton}>
+            Hướng dẫn
+          </Link>
+          <Link href="/tradein-price" className={styles.backButton}>
+            Quay lại
+          </Link>
+        </div>
       </header>
 
       <section className={styles.hero}>
