@@ -11341,3 +11341,18 @@ html {
   fill: currentColor !important;
   pointer-events: none !important;
 }
+
+.vtdd-tab-panel-disabled {
+  pointer-events: none;
+  user-select: none;
+  opacity: .46;
+  filter: grayscale(.18);
+}
+
+.vtdd-tab-panel-disabled button,
+.vtdd-tab-panel-disabled input,
+.vtdd-tab-panel-disabled select,
+.vtdd-tab-panel-disabled textarea,
+.vtdd-tab-panel-disabled a {
+  cursor: not-allowed !important;
+}

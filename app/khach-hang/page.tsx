@@ -2312,7 +2312,10 @@ export default function CustomerPage() {
           </button>
         </section>
 
-        <section className="customer-form-card">
+        <section
+          className={`customer-form-card${currentCustomerTabLocked ? " vtdd-tab-panel-disabled" : ""}`}
+          aria-disabled={currentCustomerTabLocked ? "true" : undefined}
+        >
           {mode === "tradein" && (
             <>
               <div className="customer-section-title">
@@ -2411,7 +2414,10 @@ export default function CustomerPage() {
           )}
         </section>
 
-        <section className={loai ? "customer-result-card show" : "customer-result-card"}>
+        <section
+          className={`${loai ? "customer-result-card show" : "customer-result-card"}${currentCustomerTabLocked ? " vtdd-tab-panel-disabled" : ""}`}
+          aria-disabled={currentCustomerTabLocked ? "true" : undefined}
+        >
           <div className="customer-result-kicker">TỔNG TIỀN DỰ KIẾN</div>
 
           <div className="customer-result-total">{formatMoney(priceInfo.tongTien)}</div>

@@ -4271,7 +4271,10 @@ function renderSystemLock() {
           </button>
         </section>
 
-        <section className="tradein-card">
+        <section
+          className={`tradein-card${currentStaffTabLocked ? " vtdd-tab-panel-disabled" : ""}`}
+          aria-disabled={currentStaffTabLocked ? "true" : undefined}
+        >
   {mode === "tradein" && (
     <>
       <div className="section-head">
@@ -4381,7 +4384,10 @@ function renderSystemLock() {
                     </section>
           </div>
 
-          <aside className="staff-side-panel">
+          <aside
+            className={`staff-side-panel${currentStaffTabLocked ? " vtdd-tab-panel-disabled" : ""}`}
+            aria-disabled={currentStaffTabLocked ? "true" : undefined}
+          >
                     {selectedOldRow && (
                     <section className="type-price-grid">
                         {TYPE_OPTIONS.map((t) => {
