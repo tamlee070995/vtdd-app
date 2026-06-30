@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "@tinymce/tinymce-react";
 import { sanitizeHtml } from "@/lib/html-sanitize";
 import AdminToolsDashboard from "@/components/AdminToolsDashboard";
+import PasswordInput from "@/components/PasswordInput";
 
 type AdminStaff = {
   rowNumber: number;
@@ -637,6 +638,7 @@ function TcdmAdminConsole({
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [bulkStandbyOpen, setBulkStandbyOpen] = useState(false);
   const [bulkStandbyRoles, setBulkStandbyRoles] = useState({ user: true, mod: false });
+  const [bulkStandbyPassword, setBulkStandbyPassword] = useState("");
   const [standbyImportOpen, setStandbyImportOpen] = useState(false);
   const [standbyImportPreview, setStandbyImportPreview] = useState<StandbyImportPreview>(EMPTY_STANDBY_IMPORT_PREVIEW);
   const [deleteStaffDialog, setDeleteStaffDialog] = useState<DeleteStaffDialogState>(null);
@@ -1178,15 +1180,22 @@ function TcdmAdminConsole({
       return;
     }
 
+    if (!bulkStandbyPassword.trim()) {
+      showToast("error", "Vui lòng nhập mật khẩu Admin để xác nhận thao tác Standby hàng loạt.");
+      return;
+    }
+
     try {
       setBusy("STANDBY_BULK");
 
       const data = await postJSON("/api/admin/staff", {
         action: "STANDBY_BULK",
         roles,
+        adminPassword: bulkStandbyPassword,
       });
 
       setBulkStandbyOpen(false);
+      setBulkStandbyPassword("");
       showToast("success", data.message || "Đã chuyển Standby hàng loạt.");
       setBusy("");
       if (staffPage === 1) {
@@ -1200,9 +1209,29 @@ function TcdmAdminConsole({
     }
   }
 
+  function closeBulkStandbyDialog() {
+    if (busy === "STANDBY_BULK") return;
+    setBulkStandbyOpen(false);
+    setBulkStandbyPassword("");
+  }
+
   function openStandbyImportDialog() {
     setStandbyImportPreview(EMPTY_STANDBY_IMPORT_PREVIEW);
     setStandbyImportOpen(true);
+  }
+
+  function downloadStandbyImportTemplate() {
+    const csv = "\uFEFF" + ["Mã nhân viên", "100123", "100456", "100789"].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "mau-standby-nhan-vien.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 800);
+    showToast("success", "Đã tải file mẫu Standby CSV.");
   }
 
   async function handleStandbyImportFile(event: any) {
@@ -1662,6 +1691,7 @@ function TcdmAdminConsole({
                   type="button"
                   onClick={() => {
                     setBulkStandbyRoles({ user: true, mod: false });
+                    setBulkStandbyPassword("");
                     setBulkStandbyOpen(true);
                   }}
                   disabled={staffLoading || busy === "STANDBY_BULK"}
@@ -2768,15 +2798,27 @@ function TcdmAdminConsole({
               </label>
             </section>
 
+            <label className="adminx-bulk-standby-password">
+              <span>Mật khẩu Admin</span>
+              <PasswordInput
+                value={bulkStandbyPassword}
+                onChange={(e) => setBulkStandbyPassword(e.target.value)}
+                placeholder="Nhập mật khẩu của tài khoản đang đăng nhập"
+                autoComplete="current-password"
+                disabled={busy === "STANDBY_BULK"}
+              />
+              <small>Hệ thống sẽ xác thực lại mật khẩu của Admin hiện tại trước khi áp dụng.</small>
+            </label>
+
             <div className="adminx-confirm-actions">
-              <button type="button" className="ghost" onClick={() => setBulkStandbyOpen(false)} disabled={busy === "STANDBY_BULK"}>
+              <button type="button" className="ghost" onClick={closeBulkStandbyDialog} disabled={busy === "STANDBY_BULK"}>
                 Hủy
               </button>
               <button
                 type="button"
                 className="danger"
                 onClick={runBulkStandby}
-                disabled={busy === "STANDBY_BULK" || (!bulkStandbyRoles.user && !bulkStandbyRoles.mod)}
+                disabled={busy === "STANDBY_BULK" || (!bulkStandbyRoles.user && !bulkStandbyRoles.mod) || !bulkStandbyPassword.trim()}
               >
                 {busy === "STANDBY_BULK" ? "Đang áp dụng..." : "Áp dụng"}
               </button>
@@ -2794,11 +2836,14 @@ function TcdmAdminConsole({
               Upload CSV/TSV có cột <b>Mã nhân viên</b>, <b>MANV</b> hoặc <b>NV</b>. Nếu file chỉ có một cột, hệ thống sẽ tự lấy cột đầu tiên làm mã nhân viên.
             </p>
 
-            <label className="adminx-standby-import-drop">
+            <section className="adminx-standby-import-drop">
               <span>File CSV</span>
               <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={handleStandbyImportFile} />
+              <button type="button" className="adminx-standby-template-button" onClick={downloadStandbyImportTemplate}>
+                Tải file mẫu CSV
+              </button>
               <small>Tài khoản quyền Admin trong file sẽ được bỏ qua để tránh khóa nhầm.</small>
-            </label>
+            </section>
 
             <section className="adminx-standby-import-stats" aria-label="Xem trước import Standby">
               <div>
@@ -4313,6 +4358,46 @@ const ADMINX_STYLE = `
   font-weight: 800;
 }
 
+.adminx-bulk-standby-password {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #fde68a;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fffdf0, #ffffff);
+}
+
+.adminx-bulk-standby-password > span {
+  color: #475569;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-bulk-standby-password .vtdd-password-wrap {
+  width: 100%;
+}
+
+.adminx-bulk-standby-password .vtdd-password-wrap input {
+  min-height: 48px;
+  border-radius: 16px;
+  border: 1px solid #dbe4ef;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.adminx-bulk-standby-password small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 850;
+}
+
 .adminx-standby-import-drop {
   margin-top: 16px;
   display: grid;
@@ -4341,6 +4426,23 @@ const ADMINX_STYLE = `
   color: #0f172a;
   font-size: 13px;
   font-weight: 850;
+}
+
+.adminx-standby-template-button {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #fde68a;
+  border-radius: 14px;
+  background: #fff7cc;
+  color: #020617;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.adminx-standby-template-button:hover {
+  background: #ffd400;
 }
 
 .adminx-standby-import-drop small {
@@ -4502,6 +4604,16 @@ const ADMINX_STYLE = `
   letter-spacing: .04em;
   text-transform: uppercase;
   cursor: pointer;
+}
+
+.adminx-confirm-card .adminx-standby-template-button {
+  min-height: 42px;
+  border: 1px solid #fde68a;
+  border-radius: 14px;
+  background: #fff7cc;
+  color: #020617;
+  letter-spacing: .02em;
+  text-transform: none;
 }
 
 .adminx-confirm-card button.ghost {

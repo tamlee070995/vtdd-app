@@ -13,7 +13,7 @@ import {
   updateStaffCheckinToolAccess,
   updateStaffStatus,
 } from "@/lib/staff-store";
-import { decryptText, hashPassword, normalizeCode } from "@/lib/staff-security";
+import { decryptText, hashPassword, normalizeCode, verifyPassword } from "@/lib/staff-security";
 import { getPublicMailError, sendStaffActivatedMail, sendStaffDeletedMail } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
@@ -198,6 +198,34 @@ export async function POST(req: NextRequest) {
 
       if (!canRunAction(admin, "staff-manage")) {
         return NextResponse.json({ success: false, message: "Không có quyền quản lý trạng thái nhân viên." }, { status: 403 });
+      }
+
+      const adminPassword = String(body.adminPassword || "").trim();
+      if (!adminPassword) {
+        return NextResponse.json(
+          { success: false, message: "Vui lòng nhập mật khẩu Admin để xác nhận thao tác Standby hàng loạt." },
+          { status: 400 }
+        );
+      }
+
+      const adminCode = normalizeCode(admin?.maNV || "");
+      const currentAdmin = adminCode ? await findStaffByMaNV(adminCode) : null;
+      if (
+        !currentAdmin ||
+        normalizePermission(currentAdmin.permission) !== "admin" ||
+        String(currentAdmin.status || "").trim().toLowerCase() !== "active"
+      ) {
+        return NextResponse.json(
+          { success: false, message: "Tài khoản Admin hiện tại không còn hợp lệ. Vui lòng đăng nhập lại." },
+          { status: 403 }
+        );
+      }
+
+      if (!verifyPassword(adminPassword, currentAdmin.password)) {
+        return NextResponse.json(
+          { success: false, message: "Mật khẩu Admin không đúng. Vui lòng kiểm tra lại." },
+          { status: 401 }
+        );
       }
 
       const roles = Array.isArray(body.roles)
