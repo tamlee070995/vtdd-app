@@ -1,4 +1,5 @@
 import Link from "next/link";
+import GuideCopyButton from "./GuideCopyButton";
 import styles from "./page.module.css";
 
 export const metadata = {
@@ -9,103 +10,177 @@ export const metadata = {
   },
 };
 
-type GuideItem = {
+type GuideSection = {
   id: string;
-  no: string;
+  group: string;
   title: string;
-  badge: string;
-  when: string[];
-  flow: string[];
-  issues: string[];
+  subtitle: string;
+  intro: string;
+  blocks: Array<{
+    title: string;
+    tone?: "success" | "info" | "warning";
+    items: string[];
+  }>;
 };
 
-const GUIDES: GuideItem[] = [
+const GUIDES: GuideSection[] = [
   {
     id: "tra-gia-nhan-vien",
-    no: "01",
+    group: "TRA GIÁ TCDM",
     title: "Tra giá TCDM nhân viên",
-    badge: "Bảng giá",
-    when: [
-      "Dùng khi cần tra giá thu cũ đổi mới cho khách tại siêu thị.",
-      "Dùng cho cả luồng Thu cũ đổi mới và Chỉ thu cũ nếu tab đang được mở.",
-    ],
-    flow: [
-      "Chọn đúng luồng, chọn máy mới trước rồi chọn máy cũ.",
-      "Chọn đúng bộ nhớ, loại máy và kiểm tra tổng tiền trước khi báo khách.",
-      "Nếu có cảnh báo hệ thống, đọc xong mới thao tác để tránh báo sai chính sách.",
-    ],
-    issues: [
-      "Không thấy máy mới: kiểm tra ngành hàng/hãng hoặc báo Admin kiểm tra Data_Moi.",
-      "Không thấy máy cũ: thử tìm gần đúng theo tên, mã máy hoặc bộ nhớ.",
-      "Giá bất thường: chụp màn hình và báo Admin kiểm tra dữ liệu.",
+    subtitle: "Dùng để tra bảng giá thu cũ đổi mới, chọn luồng và báo giá cho khách tại siêu thị.",
+    intro: "Mục này dùng khi nhân viên cần tra nhanh giá tham khảo trước khi kiểm tra máy thực tế. Luôn chọn đúng luồng và đọc thông báo hệ thống trước khi báo khách.",
+    blocks: [
+      {
+        title: "Dùng khi nào",
+        tone: "success",
+        items: [
+          "Khách cần đổi máy cũ lên máy mới hoặc chỉ bán máy cũ.",
+          "Nhân viên cần xem nhanh giá theo model, bộ nhớ và tình trạng máy.",
+        ],
+      },
+      {
+        title: "Quy trình đúng",
+        items: [
+          "Chọn đúng luồng Thu cũ đổi mới hoặc Chỉ thu cũ.",
+          "Chọn máy mới trước, sau đó chọn máy cũ, bộ nhớ và loại máy.",
+          "Kiểm tra tổng tiền dự kiến và ghi chú cảnh báo trước khi báo khách.",
+        ],
+      },
+      {
+        title: "Lỗi thường gặp",
+        tone: "warning",
+        items: [
+          "Không thấy máy mới: kiểm tra lại hãng/ngành hàng hoặc báo Admin kiểm tra Data_Moi.",
+          "Không thấy máy cũ: thử tìm gần đúng theo tên máy, mã máy hoặc bộ nhớ.",
+          "Giá bất thường: chụp màn hình và báo Admin kiểm tra dữ liệu.",
+        ],
+      },
     ],
   },
   {
     id: "chien-gia",
-    no: "02",
+    group: "CÔNG CỤ PMH",
     title: "Tổng giá TCDM thấp hơn đối thủ",
-    badge: "PMH",
-    when: [
-      "Dùng khi tổng giá TCDM thấp hơn giá đối thủ và cần gửi hồ sơ xin PMH.",
-      "Áp dụng cho hồ sơ có đủ ảnh xác thực giá, thông tin máy và file ghi âm/dò giá nếu có.",
-    ],
-    flow: [
-      "Nhập mã siêu thị và mã nhân viên đúng với nhau.",
-      "Chọn ngành hàng, máy cũ, máy mới đúng danh sách hệ thống.",
-      "Upload đủ ảnh theo mẫu, kiểm tra lại ảnh rõ nội dung rồi bấm gửi duyệt.",
-    ],
-    issues: [
-      "IMEI/SN sai cú pháp: nhập lại đúng số ký tự theo hướng dẫn trên form.",
-      "Thiếu ảnh: nút gửi duyệt sẽ chưa hiện, cần bổ sung đủ file bắt buộc.",
-      "Bị yêu cầu chụp lại: chỉ chụp lại đúng ảnh Admin yêu cầu.",
+    subtitle: "Gửi hồ sơ chiến giá khi tổng giá TCDM thấp hơn đối thủ và cần ngành hàng duyệt PMH.",
+    intro: "Hồ sơ cần đủ thông tin máy, ảnh xác thực và file ghi âm/dò giá nếu có. Gửi thiếu thông tin sẽ dễ bị yêu cầu chụp lại hoặc từ chối.",
+    blocks: [
+      {
+        title: "Điều kiện gửi",
+        tone: "success",
+        items: [
+          "Mã siêu thị và mã nhân viên phải khớp với nhau.",
+          "Có đủ thông tin máy cũ, máy mới và bằng chứng giá đối thủ.",
+        ],
+      },
+      {
+        title: "Quy trình đúng",
+        items: [
+          "Nhập mã ST, mã NV, IMEI hoặc Serial Number đúng cú pháp.",
+          "Chọn ngành hàng, máy cũ và máy mới theo danh sách hệ thống.",
+          "Upload đủ ảnh theo mẫu và kiểm tra ảnh rõ nội dung trước khi gửi duyệt.",
+        ],
+      },
+      {
+        title: "Khi hồ sơ phản hồi",
+        tone: "warning",
+        items: [
+          "Nếu được duyệt: bấm xem PMH để ghi nhận hoàn tất.",
+          "Nếu yêu cầu chụp lại: chỉ cập nhật đúng ảnh Admin yêu cầu.",
+          "Nếu bị từ chối: đọc lý do, tạo yêu cầu mới khi cần.",
+        ],
+      },
     ],
   },
   {
     id: "may-ngoai-danh-sach",
-    no: "03",
+    group: "CÔNG CỤ PMH",
     title: "Máy ngoài danh sách",
-    badge: "PMH",
-    when: [
-      "Dùng khi sản phẩm khách mang đến chưa có trong danh sách máy thu.",
-      "Dùng để ngành hàng thẩm định và cấp PMH phù hợp nếu hồ sơ hợp lệ.",
-    ],
-    flow: [
-      "Nhập đúng mã siêu thị, mã nhân viên, IMEI hoặc Serial Number.",
-      "Ghi model máy cũ rõ ràng, chọn RAM/ROM và chọn máy mới theo danh sách.",
-      "Chụp đủ 6 ảnh theo mẫu, ảnh phải rõ góc máy và thông tin thiết bị.",
-    ],
-    issues: [
-      "Mã nhân viên không khớp mã siêu thị: kiểm tra lại trước khi gửi.",
-      "Ảnh mờ hoặc sai góc: hồ sơ dễ bị yêu cầu chụp lại.",
-      "Đã có hồ sơ cũ chưa xem PMH: bấm xem PMH trước hoặc chọn tạo yêu cầu mới.",
+    subtitle: "Gửi yêu cầu hỗ trợ khi sản phẩm khách mang đến chưa có trong danh sách máy thu.",
+    intro: "Mục này dùng để ngành hàng thẩm định model ngoài danh sách và cấp PMH phù hợp nếu hồ sơ hợp lệ.",
+    blocks: [
+      {
+        title: "Dùng khi nào",
+        tone: "success",
+        items: [
+          "Máy khách mang đến chưa tìm thấy trong danh sách máy cũ.",
+          "Cần ngành hàng xác minh model, tình trạng và cấp mã hỗ trợ.",
+        ],
+      },
+      {
+        title: "Quy trình đúng",
+        items: [
+          "Nhập đúng mã ST, mã NV, IMEI hoặc Serial Number.",
+          "Ghi model máy cũ rõ ràng, chọn RAM/ROM và máy mới theo danh sách.",
+          "Chụp đủ 6 ảnh theo mẫu, ảnh phải rõ góc máy và thông tin thiết bị.",
+        ],
+      },
+      {
+        title: "Lưu ý",
+        tone: "warning",
+        items: [
+          "Mã nhân viên không khớp mã siêu thị sẽ không gửi được hồ sơ.",
+          "Ảnh mờ hoặc sai góc sẽ dễ bị yêu cầu chụp lại.",
+          "Nếu đã có PMH cũ chưa xem, hãy xem hoặc đóng yêu cầu cũ trước khi tạo mới.",
+        ],
+      },
     ],
   },
   {
     id: "in-sticker",
-    no: "04",
+    group: "IN ẤN",
     title: "In sticker trợ giá",
-    badge: "Print",
-    when: [
-      "Dùng khi cần in tem/sticker trợ giá cho khu vực trưng bày hoặc chương trình.",
-      "Có thể chỉnh chữ trực tiếp trước khi in.",
+    subtitle: "Tạo tem trợ giá thu cũ đổi mới và in tối đa 6 tem trên một trang A4.",
+    intro: "Dùng khi cần in nhanh sticker hỗ trợ trưng bày hoặc chương trình tại siêu thị. Có thể sửa chữ trực tiếp trước khi in.",
+    blocks: [
+      {
+        title: "Dùng khi nào",
+        tone: "success",
+        items: [
+          "Cần in tem trợ giá cho khu trưng bày.",
+          "Cần chỉnh nội dung, số tiền hoặc thông điệp theo chương trình hiện hành.",
+        ],
+      },
+      {
+        title: "Quy trình đúng",
+        items: [
+          "Chọn đúng mẫu sticker cần dùng.",
+          "Sửa nội dung ngắn gọn, dễ đọc trên tem.",
+          "Kiểm tra lề in trước khi in hàng loạt.",
+        ],
+      },
+      {
+        title: "Lỗi thường gặp",
+        tone: "warning",
+        items: [
+          "Sticker bị lệch: chọn lề in Minimum hoặc không lề tùy máy in.",
+          "Chữ quá dài: rút gọn nội dung trước khi in.",
+          "Màu không rõ: kiểm tra chế độ in màu hoặc chất lượng bản in.",
+        ],
+      },
     ],
-    flow: [
-      "Chọn đúng mẫu sticker cần dùng.",
-      "Sửa nội dung, số tiền hoặc thông điệp theo chương trình hiện hành.",
-      "In A4, tối đa 6 sticker/trang, kiểm tra lề in trước khi in hàng loạt.",
-    ],
-    issues: [
-      "Sticker bị lệch: chọn lề in Minimum hoặc không lề tùy máy in.",
-      "Chữ quá dài: rút gọn nội dung trước khi in.",
-      "Màu không rõ: kiểm tra chế độ in màu hoặc tăng chất lượng bản in.",
-    ],
+  },
+];
+
+const NAV_GROUPS = [
+  {
+    title: "TRA GIÁ TCDM",
+    items: GUIDES.filter((guide) => guide.group === "TRA GIÁ TCDM"),
+  },
+  {
+    title: "CÔNG CỤ PMH",
+    items: GUIDES.filter((guide) => guide.group === "CÔNG CỤ PMH"),
+  },
+  {
+    title: "IN ẤN",
+    items: GUIDES.filter((guide) => guide.group === "IN ẤN"),
   },
 ];
 
 export default function InternalGuidePage() {
   return (
     <main className={styles.page}>
-      <header className={styles.topbar}>
+      <aside className={styles.sidebar}>
         <Link className={styles.brand} href="/cong-cu-ho-tro">
           <span className={styles.logo}>
             <img src="/mwg-logo.svg" alt="MWG" />
@@ -115,61 +190,65 @@ export default function InternalGuidePage() {
             <small>Hướng dẫn nội bộ</small>
           </span>
         </Link>
-        <Link className={styles.homeButton} href="/cong-cu-ho-tro">
-          Danh mục
-        </Link>
-      </header>
 
-      <section className={styles.hero}>
-        <span>Internal Guide</span>
-        <h1>Hướng dẫn nhanh cho từng công cụ</h1>
-        <p>
-          Mỗi mục chỉ giữ những việc cần nhớ nhất: dùng khi nào, quy trình đúng và lỗi thường gặp.
-          Nhân viên có thể mở nhanh khi thao tác để giảm hỏi lại và tránh gửi sai hồ sơ.
-        </p>
-      </section>
+        <p className={styles.sidebarIntro}>Hướng dẫn sử dụng công cụ</p>
+        <nav className={styles.nav} aria-label="Danh mục hướng dẫn">
+          {NAV_GROUPS.map((group) => (
+            <section key={group.title} className={styles.navGroup}>
+              <h2>{group.title}</h2>
+              {group.items.map((item) => (
+                <a key={item.id} href={`#${item.id}`}>
+                  {item.title}
+                  <span aria-hidden="true">›</span>
+                </a>
+              ))}
+            </section>
+          ))}
+        </nav>
+      </aside>
 
-      <nav className={styles.quickNav} aria-label="Danh sách hướng dẫn">
-        {GUIDES.map((guide) => (
-          <a key={guide.id} href={`#${guide.id}`}>
-            <span>{guide.no}</span>
-            {guide.title}
-          </a>
-        ))}
-      </nav>
+      <section className={styles.content}>
+        <header className={styles.header}>
+          <div>
+            <p>TÀI LIỆU NỘI BỘ</p>
+            <h1>Hướng dẫn sử dụng công cụ</h1>
+            <span>Dành cho nhân viên thao tác tra giá, gửi hồ sơ PMH và in sticker trợ giá.</span>
+          </div>
+          <GuideCopyButton />
+        </header>
 
-      <section className={styles.guideList}>
-        {GUIDES.map((guide) => (
-          <article className={styles.guideCard} id={guide.id} key={guide.id}>
-            <div className={styles.guideHead}>
-              <span className={styles.number}>{guide.no}</span>
-              <div>
-                <p>{guide.badge}</p>
-                <h2>{guide.title}</h2>
+        <div className={styles.mobileNav} aria-label="Danh mục nhanh">
+          {GUIDES.map((guide) => (
+            <a key={guide.id} href={`#${guide.id}`}>
+              {guide.title}
+            </a>
+          ))}
+        </div>
+
+        <div className={styles.articleList}>
+          {GUIDES.map((guide) => (
+            <article id={guide.id} className={styles.article} key={guide.id}>
+              <p className={styles.eyebrow}>{guide.group}</p>
+              <h2>{guide.title}</h2>
+              <p className={styles.subtitle}>{guide.subtitle}</p>
+              <p className={styles.intro}>{guide.intro}</p>
+
+              <div className={styles.blockList}>
+                {guide.blocks.map((block) => (
+                  <section className={`${styles.block} ${block.tone ? styles[block.tone] : ""}`} key={block.title}>
+                    <h3>{block.title}</h3>
+                    <ul>
+                      {block.items.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
               </div>
-            </div>
-
-            <div className={styles.guideGrid}>
-              <GuideColumn title="Dùng khi nào" items={guide.when} />
-              <GuideColumn title="Quy trình đúng" items={guide.flow} />
-              <GuideColumn title="Lỗi thường gặp" items={guide.issues} />
-            </div>
-          </article>
-        ))}
+            </article>
+          ))}
+        </div>
       </section>
     </main>
-  );
-}
-
-function GuideColumn({ title, items }: { title: string; items: string[] }) {
-  return (
-    <section className={styles.guideColumn}>
-      <h3>{title}</h3>
-      <ul>
-        {items.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
-    </section>
   );
 }
