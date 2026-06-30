@@ -323,7 +323,7 @@ export default function AccountCheckPage() {
       }
 
       updateForm("emailOtp", "");
-      setEmailOtpMessage(data.message || "Đã gửi OTP Gmail. Vui lòng kiểm tra hộp thư.");
+      setEmailOtpMessage(data.message || "Đã gửi OTP Gmail. Vui lòng kiểm tra Hộp thư đến, Thư rác hoặc Thùng rác.");
     } catch (err: any) {
       setError(getErrorMessage(err));
     } finally {
@@ -634,7 +634,7 @@ export default function AccountCheckPage() {
               <div className="account-check-otp-box">
                 <div>
                   <span>OTP Gmail</span>
-                  <p>Nhập captcha rồi bấm gửi OTP. Mã có hiệu lực trong 10 phút.</p>
+                  <p>Nhập captcha rồi bấm gửi OTP. Mã có hiệu lực trong 10 phút; nếu chưa thấy mail, kiểm tra Hộp thư đến, Thư rác hoặc Thùng rác.</p>
                 </div>
                 <button type="button" onClick={sendEmailOtp} disabled={submitting || sendingEmailOtp}>
                   {sendingEmailOtp ? "Đang gửi..." : "Gửi OTP Gmail"}

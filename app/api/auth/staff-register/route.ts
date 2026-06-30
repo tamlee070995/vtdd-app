@@ -288,7 +288,7 @@ export async function POST(req: NextRequest) {
       encryptedQuestion: encryptText(question),
       answerHash: hashPassword(answer),
       encryptedGmail: encryptText(gmail),
-      needSetup: "1",
+      needSetup: "0",
     });
 
     const ipStats = recordRegisterIpSuccess(clientIp, maNV);

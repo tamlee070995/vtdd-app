@@ -440,7 +440,7 @@ export async function createStandbyAccount(data: {
   encryptedGmail: string;
   needSetup?: "0" | "1";
 }) {
-  const needSetup = data.needSetup === "0" ? "0" : "1";
+  const needSetup = data.needSetup === "1" ? "1" : "0";
 
   if (isSupabaseConfigured()) {
     try {

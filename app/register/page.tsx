@@ -275,7 +275,7 @@ export default function RegisterPage() {
       }
 
       setEmailOtp("");
-      setEmailOtpMessage(data.message || "Đã gửi OTP Gmail. Vui lòng kiểm tra hộp thư.");
+      setEmailOtpMessage(data.message || "Đã gửi OTP Gmail. Vui lòng kiểm tra Hộp thư đến, Thư rác hoặc Thùng rác.");
     } catch (err: any) {
       setError(err?.message || "Không gửi được OTP Gmail. Vui lòng thử lại.");
     } finally {
@@ -511,7 +511,7 @@ export default function RegisterPage() {
           <div className="register-vtd-otp-box">
             <div>
               <span>OTP Gmail</span>
-              <p>Nhập captcha rồi bấm gửi OTP. Mã có hiệu lực trong 10 phút.</p>
+              <p>Nhập captcha rồi bấm gửi OTP. Mã có hiệu lực trong 10 phút; nếu chưa thấy mail, kiểm tra Hộp thư đến, Thư rác hoặc Thùng rác.</p>
             </div>
             <button type="button" onClick={sendEmailOtp} disabled={submitting || sendingEmailOtp}>
               {sendingEmailOtp ? "Đang gửi..." : "Gửi OTP Gmail"}
