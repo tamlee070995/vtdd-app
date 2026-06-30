@@ -8,6 +8,7 @@ import {
   ensureStaffAdminHeaders,
   findStaffByMaNV,
   getAdminStaffPage,
+  standbyStaffByCodes,
   updateStaffAdminAccess,
   updateStaffCheckinToolAccess,
   updateStaffStatus,
@@ -97,6 +98,12 @@ function getStaffNotificationEmail(staff: any) {
 function getLoginUrl(req: NextRequest) {
   const baseUrl = String(process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin).replace(/\/+$/, "");
   return `${baseUrl}/login`;
+}
+
+function normalizeImportStaffCode(value: any) {
+  return normalizeCode(value)
+    .replace(/^(NV|MA_NV|MA-NV)/i, "")
+    .replace(/\D/g, "");
 }
 
 export async function GET(req: NextRequest) {
@@ -212,6 +219,51 @@ export async function POST(req: NextRequest) {
         success: true,
         updated: result.updated,
         message: `Đã chuyển Standby ${result.updated} tài khoản thuộc cấp bậc: ${labels}.`,
+      });
+    }
+
+    if (action === "STANDBY_IMPORT") {
+      if (!(await isFullAdmin(admin))) {
+        return NextResponse.json(
+          { success: false, message: "Chỉ Admin mới được import file Standby nhân viên." },
+          { status: 403 }
+        );
+      }
+
+      if (!canRunAction(admin, "staff-manage")) {
+        return NextResponse.json({ success: false, message: "Không có quyền quản lý trạng thái nhân viên." }, { status: 403 });
+      }
+
+      const codes = Array.isArray(body.codes)
+        ? body.codes
+            .map(normalizeImportStaffCode)
+            .filter(Boolean)
+        : [];
+
+      if (codes.length === 0) {
+        return NextResponse.json({ success: false, message: "File import chưa có mã nhân viên hợp lệ." }, { status: 400 });
+      }
+
+      if (codes.length > 5000) {
+        return NextResponse.json(
+          { success: false, message: "Mỗi lần import tối đa 5.000 mã nhân viên." },
+          { status: 400 }
+        );
+      }
+
+      const result = await standbyStaffByCodes(codes);
+      const detailParts = [
+        `Đã chuyển Standby ${result.updated} tài khoản`,
+        result.alreadyStandby.length ? `${result.alreadyStandby.length} tài khoản đã Standby sẵn` : "",
+        result.skippedAdmin.length ? `${result.skippedAdmin.length} tài khoản Admin được bỏ qua` : "",
+        result.missing.length ? `${result.missing.length} mã không tồn tại` : "",
+        result.duplicates.length ? `${result.duplicates.length} dòng trùng trong file` : "",
+      ].filter(Boolean);
+
+      return NextResponse.json({
+        success: true,
+        result,
+        message: `${detailParts.join(", ")}.`,
       });
     }
 

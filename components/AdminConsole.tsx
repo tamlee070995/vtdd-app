@@ -56,6 +56,14 @@ type DashboardLogRow = {
 type DashboardSource = "staff" | "customer";
 type DashboardDeleteMode = "oldest-3" | "oldest-5" | "oldest-7" | "oldest-30" | "all";
 
+type StandbyImportPreview = {
+  fileName: string;
+  rawRows: number;
+  codes: string[];
+  duplicates: string[];
+  errors: string[];
+};
+
 type AdminDashboard = {
   topOldProducts: Array<{ product: string; count: number }>;
   topStaff: Array<{ maNV: string; staffName: string; count: number; totalValue: number }>;
@@ -193,6 +201,14 @@ const EMPTY_SUMMARY: StaffSummary = {
 const DEFAULT_DELETE_STAFF_MAIL_TITLE = "Thông báo tài khoản đã bị xóa";
 const DEFAULT_DELETE_STAFF_MAIL_MESSAGE =
   "Tài khoản của bạn đã được Admin xóa khỏi hệ thống. Nếu cần hỗ trợ, vui lòng liên hệ quản trị viên.";
+
+const EMPTY_STANDBY_IMPORT_PREVIEW: StandbyImportPreview = {
+  fileName: "",
+  rawRows: 0,
+  codes: [],
+  duplicates: [],
+  errors: [],
+};
 
 const TAB_ITEMS: Array<{
   key: TabKey;
@@ -355,6 +371,141 @@ function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("vi-VN");
 }
 
+function normalizeImportHeader(value: any) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeImportStaffCode(value: any) {
+  return String(value || "")
+    .normalize("NFKC")
+    .replace(/[\u00A0\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .replace(/\.0$/, "")
+    .replace(/^nv/i, "")
+    .replace(/\D/g, "");
+}
+
+function detectImportDelimiter(line: string) {
+  const candidates = [",", "\t", ";"];
+  return candidates
+    .map((delimiter) => ({
+      delimiter,
+      count: line.split(delimiter).length - 1,
+    }))
+    .sort((a, b) => b.count - a.count)[0]?.delimiter || ",";
+}
+
+function parseDelimitedImport(text: string) {
+  const cleanText = String(text || "").replace(/^\uFEFF/, "");
+  const firstLine = cleanText.split(/\r?\n/).find((line) => line.trim()) || "";
+  const delimiter = detectImportDelimiter(firstLine);
+  const rows: string[][] = [];
+  let current = "";
+  let row: string[] = [];
+  let inQuotes = false;
+
+  for (let index = 0; index < cleanText.length; index += 1) {
+    const char = cleanText[index];
+    const next = cleanText[index + 1];
+
+    if (char === "\"") {
+      if (inQuotes && next === "\"") {
+        current += "\"";
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (!inQuotes && char === delimiter) {
+      row.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    if (!inQuotes && (char === "\n" || char === "\r")) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(current.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  row.push(current.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+}
+
+function buildStandbyImportPreview(text: string, fileName: string): StandbyImportPreview {
+  const rows = parseDelimitedImport(text);
+  const errors: string[] = [];
+
+  if (rows.length === 0) {
+    return { fileName, rawRows: 0, codes: [], duplicates: [], errors: ["File CSV không có dữ liệu."] };
+  }
+
+  const headerAliases = new Set([
+    "manhanvien",
+    "manv",
+    "ma_nv",
+    "nv",
+    "staffcode",
+    "employeeid",
+    "employee",
+  ]);
+  const headerRow = rows[0] || [];
+  const headerIndex = headerRow.findIndex((cell) => headerAliases.has(normalizeImportHeader(cell)));
+  const hasHeader = headerIndex >= 0;
+  const codeIndex = hasHeader ? headerIndex : 0;
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const seen = new Set<string>();
+  const duplicates: string[] = [];
+  const codes: string[] = [];
+
+  dataRows.forEach((item, index) => {
+    const rowNumber = index + (hasHeader ? 2 : 1);
+    const code = normalizeImportStaffCode(item[codeIndex]);
+
+    if (!code) {
+      if (item.some((cell) => String(cell || "").trim())) {
+        errors.push(`Dòng ${rowNumber}: thiếu mã nhân viên.`);
+      }
+      return;
+    }
+
+    if (seen.has(code)) {
+      duplicates.push(code);
+      return;
+    }
+
+    seen.add(code);
+    codes.push(code);
+  });
+
+  if (codes.length > 5000) {
+    errors.push("Mỗi lần import tối đa 5.000 mã nhân viên.");
+  }
+
+  return {
+    fileName,
+    rawRows: dataRows.length,
+    codes,
+    duplicates,
+    errors,
+  };
+}
+
 function maskIpAddress(value: string, fullAccess: boolean) {
   const ip = String(value || "").trim();
   if (!ip || fullAccess) return ip || "—";
@@ -486,6 +637,8 @@ function TcdmAdminConsole({
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [bulkStandbyOpen, setBulkStandbyOpen] = useState(false);
   const [bulkStandbyRoles, setBulkStandbyRoles] = useState({ user: true, mod: false });
+  const [standbyImportOpen, setStandbyImportOpen] = useState(false);
+  const [standbyImportPreview, setStandbyImportPreview] = useState<StandbyImportPreview>(EMPTY_STANDBY_IMPORT_PREVIEW);
   const [deleteStaffDialog, setDeleteStaffDialog] = useState<DeleteStaffDialogState>(null);
   const [deleteStaffMailEnabled, setDeleteStaffMailEnabled] = useState(true);
   const [deleteStaffMailTitle, setDeleteStaffMailTitle] = useState(DEFAULT_DELETE_STAFF_MAIL_TITLE);
@@ -1047,6 +1200,69 @@ function TcdmAdminConsole({
     }
   }
 
+  function openStandbyImportDialog() {
+    setStandbyImportPreview(EMPTY_STANDBY_IMPORT_PREVIEW);
+    setStandbyImportOpen(true);
+  }
+
+  async function handleStandbyImportFile(event: any) {
+    const file = event?.target?.files?.[0];
+    if (!file) {
+      setStandbyImportPreview(EMPTY_STANDBY_IMPORT_PREVIEW);
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      setStandbyImportPreview(buildStandbyImportPreview(text, file.name));
+    } catch {
+      setStandbyImportPreview({
+        ...EMPTY_STANDBY_IMPORT_PREVIEW,
+        fileName: file.name || "",
+        errors: ["Không đọc được file CSV. Vui lòng kiểm tra lại định dạng file."],
+      });
+    }
+  }
+
+  async function runStandbyImport() {
+    if (!isFullAdmin) {
+      showToast("error", "Chỉ Admin mới được import file Standby nhân viên.");
+      return;
+    }
+
+    if (standbyImportPreview.codes.length === 0) {
+      showToast("error", "File import chưa có mã nhân viên hợp lệ.");
+      return;
+    }
+
+    if (standbyImportPreview.errors.some((item) => item.includes("5.000"))) {
+      showToast("error", "Mỗi lần import tối đa 5.000 mã nhân viên.");
+      return;
+    }
+
+    try {
+      setBusy("STANDBY_IMPORT");
+
+      const data = await postJSON("/api/admin/staff", {
+        action: "STANDBY_IMPORT",
+        codes: standbyImportPreview.codes,
+      });
+
+      setStandbyImportOpen(false);
+      setStandbyImportPreview(EMPTY_STANDBY_IMPORT_PREVIEW);
+      showToast("success", data.message || "Đã import Standby nhân viên.");
+      setBusy("");
+      if (staffPage === 1) {
+        await loadStaff(1, { silent: true });
+      } else {
+        setStaffPage(1);
+      }
+    } catch (err: any) {
+      setBusy("");
+      showToast("error", getErrorMessage(err));
+    }
+  }
+
   async function runStaffAdminAccess(maNV: string, permission: string, modules: string) {
     try {
       setBusy(`UPDATE_PERMISSION-${maNV}`);
@@ -1451,6 +1667,16 @@ function TcdmAdminConsole({
                   disabled={staffLoading || busy === "STANDBY_BULK"}
                 >
                   {busy === "STANDBY_BULK" ? "Đang xử lý..." : "Standby"}
+                </button>
+              )}
+              {isFullAdmin && (
+                <button
+                  className="adminx-action-btn import"
+                  type="button"
+                  onClick={openStandbyImportDialog}
+                  disabled={staffLoading || busy === "STANDBY_IMPORT"}
+                >
+                  {busy === "STANDBY_IMPORT" ? "Đang import..." : "Import Standby CSV"}
                 </button>
               )}
               <button className="adminx-action-btn" type="button" onClick={() => loadStaff(staffPage)} disabled={staffLoading}>
@@ -2559,6 +2785,79 @@ function TcdmAdminConsole({
         </div>
       )}
 
+      {standbyImportOpen && (
+        <div className="adminx-confirm-layer" role="dialog" aria-modal="true" aria-labelledby="standbyImportTitle">
+          <div className="adminx-confirm-card adminx-standby-import-card">
+            <span>Import Standby CSV</span>
+            <h3 id="standbyImportTitle">Chuyển Standby theo file</h3>
+            <p>
+              Upload CSV/TSV có cột <b>Mã nhân viên</b>, <b>MANV</b> hoặc <b>NV</b>. Nếu file chỉ có một cột, hệ thống sẽ tự lấy cột đầu tiên làm mã nhân viên.
+            </p>
+
+            <label className="adminx-standby-import-drop">
+              <span>File CSV</span>
+              <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={handleStandbyImportFile} />
+              <small>Tài khoản quyền Admin trong file sẽ được bỏ qua để tránh khóa nhầm.</small>
+            </label>
+
+            <section className="adminx-standby-import-stats" aria-label="Xem trước import Standby">
+              <div>
+                <span>File</span>
+                <b>{standbyImportPreview.fileName || "Chưa chọn"}</b>
+              </div>
+              <div>
+                <span>Dòng đọc được</span>
+                <b>{formatNumber(standbyImportPreview.rawRows)}</b>
+              </div>
+              <div>
+                <span>Mã hợp lệ</span>
+                <b>{formatNumber(standbyImportPreview.codes.length)}</b>
+              </div>
+              <div>
+                <span>Trùng trong file</span>
+                <b>{formatNumber(standbyImportPreview.duplicates.length)}</b>
+              </div>
+            </section>
+
+            {(standbyImportPreview.errors.length > 0 || standbyImportPreview.duplicates.length > 0) && (
+              <section className="adminx-standby-import-warnings">
+                {standbyImportPreview.errors.slice(0, 6).map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+                {standbyImportPreview.duplicates.length > 0 && (
+                  <p>
+                    Bỏ qua mã trùng: {standbyImportPreview.duplicates.slice(0, 8).join(", ")}
+                    {standbyImportPreview.duplicates.length > 8 ? "..." : ""}
+                  </p>
+                )}
+              </section>
+            )}
+
+            <div className="adminx-confirm-actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setStandbyImportOpen(false);
+                  setStandbyImportPreview(EMPTY_STANDBY_IMPORT_PREVIEW);
+                }}
+                disabled={busy === "STANDBY_IMPORT"}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={runStandbyImport}
+                disabled={busy === "STANDBY_IMPORT" || standbyImportPreview.codes.length === 0}
+              >
+                {busy === "STANDBY_IMPORT" ? "Đang import..." : "Áp dụng Standby"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deleteStaffDialog && (
         <div className="adminx-confirm-layer" role="dialog" aria-modal="true" aria-labelledby="deleteStaffTitle">
           <div className="adminx-confirm-card adminx-delete-staff-card">
@@ -2936,6 +3235,12 @@ const ADMINX_STYLE = `
 .adminx-action-btn.standby {
   background: #020617;
   color: #ffd400;
+}
+
+.adminx-action-btn.import {
+  background: #e8f7ff;
+  border: 1px solid #bae6fd;
+  color: #075985;
 }
 
 .adminx-staff-actions button.primary {
@@ -3921,6 +4226,10 @@ const ADMINX_STYLE = `
   width: min(100%, 520px);
 }
 
+.adminx-standby-import-card {
+  width: min(100%, 620px);
+}
+
 .adminx-delete-staff-card {
   width: min(100%, 560px);
 }
@@ -4002,6 +4311,104 @@ const ADMINX_STYLE = `
   font-size: 12px;
   line-height: 1.35;
   font-weight: 800;
+}
+
+.adminx-standby-import-drop {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px dashed #94a3b8;
+  border-radius: 18px;
+  background: #f8fafc;
+}
+
+.adminx-standby-import-drop > span {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-standby-import-drop input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid #dbe4ef;
+  border-radius: 14px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.adminx-standby-import-drop small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.adminx-standby-import-stats {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.adminx-standby-import-stats div {
+  min-height: 72px;
+  display: block;
+  margin-top: 0;
+  padding: 12px;
+  border: 1px solid #dbe4ef;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.adminx-standby-import-stats span {
+  display: block;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.adminx-standby-import-stats b {
+  display: block;
+  margin-top: 8px;
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.15;
+  font-weight: 1000;
+  word-break: break-word;
+}
+
+.adminx-standby-import-warnings {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 16px;
+  background: #fff7ed;
+}
+
+.adminx-standby-import-warnings p {
+  margin: 0;
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 850;
+}
+
+@media (max-width: 640px) {
+  .adminx-standby-import-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .adminx-delete-mail-toggle {

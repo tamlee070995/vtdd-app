@@ -648,6 +648,76 @@ export async function bulkStandbyStaffByPermission(roles: Array<"user" | "mod">)
   return { updated: targets.length };
 }
 
+export async function standbyStaffByCodes(inputCodes: string[]) {
+  const requested = inputCodes
+    .map((code) => cleanCode(code))
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const duplicates: string[] = [];
+  const uniqueCodes: string[] = [];
+
+  requested.forEach((code) => {
+    if (seen.has(code)) {
+      duplicates.push(code);
+      return;
+    }
+
+    seen.add(code);
+    uniqueCodes.push(code);
+  });
+
+  if (uniqueCodes.length === 0) {
+    return {
+      requested: requested.length,
+      unique: 0,
+      updated: 0,
+      alreadyStandby: [] as string[],
+      skippedAdmin: [] as string[],
+      missing: [] as string[],
+      duplicates,
+    };
+  }
+
+  const rows = await getStaffRows();
+  const byCode = new Map(rows.map((row) => [cleanCode(row.maNV), row]));
+  const alreadyStandby: string[] = [];
+  const skippedAdmin: string[] = [];
+  const missing: string[] = [];
+  let updated = 0;
+
+  for (const code of uniqueCodes) {
+    const row = byCode.get(code);
+
+    if (!row) {
+      missing.push(code);
+      continue;
+    }
+
+    if (row.permission === "admin") {
+      skippedAdmin.push(code);
+      continue;
+    }
+
+    if (String(row.status || "").trim().toLowerCase() === "standby") {
+      alreadyStandby.push(code);
+      continue;
+    }
+
+    await updateStaffStatus(row.rowNumber, "Standby", row.maNV);
+    updated += 1;
+  }
+
+  return {
+    requested: requested.length,
+    unique: uniqueCodes.length,
+    updated,
+    alreadyStandby,
+    skippedAdmin,
+    missing,
+    duplicates,
+  };
+}
+
 export async function deleteStaffAccount(rowNumber: number, maNV: string) {
   const staffCode = cleanCode(maNV);
 
