@@ -14,8 +14,10 @@ export default function StaffLoginForm({ initialError = "", next = "" }: StaffLo
   const [loading, setLoading] = useState(false);
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (loading) return;
+    if (loading) {
+      e.preventDefault();
+      return;
+    }
 
     const form = e.currentTarget;
     const formData = new FormData(form);
@@ -23,13 +25,13 @@ export default function StaffLoginForm({ initialError = "", next = "" }: StaffLo
     const password = String(formData.get("password") || "").trim();
 
     if (!maNV || !password) {
+      e.preventDefault();
       setError("Vui lòng nhập mã nhân viên và mật khẩu.");
       return;
     }
 
     setError("");
     setLoading(true);
-    form.submit();
   }
 
   return (
@@ -52,7 +54,8 @@ export default function StaffLoginForm({ initialError = "", next = "" }: StaffLo
         inputMode="text"
         placeholder="NV12345"
         autoComplete="username"
-        disabled={loading}
+        readOnly={loading}
+        aria-disabled={loading}
       />
 
       <label htmlFor="password">Mật khẩu</label>
@@ -61,7 +64,8 @@ export default function StaffLoginForm({ initialError = "", next = "" }: StaffLo
         name="password"
         placeholder="Nhập mật khẩu"
         autoComplete="current-password"
-        disabled={loading}
+        readOnly={loading}
+        aria-disabled={loading}
       />
 
       {error ? (
