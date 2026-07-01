@@ -16,10 +16,17 @@ import { getSystemSettings } from "@/lib/system-store";
 
 export const dynamic = "force-dynamic";
 
-function getSafeNextPath(req: NextRequest, form?: FormData) {
-  const fromForm = form ? String(form.get("next") || "").trim() : "";
+type LoginPayload = {
+  maNV: string;
+  password: string;
+  nextPath: string;
+  wantsJson: boolean;
+};
+
+function getSafeNextPath(req: NextRequest, nextValue?: unknown) {
+  const fromBody = typeof nextValue === "string" ? nextValue.trim() : "";
   const fromQuery = new URL(req.url).searchParams.get("next") || "";
-  const raw = fromForm || fromQuery;
+  const raw = fromBody || fromQuery;
 
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) {
     return "/staff";
@@ -38,7 +45,31 @@ function getSafeNextPath(req: NextRequest, form?: FormData) {
   }
 }
 
-function redirectLogin(req: NextRequest, message: string, nextPath?: string) {
+function redirectLogin(
+  req: NextRequest,
+  message: string,
+  nextPath?: string,
+  wantsJson = false,
+  status = 400
+) {
+  if (wantsJson) {
+    const res = NextResponse.json(
+      {
+        success: false,
+        message,
+      },
+      {
+        status,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+
+    clearStaffSessionCookies(res);
+    return res;
+  }
+
   const url = new URL("/login", req.url);
   url.searchParams.set("error", message);
   if (nextPath && nextPath !== "/staff") {
@@ -56,6 +87,32 @@ function redirectLogin(req: NextRequest, message: string, nextPath?: string) {
   return res;
 }
 
+async function readLoginPayload(req: NextRequest): Promise<LoginPayload> {
+  const contentType = req.headers.get("content-type") || "";
+  const accept = req.headers.get("accept") || "";
+  const acceptsJson = accept.toLowerCase().includes("application/json");
+
+  if (contentType.toLowerCase().includes("application/json")) {
+    const body = await req.json().catch(() => ({} as Record<string, unknown>));
+
+    return {
+      maNV: normalizeCode(body?.maNV),
+      password: normalizeText(body?.password),
+      nextPath: getSafeNextPath(req, body?.next),
+      wantsJson: true,
+    };
+  }
+
+  const form = await req.formData();
+
+  return {
+    maNV: normalizeCode(form.get("maNV")),
+    password: normalizeText(form.get("password")),
+    nextPath: getSafeNextPath(req, form.get("next")),
+    wantsJson: acceptsJson,
+  };
+}
+
 function isCheckinNextPath(nextPath: string) {
   return (
     nextPath === "/cong-cu-ho-tro/check-in" ||
@@ -64,15 +121,19 @@ function isCheckinNextPath(nextPath: string) {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const form = await req.formData();
-    const nextPath = getSafeNextPath(req, form);
+  let nextPath = getSafeNextPath(req);
+  let wantsJson = false;
 
-    const maNV = normalizeCode(form.get("maNV"));
-    const password = normalizeText(form.get("password"));
+  try {
+    const payload = await readLoginPayload(req);
+    nextPath = payload.nextPath;
+    wantsJson = payload.wantsJson;
+
+    const maNV = payload.maNV;
+    const password = payload.password;
 
     if (!maNV || !password) {
-      return redirectLogin(req, "Vui lòng nhập Mã nhân viên và Mật khẩu.", nextPath);
+      return redirectLogin(req, "Vui lòng nhập Mã nhân viên và Mật khẩu.", nextPath, wantsJson);
     }
 
     const staff = await findStaffByMaNV(maNV);
@@ -81,7 +142,9 @@ export async function POST(req: NextRequest) {
       return redirectLogin(
         req,
         "Tài khoản chưa tồn tại trên hệ thống. Vui lòng kiểm tra lại mã nhân viên hoặc tạo tài khoản mới và liên hệ admin duyệt để sử dụng.",
-        nextPath
+        nextPath,
+        wantsJson,
+        404
       );
     }
 
@@ -89,12 +152,14 @@ export async function POST(req: NextRequest) {
       return redirectLogin(
         req,
         "Tài khoản chưa được duyệt sử dụng, vui lòng liên hệ Admin.",
-        nextPath
+        nextPath,
+        wantsJson,
+        403
       );
     }
 
     if (!verifyPassword(password, staff.password)) {
-      return redirectLogin(req, "Mật khẩu không đúng. Vui lòng kiểm tra lại.", nextPath);
+      return redirectLogin(req, "Mật khẩu không đúng. Vui lòng kiểm tra lại.", nextPath, wantsJson, 401);
     }
 
     if (!isCheckinNextPath(nextPath)) {
@@ -106,7 +171,7 @@ export async function POST(req: NextRequest) {
       );
 
       if (!userFirewall.allowed) {
-        return redirectLogin(req, userFirewall.reason, nextPath);
+        return redirectLogin(req, userFirewall.reason, nextPath, wantsJson, 403);
       }
     }
 
@@ -114,7 +179,9 @@ export async function POST(req: NextRequest) {
       return redirectLogin(
         req,
         "Tài khoản chưa có Mã siêu thị, vui lòng liên hệ Admin.",
-        nextPath
+        nextPath,
+        wantsJson,
+        403
       );
     }
 
@@ -122,7 +189,9 @@ export async function POST(req: NextRequest) {
       return redirectLogin(
         req,
         "Tài khoản chưa được Admin cấp quyền dùng công cụ Check-in.",
-        nextPath
+        nextPath,
+        wantsJson,
+        403
       );
     }
 
@@ -132,12 +201,24 @@ export async function POST(req: NextRequest) {
 
     const url = new URL(nextPath, req.url);
 
-    const res = NextResponse.redirect(url, {
-      status: 303,
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    });
+    const res = wantsJson
+      ? NextResponse.json(
+          {
+            success: true,
+            redirectTo: `${url.pathname}${url.search}${url.hash}`,
+          },
+          {
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          }
+        )
+      : NextResponse.redirect(url, {
+          status: 303,
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        });
 
     setStaffSessionCookies(res, {
       maNV: staff.maNV,
@@ -155,7 +236,9 @@ export async function POST(req: NextRequest) {
     return redirectLogin(
       req,
       "Lỗi hệ thống đăng nhập. Vui lòng thử lại sau.",
-      getSafeNextPath(req)
+      nextPath,
+      wantsJson,
+      500
     );
   }
 }

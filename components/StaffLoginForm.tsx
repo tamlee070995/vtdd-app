@@ -10,28 +10,55 @@ type StaffLoginFormProps = {
 };
 
 export default function StaffLoginForm({ initialError = "", next = "" }: StaffLoginFormProps) {
+  const [maNV, setMaNV] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
     if (loading) {
-      e.preventDefault();
       return;
     }
 
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const maNV = String(formData.get("maNV") || "").trim();
-    const password = String(formData.get("password") || "").trim();
+    const cleanMaNV = maNV.trim();
+    const cleanPassword = password.trim();
 
-    if (!maNV || !password) {
-      e.preventDefault();
+    if (!cleanMaNV || !cleanPassword) {
       setError("Vui lòng nhập mã nhân viên và mật khẩu.");
       return;
     }
 
-    setError("");
-    setLoading(true);
+    try {
+      setError("");
+      setLoading(true);
+
+      const res = await fetch("/api/auth/staff-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "Cache-Control": "no-store",
+        },
+        cache: "no-store",
+        credentials: "same-origin",
+        body: JSON.stringify({ maNV: cleanMaNV, password: cleanPassword, next }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.success) {
+        setError(data?.message || "Không đăng nhập được. Vui lòng thử lại.");
+        setLoading(false);
+        return;
+      }
+
+      window.location.assign(data.redirectTo || next || "/staff");
+    } catch {
+      setError("Không đăng nhập được. Vui lòng kiểm tra kết nối và thử lại.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -54,6 +81,8 @@ export default function StaffLoginForm({ initialError = "", next = "" }: StaffLo
         inputMode="text"
         placeholder="NV12345"
         autoComplete="username"
+        value={maNV}
+        onChange={(e) => setMaNV(e.target.value)}
         readOnly={loading}
         aria-disabled={loading}
       />
@@ -64,6 +93,8 @@ export default function StaffLoginForm({ initialError = "", next = "" }: StaffLo
         name="password"
         placeholder="Nhập mật khẩu"
         autoComplete="current-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
         readOnly={loading}
         aria-disabled={loading}
       />
