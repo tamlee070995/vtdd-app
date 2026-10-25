@@ -8,7 +8,7 @@ import { ensureStaffAdminHeaders } from "@/lib/staff-store";
 
 export const dynamic = "force-dynamic";
 
-const TCDM_CLIENT_SETTING_KEYS = [
+const LEGACY_PRICE_SETTING_KEYS = [
   "MARQUEE_MESSAGE",
   "FIXED_BANNER_MESSAGE",
   "PUSH_NOTIFY_MESSAGE",
@@ -76,19 +76,11 @@ function buildClientSettings(settings: Record<string, string>, admin: Awaited<Re
   if (!admin) return {};
   if (admin.permission === "admin") {
     return Object.fromEntries(
-      Object.entries(settings).filter(([key]) => !isSensitiveSettingKey(key) && !isHiddenClientSettingKey(key))
+      Object.entries(settings).filter(([key]) => !isSensitiveSettingKey(key) && !isHiddenClientSettingKey(key) && !LEGACY_PRICE_SETTING_KEYS.includes(key))
     );
   }
 
   const keys = new Set<string>();
-
-  if (
-    adminHasAction(admin, "settings-write", "tcdm") ||
-    adminHasAction(admin, "reload-data", "tcdm") ||
-    adminHasAction(admin, "dashboard-view", "tcdm")
-  ) {
-    TCDM_CLIENT_SETTING_KEYS.forEach((key) => keys.add(key));
-  }
 
   if (adminCanUsePmhTool(admin)) {
     PMH_CLIENT_SETTING_KEYS.forEach((key) => keys.add(key));
@@ -141,7 +133,6 @@ export default async function AdminPage() {
             <span>{admin.permission.toUpperCase()}: {admin.name}</span>
             <span>NV: {admin.maNV}</span>
             <span>Modules: {admin.permission === "admin" ? "ALL" : admin.modules.join(", ") || "Chưa cấp"}</span>
-            <span>Data version: {settings.DATA_VERSION || "1"}</span>
           </div>
 
           <div className="admin-cms-pro-actions">

@@ -4,7 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { calculateTradeinQuote, formatTradeinRange, TRADEIN_GRADES, tradeinMatches,
-  type NewTradeinProduct, type OldTradeinProduct, type PriceRange, type TradeinData } from "@/lib/tradein-pricing";
+  type NewTradeinProduct, type OldTradeinProduct, type PriceRange } from "@/lib/tradein-pricing";
+import useTradeinPage from "./useTradeinPage";
+import TradeinUpdateNotice from "./TradeinUpdateNotice";
 import styles from "./Tradein.module.css";
 
 type SearchProduct = { id: string; brand: string; model: string; storage?: string };
@@ -62,28 +64,11 @@ function ProductSearch<T extends SearchProduct>({ label, placeholder, products, 
 }
 
 export default function TradeinLookup() {
-  const [data, setData] = useState<TradeinData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { data, status, loading, error, refreshReason } = useTradeinPage();
   const [old, setOld] = useState<OldTradeinProduct | null>(null);
   const [next, setNext] = useState<NewTradeinProduct | null>(null);
-  const loadId = useRef(0);
-  async function load() {
-    const requestId = ++loadId.current;
-    setLoading(true); setError("");
-    try {
-      const response = await fetch("/api/tradein", { cache: "no-store" });
-      const payload = await response.json();
-      if (!response.ok || !payload.success) throw new Error(payload.message || "Chưa tải được bảng giá.");
-      if (requestId !== loadId.current) return;
-      setData(payload.data); setOld(null); setNext(null);
-    } catch (reason) {
-      if (requestId === loadId.current) setError(reason instanceof Error ? reason.message : "Chưa tải được bảng giá.");
-    } finally { if (requestId === loadId.current) setLoading(false); }
-  }
-  useEffect(() => { const state = loadId; void load(); return () => { state.current++; }; }, []);
   const updatedAt = data ? new Date(data.syncedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false }) : "";
-  return <main className={styles.page}>
+  return <><main className={styles.page} inert={Boolean(refreshReason)}>
     <header className={styles.topbar}><Link className={styles.brand} href="/" aria-label="Viễn Thông Di Động — Trang chủ">
       <Image src="/mwg-logo.svg" width={46} height={46} alt="" /><span><b>Viễn Thông Di Động</b><small>Chính sách &amp; nghiệp vụ sản phẩm</small></span>
     </Link><Link className={styles.homeLink} href="/">Trang chủ <span aria-hidden="true">↗</span></Link></header>
@@ -93,8 +78,9 @@ export default function TradeinLookup() {
         <span className={styles.publicBadge}>● Không cần đăng nhập</span>
       </section>
       <div className={styles.dataBar} aria-live="polite"><span>{loading ? "Đang tải bảng giá…" : data ? <>Cập nhật: <b>{updatedAt}</b></> : "Bảng giá thu cũ đổi mới"}</span>
-        <button type="button" disabled={loading} onClick={() => void load()}>{loading ? "Đang tải…" : "Tải lại bảng giá ↻"}</button></div>
-      {error ? <div role="alert" className={styles.error}>{error}{data ? <p>Bạn đang xem bản giá tải trước đó. Thử tải lại để lấy bản cập nhật.</p> : null}</div> : null}
+        <button type="button" disabled={loading} onClick={() => window.location.reload()}>{loading ? "Đang tải…" : "Tải lại trang ↻"}</button></div>
+      {status?.locked ? <section className={styles.maintenance} role="status"><span aria-hidden="true">⌁</span><h2>Trang tra giá đang tạm khóa</h2><p>{status.message}</p><small>Trang tự kiểm tra mỗi 30 giây. Khi mở lại, bạn sẽ nhận thông báo tải lại trang.</small></section> : <>
+      {error ? <div role="alert" className={styles.error}>{error}</div> : null}
       {!data && loading ? <div className={styles.loading} role="status">Đang chuẩn bị danh sách máy và bảng giá…</div> : null}
       {data ? <div className={styles.steps} aria-busy={loading}>
         <section className={styles.step} aria-labelledby="old-heading"><div className={styles.stepHeading}><span className={styles.stepNumber}>01</span><div><p>MÁY ĐANG SỬ DỤNG</p><h2 id="old-heading">Tra giá máy cũ</h2></div><span className={styles.stepTag}>5 loại tình trạng</span></div>
@@ -120,8 +106,8 @@ export default function TradeinLookup() {
             </article>;
           })}</div></div> : <div className={styles.emptyQuote}><span aria-hidden="true">↗</span><p>{old ? "Chọn máy mới để xem trợ giá và tổng giá trị thu đổi cho cả 5 loại." : "Bắt đầu bằng việc chọn máy cũ. Mức trợ giá sẽ được tính theo máy mới bạn chọn."}</p></div>}
         </section>
-      </div> : null}
+      </div> : null}</>}
       <footer className={styles.footer}><span>VIỄN THÔNG DI ĐỘNG</span><Link href="/#he-thu-cu-doi-moi">Hệ Thu Cũ Đổi Mới <span aria-hidden="true">↗</span></Link></footer>
     </div>
-  </main>;
+  </main>{refreshReason ? <TradeinUpdateNotice reason={refreshReason} /> : null}</>;
 }

@@ -255,9 +255,8 @@ const PERSONNEL_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc
 ];
 
 const TCDM_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
-  { key: "settings-write", label: "Lưu cấu hình", desc: "Lưu thông báo, lock web và ngày áp dụng." },
-  { key: "reload-data", label: "Reload data", desc: "Tăng Data version để nhân viên nhận dữ liệu mới." },
-  { key: "dashboard-view", label: "Xem dashboard", desc: "Xem log tra giá, top máy và thống kê." },
+  { key: "settings-write", label: "Đóng/mở trang tra giá", desc: "Tạm khóa trang tra giá hiện tại và sửa thông báo cập nhật." },
+  { key: "reload-data", label: "Đồng bộ giá Google Sheet", desc: "Cập nhật bảng giá thu cũ đổi mới và thông báo người đang tra cứu." },
 ];
 
 const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
@@ -325,7 +324,7 @@ function stripHiddenClientSettings(values: Record<string, string>) {
 const PERMISSION_TREE = [
   {
     title: "Quản trị vận hành TCDM",
-    desc: "Thông báo, lock web, reload data và dashboard tra giá.",
+    desc: "Đồng bộ giá từ Google Sheet và đóng/mở trang tra giá hiện tại.",
     module: "tcdm",
     children: TCDM_ACTION_OPTIONS,
   },
@@ -6206,7 +6205,7 @@ const ADMIN_MODULES: Array<{
     key: "tcdm",
     no: "01",
     title: "Quản trị: Trang tra giá TCDM",
-    desc: "Thông báo, lock web, dashboard và reload data cho luồng tra giá.",
+    desc: "Đồng bộ Google Sheet, tạm khóa và mở lại trang tra giá hiện tại.",
     badge: "Đang hoạt động",
   },
   {
@@ -6706,16 +6705,9 @@ export default function AdminConsole({
                 <h3>Quản trị: Trang tra giá TCDM</h3>
               </div>
             </div>
-            <TradeinAdminTool canSync={isAdmin || allowedActions.includes("reload-data") || (!adminHasExplicitActions && allowedModules.includes("tcdm"))} />
-            <TcdmAdminConsole
-              key="tcdm"
-              scope="tcdm"
-              initialSettings={initialSettings}
-              adminRole={adminRole}
-              adminName={adminName}
-              adminModules={adminModules}
-              adminActions={adminActions}
-              adminHasExplicitActions={adminHasExplicitActions}
+            <TradeinAdminTool
+              canSync={isAdmin || allowedActions.includes("reload-data") || (!adminHasExplicitActions && allowedModules.includes("tcdm"))}
+              canManage={isAdmin || allowedActions.includes("settings-write") || (!adminHasExplicitActions && allowedModules.includes("tcdm"))}
             />
           </>
         ) : module === "people" ? (

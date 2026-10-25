@@ -37,18 +37,18 @@ export async function readTradeinSource() {
 }
 export async function syncTradeinSource(expectedVersion: string, actor: string) {
   const previous = await getTradeinSnapshot();
-  if ((previous?.version || "") !== expectedVersion) throw new TradeinDataError("Bảng giá vừa được đồng bộ ở phiên khác. Vui lòng tải lại trạng thái.", 409);
+  if ((previous?.version || "") !== expectedVersion) throw new TradeinDataError("Bảng giá vừa được đồng bộ ở phiên khác. Bấm “Làm mới thông tin” rồi thử lại.", 409);
   // Read and validate both sheets before replacing the single stored snapshot.
   const parsed = await readTradeinSource();
   const snapshot: TradeinSnapshot = { ...parsed, schemaVersion: 1, version: randomUUID(), syncedAt: new Date().toISOString(), importedBy: actor };
   const row = { key: SNAPSHOT_KEY, value: JSON.stringify(snapshot), type: "TEXT", updated_at_text: snapshot.syncedAt, updated_by: actor };
   if (previous) {
     const changed = await updateRows("system_settings", { key: `eq.${SNAPSHOT_KEY}`, value: `like.*"version":"${previous.version}"*` }, row);
-    if (changed.length !== 1) throw new TradeinDataError("Bảng giá vừa được đồng bộ ở phiên khác. Vui lòng tải lại trạng thái.", 409);
+    if (changed.length !== 1) throw new TradeinDataError("Bảng giá vừa được đồng bộ ở phiên khác. Bấm “Làm mới thông tin” rồi thử lại.", 409);
   } else {
     try { await insertRows("system_settings", [row]); }
     catch (error) {
-      if (/23505|duplicate/i.test(String(error))) throw new TradeinDataError("Bảng giá vừa được đồng bộ ở phiên khác. Vui lòng tải lại trạng thái.", 409);
+      if (/23505|duplicate/i.test(String(error))) throw new TradeinDataError("Bảng giá vừa được đồng bộ ở phiên khác. Bấm “Làm mới thông tin” rồi thử lại.", 409);
       throw error;
     }
   }
