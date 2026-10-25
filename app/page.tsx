@@ -25,8 +25,13 @@ export default async function HomePage() {
     {
       number: "01",
       title: "Hệ Thu Cũ Đổi Mới",
-      desc: "Quy trình và tài liệu phục vụ vận hành Thu cũ đổi mới.",
+      desc: "Công cụ, quy trình và tài liệu phục vụ vận hành Thu cũ đổi mới.",
       items: [
+        {
+          title: "In sticker trợ giá",
+          desc: "Chọn mẫu, chỉnh nội dung và in tối đa 6 sticker trên một trang A4.",
+          href: "/sticker-tcdm",
+        },
         cms["quy-trinh-thu-cu"].published
           ? {
               title: cms["quy-trinh-thu-cu"].title,
@@ -109,18 +114,6 @@ export default async function HomePage() {
           title: "Cổng công cụ hỗ trợ siêu thị",
           desc: "Click chọn để xem chi tiết công cụ hỗ trợ.",
           href: "/cong-cu-ho-tro",
-        },
-      ],
-    },
-    {
-      number: "06",
-      title: "In Sticker Trợ Giá",
-      desc: "Tạo và in tem trợ giá phục vụ trưng bày tại siêu thị.",
-      items: [
-        {
-          title: "In sticker trợ giá",
-          desc: "Chọn mẫu, chỉnh nội dung và in tối đa 6 sticker trên một trang A4.",
-          href: "/sticker-tcdm",
         },
       ],
     },
