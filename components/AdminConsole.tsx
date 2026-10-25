@@ -6,6 +6,7 @@ import { sanitizeHtml } from "@/lib/html-sanitize";
 import AdminToolsDashboard from "@/components/AdminToolsDashboard";
 import PasswordInput from "@/components/PasswordInput";
 import DemoAdminTool from "@/components/DemoAdminTool";
+import TradeinAdminTool from "@/components/TradeinAdminTool";
 
 type AdminStaff = {
   rowNumber: number;
@@ -6705,6 +6706,7 @@ export default function AdminConsole({
                 <h3>Quản trị: Trang tra giá TCDM</h3>
               </div>
             </div>
+            <TradeinAdminTool canSync={isAdmin || allowedActions.includes("reload-data") || (!adminHasExplicitActions && allowedModules.includes("tcdm"))} />
             <TcdmAdminConsole
               key="tcdm"
               scope="tcdm"

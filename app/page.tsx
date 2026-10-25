@@ -28,6 +28,11 @@ export default async function HomePage() {
       desc: "Công cụ, quy trình và tài liệu phục vụ vận hành Thu cũ đổi mới.",
       items: [
         {
+          title: "Tra cứu giá thu cũ đổi mới",
+          desc: "Xem giá máy cũ Loại 1–5 và mức trợ giá lên đời máy mới.",
+          href: "/tra-gia-thu-cu",
+        },
+        {
           title: "In sticker trợ giá",
           desc: "Chọn mẫu, chỉnh nội dung và in tối đa 6 sticker trên một trang A4.",
           href: "/sticker-tcdm",
@@ -139,7 +144,7 @@ export default async function HomePage() {
 
       <section className={styles.modules} aria-label="Danh mục nghiệp vụ">
         {groups.map((group) => (
-          <article className={styles.moduleCard} key={group.number}>
+          <article className={styles.moduleCard} key={group.number} id={group.number === "01" ? "he-thu-cu-doi-moi" : undefined}>
             <div className={styles.moduleTop}>
               <div className={styles.moduleNo}>{group.number}</div>
               <div>

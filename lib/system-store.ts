@@ -304,7 +304,10 @@ export async function getSystemSettings() {
       const rows = await selectAllRows<{
         key: string;
         value: string;
-      }>("system_settings", { order: "key.asc" });
+      }>("system_settings", {
+        // The large pricing snapshot has its own reader; keep it out of general page settings.
+        filters: { key: "neq.TRADEIN_PUBLIC_SNAPSHOT_V1" }, order: "key.asc",
+      });
       const settings: Record<string, string> = { ...DEFAULT_SYSTEM_SETTINGS };
 
       rows.forEach((row) => {
