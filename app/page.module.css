@@ -59,7 +59,8 @@
 .empty button { min-height: 44px; margin-top: 20px; padding: 10px 18px; border: 1px solid #d8c08d; border-radius: 10px; background: #fff6d9; color: #81520b; cursor: pointer; font-size: 14px; font-weight: 500; }
 .footer { margin-top: 46px; padding-top: 20px; border-top: 1px solid #e6e9ef; color: #697386; font-size: 11px; line-height: 1.6; }
 @keyframes opening { to { transform: rotate(360deg); } }
-@media (hover: hover) { .toolItem:hover { border-color: #d5b268; box-shadow: 0 8px 24px #0b122008; transform: translateY(-2px); }.tab:hover { background: #1a2536; color: #fff; }.tab[aria-selected="true"]:hover { color: #ffda26; } }
+@media (hover: hover) { .toolItem:hover { border-color: #d5b268; box-shadow: 0 8px 24px #0b122008; transform: translateY(-2px); } }
+@media (min-width: 1024px) and (hover: hover) { .tab:hover { background: #1a2536; color: #fff; }.tab[aria-selected="true"]:hover { color: #ffda26; } }
 @media (max-width: 1150px) and (min-width: 1024px) { .page { grid-template-columns: 224px minmax(0, 1fr); }.sidebar { padding-left: 14px; padding-right: 14px; }.main { padding: 30px 24px; }.toolGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.contentHeader { align-items: flex-start; flex-direction: column; gap: 20px; }.search { flex: none; width: 100%; max-width: 420px; }.tab[aria-selected="true"]::before { left: -14px; } }
 @media (max-width: 1023px) {
   .page { display: block; background: #fff; --home-tab-height: 70px; }
