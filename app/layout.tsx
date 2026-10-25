@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import OnlineHeartbeat from "@/components/OnlineHeartbeat";
+import "./roboto.css";
 import "./globals.css";
 import CmsImageLightbox from "@/components/CmsImageLightbox";
 import FrontendErrorReporter from "@/components/FrontendErrorReporter";
@@ -82,13 +83,18 @@ export const viewport: Viewport = {
   themeColor: "#07111f",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  maximumScale: 5,
   viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" suppressHydrationWarning>
+      <head>
+        <link rel="preload" href="/fonts/roboto/roboto-latin-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/roboto/roboto-vietnamese-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/roboto/roboto-latin-ext-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      </head>
       <body suppressHydrationWarning>
         <OnlineHeartbeat />
         <FrontendErrorReporter />

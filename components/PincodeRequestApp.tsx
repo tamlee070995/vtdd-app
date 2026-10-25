@@ -2363,7 +2363,7 @@ const STYLE = `
   background: #07111f;
   color: #ffd400;
   border: 1px solid rgba(255,212,0,.34);
-  font-family: "Roboto Mono", "Cascadia Mono", "Consolas", monospace;
+  font-family: Roboto, Arial, sans-serif;
   font-size: clamp(26px, 6vw, 48px);
   line-height: 1.05;
   font-weight: 1000;

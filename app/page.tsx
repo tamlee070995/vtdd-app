@@ -1,198 +1,47 @@
-import Link from "next/link";
-import styles from "./page.module.css";
-import { getHomeCmsItems } from "@/lib/home-cms-store";
-import HomeNavigationFeedback from "@/components/HomeNavigationFeedback";
+import HomePortal, { type HomeGroup, type HomeTool } from "@/components/HomePortal";
+import { getHomeCmsItems, type HomeCmsItem } from "@/lib/home-cms-store";
 
 export const dynamic = "force-dynamic";
 
-type ToolItem = {
-  title: string;
-  desc: string;
-  href?: string;
-  status?: string;
-};
-
-type ToolGroup = {
-  number: string;
-  title: string;
-  desc: string;
-  items: ToolItem[];
-};
+function cmsTool(item: HomeCmsItem): HomeTool {
+  return {
+    title: item.published ? item.title : item.draftTitle,
+    desc: item.published ? item.summary : item.draftSummary,
+    icon: "document",
+    ...(item.published ? { href: `/p/${item.slug}` } : { status: "Đang cập nhật" }),
+  };
+}
 
 export default async function HomePage() {
   const cms = await getHomeCmsItems();
-
-  const groups: ToolGroup[] = [
+  const groups: HomeGroup[] = [
     {
-      number: "01",
-      title: "Hệ Thu Cũ Đổi Mới",
-      desc: "Công cụ, quy trình và tài liệu phục vụ vận hành Thu cũ đổi mới.",
+      id: "he-thu-cu-doi-moi", title: "Thu cũ đổi mới", navTitle: "Thu cũ đổi mới", shortTitle: "Thu cũ", icon: "tradein",
+      desc: "Công cụ tra giá, in tem và quy trình thu cũ đổi mới.",
       items: [
-        {
-          title: "Tra cứu giá thu cũ đổi mới",
-          desc: "Xem giá máy cũ Loại 1–5 và mức trợ giá lên đời máy mới.",
-          href: "/tra-gia-thu-cu",
-        },
-        {
-          title: "In sticker trợ giá",
-          desc: "Chọn mẫu, chỉnh nội dung và in tối đa 6 sticker trên một trang A4.",
-          href: "/sticker-tcdm",
-        },
-        cms["quy-trinh-thu-cu"].published
-          ? {
-              title: cms["quy-trinh-thu-cu"].title,
-              desc: cms["quy-trinh-thu-cu"].summary,
-              href: "/p/quy-trinh-thu-cu",
-            }
-          : {
-              title: cms["quy-trinh-thu-cu"].draftTitle || "Quy trình thu cũ đổi mới",
-              desc: cms["quy-trinh-thu-cu"].draftSummary || "Tài liệu quy trình thao tác, kiểm tra và xử lý hồ sơ.",
-              status: "Đang cập nhật",
-            },
+        { title: "Tra cứu giá thu cũ đổi mới", desc: "Giá máy Loại 1–5 và mức trợ giá lên đời máy mới.", href: "/tra-gia-thu-cu", icon: "search" },
+        { title: "In sticker trợ giá", desc: "Chỉnh nội dung, in tối đa 6 sticker trên một trang A4.", href: "/sticker-tcdm", icon: "printer" },
+        cmsTool(cms["quy-trinh-thu-cu"]),
       ],
     },
     {
-      number: "02",
-      title: "Hệ Máy Mới",
-      desc: "Chính sách liên quan sản phẩm mới, bán ra và bảo hành.",
-      items: cms["may-moi"].published
-        ? [
-            {
-              title: cms["may-moi"].title,
-              desc: cms["may-moi"].summary,
-              href: "/p/may-moi",
-            },
-          ]
-        : [
-            {
-              title: cms["may-moi"].draftTitle || "Chính sách bảo hành",
-              desc: cms["may-moi"].draftSummary || "Thông tin chính sách bảo hành theo ngành hàng.",
-              status: "Đang cập nhật",
-            },
-          ],
+      id: "he-may-moi", title: "Hệ máy mới", navTitle: "Hệ máy mới", shortTitle: "Máy mới", icon: "phone",
+      desc: "Chính sách sản phẩm mới, bán ra và bảo hành.", items: [cmsTool(cms["may-moi"])],
     },
     {
-      number: "03",
-      title: "Hệ Máy Cũ",
-      desc: "Quản lý nhóm máy đã sử dụng, máy thu mua và nghiệp vụ liên quan.",
-      items: cms["may-cu"].published
-        ? [
-            {
-              title: cms["may-cu"].title,
-              desc: cms["may-cu"].summary,
-              href: "/p/may-cu",
-            },
-          ]
-        : [
-            {
-              title: cms["may-cu"].draftTitle || "Máy ĐSD, Máy Cũ Thu Mua",
-              desc: cms["may-cu"].draftSummary || "Thông tin nghiệp vụ dành cho máy đã sử dụng / máy cũ thu mua.",
-              status: "Đang cập nhật",
-            },
-          ],
+      id: "he-may-cu", title: "Hệ máy cũ", navTitle: "Hệ máy cũ", shortTitle: "Máy cũ", icon: "used",
+      desc: "Thông tin nghiệp vụ cho máy đã sử dụng và máy cũ thu mua.", items: [cmsTool(cms["may-cu"])],
     },
     {
-      number: "04",
-      title: "Demo",
-      desc: "Công cụ hỗ trợ xử lý máy trưng bày, demo và chuyển đổi.",
-      items: [{
-        title: cms.demo.published ? cms.demo.title : "Gỡ Demo",
-        desc: "Chọn hãng để xem hướng dẫn gỡ demo và công cụ hỗ trợ.",
-        href: "/p/demo",
-      }],
+      id: "demo", title: "Demo", navTitle: "Demo", shortTitle: "Demo", icon: "demo",
+      desc: "Hướng dẫn theo hãng và công cụ xử lý máy trưng bày.",
+      items: [{ title: cms.demo.published ? cms.demo.title : "Gỡ Demo", desc: "Chọn hãng để xem hướng dẫn gỡ demo và công cụ hỗ trợ.", href: "/p/demo", icon: "demo" }],
     },
     {
-      number: "05",
-      title: "Công Cụ Hỗ Trợ",
-      desc: "Cổng nghiệp vụ PMH, chiến giá và thẩm định hồ sơ hỗ trợ vận hành.",
-      items: [
-        {
-          title: "Cổng công cụ hỗ trợ siêu thị",
-          desc: "Click chọn để xem chi tiết công cụ hỗ trợ.",
-          href: "/cong-cu-ho-tro",
-        },
-      ],
+      id: "cong-cu-ho-tro", title: "Công cụ hỗ trợ", navTitle: "Công cụ hỗ trợ", shortTitle: "Công cụ", icon: "tools",
+      desc: "Công cụ nghiệp vụ hỗ trợ vận hành tại siêu thị.",
+      items: [{ title: "Cổng công cụ hỗ trợ siêu thị", desc: "PMH, chiến giá, thẩm định hồ sơ và các công cụ hỗ trợ.", href: "/cong-cu-ho-tro", icon: "tools" }],
     },
   ];
-
-  return (
-    <HomeNavigationFeedback><main className={styles.page}>
-      <header className={styles.topbar}>
-        <Link className={styles.brand} href="/" aria-label="Về trang chủ">
-          <span className={styles.logoShell}>
-            <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
-          </span>
-
-          <span>
-            <strong>ICT</strong>
-            <small>Viễn Thông Di Động</small>
-          </span>
-        </Link>
-
-        <Link className={styles.adminButton} href="/admin">
-          Admin
-        </Link>
-      </header>
-
-      <section className={styles.hero}>
-        <div className={styles.heroPattern} />
-        <div className={styles.heroContent}>
-          <span>NGÀNH HÀNG</span>
-          <h1>Viễn Thông Di Động</h1>
-          <p>Trung Tâm Chính Sách &amp; Nghiệp Vụ Sản Phẩm.</p>
-        </div>
-      </section>
-
-      <section className={styles.modules} aria-label="Danh mục nghiệp vụ">
-        {groups.map((group) => (
-          <article className={styles.moduleCard} key={group.number} id={group.number === "01" ? "he-thu-cu-doi-moi" : undefined}>
-            <div className={styles.moduleTop}>
-              <div className={styles.moduleNo}>{group.number}</div>
-              <div>
-                <h2>{group.title}</h2>
-                <p>{group.desc}</p>
-              </div>
-            </div>
-
-            <div className={styles.moduleTools}>
-              {group.items.map((item) => {
-                const content = (
-                  <>
-                    <span>
-                      <b>{item.title}</b>
-                      <small>{item.desc}</small>
-                    </span>
-                    {item.href ? <i aria-hidden="true">›</i> : <em>{item.status}</em>}
-                  </>
-                );
-
-                return item.href ? (
-                  <Link
-                    className={styles.toolItem}
-                    href={item.href}
-                    key={item.title}
-                  >
-                    {content}
-                  </Link>
-                ) : (
-                  <div
-                    className={styles.toolItemDisabled}
-                    key={item.title}
-                  >
-                    {content}
-                  </div>
-                );
-              })}
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <footer className={styles.footer}>
-        <span />
-        <b>Copyright © - Vien Thong Di Dong</b>
-        <span />
-      </footer>
-    </main></HomeNavigationFeedback>
-  );
+  return <HomePortal groups={groups} />;
 }

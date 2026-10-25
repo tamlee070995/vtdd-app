@@ -2108,6 +2108,7 @@ function TcdmAdminConsole({
                         "advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount",
                       toolbar:
                         "undo redo | blocks | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table link image media | removeformat code fullscreen help",
+                      content_css: ["default", "/fonts/roboto/roboto.css"],
                       content_style:
                         "body{font-family:Roboto,Arial,sans-serif;font-size:14px;line-height:1.55;color:#0f172a;padding:12px;} img{display:block;max-width:100%!important;height:auto!important;margin:10px auto;border-radius:14px;} table{max-width:100%;border-collapse:collapse;} td,th{border:1px solid #e2e8f0;padding:6px;} p{margin:0 0 8px;} ul,ol{margin:6px 0 8px 20px;padding:0;}",
                     }}
@@ -6532,6 +6533,7 @@ function CmsEditor({
                   "undo redo | blocks | bold italic underline forecolor backcolor | " +
                   "alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | " +
                   "link image media table | removeformat | code preview fullscreen | help",
+                content_css: ["default", "/fonts/roboto/roboto.css"],
                 content_style:
                   "body{font-family:Roboto,Arial,sans-serif;font-size:15px;line-height:1.65;color:#07111f;padding:12px;} img{max-width:100%;height:auto;border-radius:18px;} h2{font-size:28px;} h3{font-size:22px;} blockquote{border-left:5px solid #ffd400;background:#fffbeb;border-radius:14px;margin:12px 0;padding:12px 16px;}",
               }}

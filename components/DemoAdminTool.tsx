@@ -150,7 +150,8 @@ export default function DemoAdminTool({ showToast }: Props) {
           automatic_uploads:true, paste_data_images:true, plugins:"lists link image table code fullscreen",
           toolbar:"undo redo | blocks | bold italic underline | bullist numlist | link image table | code fullscreen",
           images_upload_handler:async blobInfo=>(await upload(new File([blobInfo.blob()],blobInfo.filename(),{type:blobInfo.blob().type}))).url,
-          content_style:"body{font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#07111f}img{max-width:100%;height:auto}"
+          content_css: ["default", "/fonts/roboto/roboto.css"],
+          content_style:"body{font-family:Roboto,Arial,sans-serif;font-size:15px;line-height:1.7;color:#07111f}img{max-width:100%;height:auto}"
         }} />
         <p className={styles.sectionTitle}>Ảnh minh họa</p>{mediaFields("images")}
         <p className={styles.sectionTitle}>Video hướng dẫn</p><label className={styles.field}>Liên kết video<input type="url" value={guide.videoUrl} disabled={!!busy} onChange={event=>change({videoUrl:event.target.value})} placeholder="Liên kết YouTube, Vimeo hoặc tệp MP4 / WebM" /></label>
