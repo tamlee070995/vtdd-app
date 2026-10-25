@@ -416,7 +416,7 @@ export default function AccountCheckPage() {
       <section className="account-check-shell">
         <header className="account-check-brand">
           <span className="account-check-logo">
-            <img src="/mwg-logo.svg" alt="MWG" />
+            <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
           </span>
           <div>
             <b>Viễn Thông Di Động</b>
@@ -741,7 +741,7 @@ const styles = `
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #ffd400;
+  background: transparent;
 }
 
 .account-check-logo img {

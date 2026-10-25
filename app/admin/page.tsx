@@ -118,7 +118,7 @@ export default async function AdminPage() {
       <section className="admin-cms-pro-shell">
         <header className="admin-cms-pro-hero">
           <div className="admin-cms-pro-brand">
-            <span className="admin-cms-pro-logo"><img src="/mwg-logo.svg" alt="MWG" /></span>
+            <span className="admin-cms-pro-logo"><img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" /></span>
             <div>
               <b>Viễn Thông Di Động</b>
             </div>
@@ -184,7 +184,7 @@ export default async function AdminPage() {
         }
         .admin-cms-pro-brand, .admin-cms-pro-title, .admin-cms-pro-meta, .admin-cms-pro-actions { position: relative; z-index: 1; }
         .admin-cms-pro-brand { display: flex; align-items: center; gap: 12px; }
-        .admin-cms-pro-logo { width: 54px; height: 54px; border-radius: 18px; background: #ffd400; overflow: hidden; display: grid; place-items: center; box-shadow: 0 0 0 7px rgba(255,212,0,.12); }
+        .admin-cms-pro-logo { width: 54px; height: 54px; border-radius: 18px; background: transparent; overflow: hidden; display: grid; place-items: center; box-shadow: 0 0 0 7px rgba(255,212,0,.12); }
         .admin-cms-pro-logo img { width: 100%; height: 100%; object-fit: contain; }
         .admin-cms-pro-brand b { display: block; font-size: 20px; line-height: 1; font-weight: 1000; }
         .admin-cms-pro-brand small { display: block; margin-top: 5px; color: rgba(255,255,255,.66); font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }

@@ -162,7 +162,7 @@ function getMailLogoUrl() {
   const baseUrl = String(process.env.NEXT_PUBLIC_APP_URL || "").trim().replace(/\/+$/, "");
   if (!baseUrl) return "";
 
-  const path = raw || "/mwg-logo.png";
+  const path = raw || "/brand/vtdd-logo-v2.png";
   return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
@@ -171,15 +171,15 @@ function buildBrandLogo() {
 
   if (logoUrl) {
     return `
-      <td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;border-radius:18px;background:#ffd400;overflow:hidden;box-shadow:0 10px 24px rgba(0,0,0,.22);">
-        <img src="${escapeHtml(logoUrl)}" width="52" height="52" alt="MWG" style="display:block;width:52px;height:52px;border:0;outline:none;text-decoration:none;object-fit:cover;border-radius:18px;" />
+      <td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;border-radius:18px;background:#07111f;overflow:hidden;box-shadow:0 10px 24px rgba(0,0,0,.22);">
+        <img src="${escapeHtml(logoUrl)}" width="52" height="52" alt="Viễn Thông Di Động" style="display:block;width:52px;height:52px;border:0;outline:none;text-decoration:none;object-fit:contain;border-radius:18px;" />
       </td>
     `;
   }
 
   return `
     <td width="52" height="52" align="center" valign="middle" style="width:52px;height:52px;border-radius:18px;background:#ffd400;color:#07111f;font-family:Roboto,Arial,sans-serif;font-size:12px;line-height:13px;font-weight:900;letter-spacing:-.8px;text-align:center;box-shadow:0 10px 24px rgba(0,0,0,.22);">
-      MWG
+      VTDD
     </td>
   `;
 }

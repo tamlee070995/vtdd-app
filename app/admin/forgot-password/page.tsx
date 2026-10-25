@@ -23,7 +23,7 @@ export default async function AdminForgotPasswordPage({
     <main className="admin-forgot-pro-page">
       <section className="admin-forgot-pro-card">
         <aside className="admin-forgot-pro-hero">
-          <div className="admin-forgot-pro-logo"><img src="/mwg-logo.svg" alt="MWG" /></div>
+          <div className="admin-forgot-pro-logo"><img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" /></div>
           <span>SECURE RECOVERY</span>
           <h1>Khôi phục mật khẩu Admin</h1>
           <p>OTP chỉ gửi tới Gmail của Quản trị viên.</p>
@@ -75,7 +75,7 @@ export default async function AdminForgotPasswordPage({
         .admin-forgot-pro-page { min-height:100dvh; padding:clamp(12px,2vw,26px); display:grid; place-items:center; background:radial-gradient(circle at 12% 0%, rgba(255,212,0,.22), transparent 30%), #eef3f8; font-family:Roboto, Arial, sans-serif; color:#07111f; }
         .admin-forgot-pro-card { width:min(100%, 1000px); min-height:590px; display:grid; grid-template-columns:.92fr 1.08fr; overflow:hidden; border-radius:34px; background:#fff; border:1px solid rgba(203,213,225,.95); box-shadow:0 30px 100px rgba(15,23,42,.15); }
         .admin-forgot-pro-hero { padding:clamp(28px,4vw,54px); display:flex; flex-direction:column; justify-content:flex-end; background:radial-gradient(circle at 88% 14%, rgba(255,212,0,.52), transparent 32%), linear-gradient(135deg,#07111f,#020617); color:#fff; }
-        .admin-forgot-pro-logo { width:68px; height:68px; border-radius:21px; overflow:hidden; display:grid; place-items:center; background:#ffd400; margin-bottom:auto; box-shadow:0 0 0 8px rgba(255,212,0,.12); }
+        .admin-forgot-pro-logo { width:68px; height:68px; border-radius:21px; overflow:hidden; display:grid; place-items:center; background: transparent; margin-bottom:auto; box-shadow:0 0 0 8px rgba(255,212,0,.12); }
         .admin-forgot-pro-logo img { width:100%; height:100%; object-fit:contain; }
         .admin-forgot-pro-hero > span { width:fit-content; margin-bottom:18px; padding:10px 14px; border-radius:999px; background:rgba(255,255,255,.1); color:#ffd400; font-size:11px; font-weight:1000; letter-spacing:.12em; }
         .admin-forgot-pro-hero h1 { margin:0; font-size:clamp(42px,5.8vw,78px); line-height:.9; font-weight:1000; letter-spacing:-.08em; }

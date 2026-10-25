@@ -92,14 +92,14 @@ const INSTALL_STYLE = `
   border-radius: 16px;
   display: grid;
   place-items: center;
-  background: #ffd400;
+  background: transparent;
   overflow: hidden;
   flex: 0 0 auto;
 }
 
 .install-app-logo img {
-  width: 82%;
-  height: 82%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
@@ -663,7 +663,7 @@ export default function InstallAppClient() {
         <header className="install-app-topbar">
           <div className="install-app-brand">
             <div className="install-app-logo">
-              <img src="/mwg-logo.svg" alt="VTDD App" />
+              <img src="/brand/vtdd-logo-v2.webp" alt="VTDD App" />
             </div>
             <div>
               <b>Viễn Thông Di Động</b>
@@ -697,7 +697,7 @@ export default function InstallAppClient() {
             <div className="install-app-phone-screen">
               <div className="install-app-mini-top">
                 <i>
-                  <img src="/mwg-logo.svg" alt="" />
+                  <img src="/brand/vtdd-logo-v2.webp" alt="" />
                 </i>
                 <b>VTDD App</b>
               </div>

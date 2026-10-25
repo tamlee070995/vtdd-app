@@ -70,7 +70,7 @@ export default function TradeinLookup() {
   const updatedAt = data ? new Date(data.syncedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false }) : "";
   return <><main className={styles.page} inert={Boolean(refreshReason)}>
     <header className={styles.topbar}><Link className={styles.brand} href="/" aria-label="Viễn Thông Di Động — Trang chủ">
-      <Image src="/mwg-logo.svg" width={46} height={46} alt="" /><span><b>Viễn Thông Di Động</b><small>Chính sách &amp; nghiệp vụ sản phẩm</small></span>
+      <Image src="/brand/vtdd-logo-v2.webp" width={46} height={46} alt="" /><span><b>Viễn Thông Di Động</b><small>Chính sách &amp; nghiệp vụ sản phẩm</small></span>
     </Link><Link className={styles.homeLink} href="/">Trang chủ <span aria-hidden="true">↗</span></Link></header>
     <div className={styles.shell}>
       <nav className={styles.breadcrumb} aria-label="Đường dẫn"><Link href="/">Trang chủ</Link><span>›</span><Link href="/#he-thu-cu-doi-moi">Hệ Thu Cũ Đổi Mới</Link><span>›</span><span aria-current="page">Tra giá</span></nav>

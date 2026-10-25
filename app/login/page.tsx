@@ -18,7 +18,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
         <header className="staff-auth-topbar">
           <Link className="staff-auth-brand" href="/">
             <span className="staff-auth-logo">
-              <img src="/mwg-logo.svg" alt="MWG" />
+              <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
             </span>
             <span>
               <b>Viễn Thông Di Động</b>

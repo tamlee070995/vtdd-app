@@ -1,4 +1,4 @@
-const SW_VERSION = "vtdd-pwa-v1";
+const SW_VERSION = "vtdd-pwa-v2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();

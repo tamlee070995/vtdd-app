@@ -32,7 +32,7 @@ export default async function PublishedCmsPage({ params }: { params: Promise<{ s
     <main className={styles.page}>
       <header className={styles.topbar}>
         <Link href="/" className={styles.brand}>
-          <span><img src="/mwg-logo.svg" alt="MWG" /></span>
+          <span><img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" /></span>
           <b>Viễn Thông Di Động</b>
         </Link>
         <Link href="/" className={styles.back}>Trang chủ</Link>

@@ -79,7 +79,7 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
         <aside className="admin-auth-hero" aria-label="Trung tâm quản trị">
           <div className="admin-auth-brand">
             <span className="admin-auth-logo">
-              <img src="/mwg-logo.svg" alt="MWG" />
+              <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
             </span>
             <span>
               <b>Viễn Thông Di Động</b>

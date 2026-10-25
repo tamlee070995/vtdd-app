@@ -145,7 +145,7 @@ export default function InternalGuidePage() {
       <aside className={styles.sidebar}>
         <Link className={styles.brand} href="/cong-cu-ho-tro">
           <span className={styles.logo}>
-            <img src="/mwg-logo.svg" alt="MWG" />
+            <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
           </span>
           <span>
             <strong>Viễn Thông Di Động</strong>

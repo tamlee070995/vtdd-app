@@ -14,7 +14,7 @@ export default function PmhToolClosedPage({ title, reason }: PmhToolClosedPagePr
         <header className="pmh-closed-topbar">
           <Link className="pmh-closed-brand" href="/cong-cu-ho-tro" aria-label="Về cổng hỗ trợ">
             <span>
-              <img src="/mwg-logo.svg" alt="MWG" />
+              <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
             </span>
             <b>Viễn Thông Di Động</b>
           </Link>

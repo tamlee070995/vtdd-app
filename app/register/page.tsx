@@ -342,7 +342,7 @@ export default function RegisterPage() {
       <section className="register-vtd-shell">
         <header className="register-vtd-brand">
           <Link href="/" className="register-vtd-logo" aria-label="Về trang chủ">
-            <img src="/mwg-logo.svg" alt="MWG" />
+            <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
           </Link>
 
           <div>
@@ -647,7 +647,7 @@ const styles = `
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: #ffd400;
+  background: transparent;
   box-shadow: 0 0 0 6px rgba(255, 212, 0, .14);
 }
 

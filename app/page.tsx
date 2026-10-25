@@ -1,6 +1,7 @@
 import Link from "next/link";
 import styles from "./page.module.css";
 import { getHomeCmsItems } from "@/lib/home-cms-store";
+import HomeNavigationFeedback from "@/components/HomeNavigationFeedback";
 
 export const dynamic = "force-dynamic";
 
@@ -115,11 +116,11 @@ export default async function HomePage() {
   ];
 
   return (
-    <main className={styles.page}>
+    <HomeNavigationFeedback><main className={styles.page}>
       <header className={styles.topbar}>
         <Link className={styles.brand} href="/" aria-label="Về trang chủ">
           <span className={styles.logoShell}>
-            <img src="/mwg-logo.svg" alt="MWG" />
+            <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
           </span>
 
           <span>
@@ -161,7 +162,7 @@ export default async function HomePage() {
                       <b>{item.title}</b>
                       <small>{item.desc}</small>
                     </span>
-                    {item.href ? <i>›</i> : <em>{item.status}</em>}
+                    {item.href ? <i aria-hidden="true">›</i> : <em>{item.status}</em>}
                   </>
                 );
 
@@ -192,6 +193,6 @@ export default async function HomePage() {
         <b>Copyright © - Vien Thong Di Dong</b>
         <span />
       </footer>
-    </main>
+    </main></HomeNavigationFeedback>
   );
 }

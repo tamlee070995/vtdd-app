@@ -165,7 +165,7 @@ export default function StickerTcdmPage() {
       <header className={styles.header}>
         <Link href="/" className={styles.brand}>
           <span className={styles.logoBox}>
-            <img src="/mwg-logo.svg" alt="MWG" />
+            <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
           </span>
 
           <span>

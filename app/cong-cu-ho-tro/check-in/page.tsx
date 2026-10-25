@@ -38,7 +38,7 @@ function CheckinAccessBlocked({ signedIn }: { signedIn: boolean }) {
           display: grid;
           place-items: center;
           overflow: hidden;
-          background: #ffd400;
+          background: transparent;
           margin-bottom: 18px;
         }
         .checkin-access-logo img { width: 100%; height: 100%; object-fit: contain; }
@@ -100,7 +100,7 @@ function CheckinAccessBlocked({ signedIn }: { signedIn: boolean }) {
       `}</style>
       <section className="checkin-access-card">
         <div className="checkin-access-logo">
-          <img src="/mwg-logo.svg" alt="MWG" />
+          <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
         </div>
         <span>Internal Tool</span>
         <h1>Check-in chỉ dành cho tài khoản được cấp quyền</h1>
@@ -152,7 +152,7 @@ function CheckinClosed({ reason }: { reason: string }) {
           display: grid;
           place-items: center;
           overflow: hidden;
-          background: #ffd400;
+          background: transparent;
           margin-bottom: 18px;
         }
         .checkin-access-logo img { width: 100%; height: 100%; object-fit: contain; }
@@ -197,7 +197,7 @@ function CheckinClosed({ reason }: { reason: string }) {
       `}</style>
       <section className="checkin-access-card">
         <div className="checkin-access-logo">
-          <img src="/mwg-logo.svg" alt="MWG" />
+          <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
         </div>
         <span>Ngoài giờ chạy</span>
         <h1>Check-in đang tạm đóng</h1>

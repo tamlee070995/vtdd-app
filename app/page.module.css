@@ -38,7 +38,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #ffd400;
+  background: transparent;
 }
 
 .logoShell img {
@@ -225,6 +225,44 @@
 .toolItem {
   background: linear-gradient(135deg, rgba(255, 255, 255, .98), rgba(255, 247, 204, .85));
   color: #020617;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+  -webkit-tap-highlight-color: rgba(255, 212, 0, .3);
+}
+
+.toolItem:active,
+.toolItem[data-opening="true"] {
+  background: #fff2ac;
+  border-color: #d7a700;
+  box-shadow: 0 0 0 3px rgba(255, 212, 0, .24);
+  transform: scale(.985);
+}
+
+.toolItem:focus-visible,
+.adminButton:focus-visible {
+  outline: 3px solid #d7a700;
+  outline-offset: 4px;
+}
+
+.adminButton[data-opening="true"] {
+  background: #ffd400;
+  color: #07111f;
+}
+
+.toolItem[data-opening="true"] i { font-size: 0; }
+.toolItem[data-opening="true"] i::after {
+  content: "";
+  width: 17px;
+  height: 17px;
+  border: 2px solid #ffffff40;
+  border-top-color: #ffd400;
+  border-radius: 50%;
+  animation: opening .8s linear infinite;
+}
+
+@keyframes opening { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .toolItem { transition: none; }
+  .toolItem[data-opening="true"] i::after { animation: none; }
 }
 
 .toolItemDisabled {

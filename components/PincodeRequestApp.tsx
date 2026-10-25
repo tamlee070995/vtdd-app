@@ -929,7 +929,7 @@ export default function PincodeRequestApp({ flow, title, subtitle }: PincodeRequ
 
       <header className="pmh-topbar">
         <Link href="/" className="pmh-brand" aria-label="Về trang chủ">
-          <img src="/mwg-logo.svg" alt="MWG" />
+          <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
           <span>
             <b>Viễn Thông Di Động</b>
             <small>Công cụ hỗ trợ</small>
@@ -1525,7 +1525,7 @@ const STYLE = `
   width: 48px;
   height: 48px;
   border-radius: 16px;
-  background: #ffd400;
+  background: transparent;
   object-fit: contain;
 }
 .pmh-brand b {

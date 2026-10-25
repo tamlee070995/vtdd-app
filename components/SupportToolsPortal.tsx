@@ -56,7 +56,7 @@ export default function SupportToolsPortal({
       <header className="support-topbar">
         <Link className="support-brand" href="/" aria-label="Về trang chủ">
           <span className="support-logo-shell">
-            <img src="/mwg-logo.svg" alt="MWG" />
+            <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
           </span>
           <span>
             <strong>Viễn Thông Di Động</strong>
@@ -230,7 +230,7 @@ const STYLE = `
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #ffd400;
+  background: transparent;
 }
 .support-logo-shell img {
   width: 100%;

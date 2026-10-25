@@ -26,7 +26,7 @@ export default function AppBootSplash() {
     <main className="vtdd-app-loading vtdd-app-loading-overlay" role="status" aria-live="polite">
       <section className="vtdd-app-loading-card" aria-label="Đang tải VTDD App">
         <div className="vtdd-app-loading-logo">
-          <img src="/mwg-logo.svg" alt="Viễn Thông Di Động" />
+          <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
         </div>
         <h1>Viễn Thông Di Động</h1>
         <strong>VTDD App</strong>

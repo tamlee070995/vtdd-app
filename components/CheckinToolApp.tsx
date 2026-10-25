@@ -119,7 +119,7 @@ export default function CheckinToolApp() {
 
       <header className="checkin-topbar">
         <Link className="checkin-brand" href="/cong-cu-ho-tro" aria-label="Về cổng hỗ trợ">
-          <span className="checkin-logo"><img src="/mwg-logo.svg" alt="MWG" /></span>
+          <span className="checkin-logo"><img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" /></span>
           <span>
             <strong>Viễn Thông Di Động</strong>
             <small>Event Check-in</small>
@@ -249,7 +249,7 @@ const STYLE = `
   box-shadow: 0 24px 76px rgba(15,23,42,.16);
 }
 .checkin-brand { min-width: 0; display: inline-flex; align-items: center; gap: 13px; color: #fff; text-decoration: none; }
-.checkin-logo { width: 54px; height: 54px; border-radius: 17px; display: grid; place-items: center; overflow: hidden; background: #ffd400; }
+.checkin-logo { width: 54px; height: 54px; border-radius: 17px; display: grid; place-items: center; overflow: hidden; background: transparent; }
 .checkin-logo img { width: 100%; height: 100%; object-fit: contain; }
 .checkin-brand strong { display: block; color: #fff; font-size: 24px; line-height: 1; font-weight: 1000; }
 .checkin-brand small { display: block; margin-top: 4px; color: rgba(255,255,255,.72); font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }

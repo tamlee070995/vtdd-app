@@ -38,7 +38,7 @@
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: #ffd400;
+  background: transparent;
 }
 
 .logoBox img {
