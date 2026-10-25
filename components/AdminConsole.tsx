@@ -5,6 +5,7 @@ import { Editor } from "@tinymce/tinymce-react";
 import { sanitizeHtml } from "@/lib/html-sanitize";
 import AdminToolsDashboard from "@/components/AdminToolsDashboard";
 import PasswordInput from "@/components/PasswordInput";
+import DemoAdminTool from "@/components/DemoAdminTool";
 
 type AdminStaff = {
   rowNumber: number;
@@ -6232,8 +6233,8 @@ const ADMIN_MODULES: Array<{
     key: "demo",
     no: "04",
     title: "Quản trị: Trang demo / gỡ demo",
-    desc: "Soạn nội dung hướng dẫn gỡ demo, chuyển đổi máy trưng bày.",
-    badge: "CMS nháp / xuất bản",
+    desc: "Quản lý hãng, hướng dẫn gỡ demo, ảnh, video và công cụ tải về.",
+    badge: "Hãng / hướng dẫn",
   },
   {
     key: "tools",
@@ -6406,7 +6407,7 @@ function CmsEditor({
         <div>
           <span className="adminx-eyebrow">Nội dung CMS</span>
           <h2>{item.label}</h2>
-          <p>Soạn nội dung dạng bản nháp. Khi bấm xuất bản, trang chủ sẽ mở trang nội dung này.</p>
+          <p>{slug === "demo" ? "Nội dung chung hiển thị bên dưới danh mục hãng. Quản lý từng hãng ở phần phía trên." : "Soạn nội dung dạng bản nháp. Khi bấm xuất bản, trang chủ sẽ mở trang nội dung này."}</p>
         </div>
         <div className={item.published ? "cms-status published" : "cms-status draft"}>
           {item.published ? "Đang xuất bản" : "Đang cập nhật"}
@@ -6733,6 +6734,13 @@ export default function AdminConsole({
               adminActions={adminActions}
               adminHasExplicitActions={adminHasExplicitActions}
             />
+          </>
+        ) : module === "demo" ? (
+          <>
+            <DemoAdminTool showToast={showToast} />
+            <details style={{ marginTop: 28 }}><summary style={{ cursor: "pointer", fontWeight: 800 }}>Thông tin / công cụ chung của trang Gỡ Demo</summary>
+              {cmsLoading ? <p>Đang tải...</p> : <CmsEditor slug="demo" item={cmsItems.demo} onSaved={loadCms} showToast={showToast} />}
+            </details>
           </>
         ) : isCmsModule(module) ? (
           cmsLoading ? (

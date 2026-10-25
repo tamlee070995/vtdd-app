@@ -89,21 +89,11 @@ export default async function HomePage() {
       number: "04",
       title: "Demo",
       desc: "Công cụ hỗ trợ xử lý máy trưng bày, demo và chuyển đổi.",
-      items: cms.demo.published
-        ? [
-            {
-              title: cms.demo.title,
-              desc: cms.demo.summary,
-              href: "/p/demo",
-            },
-          ]
-        : [
-            {
-              title: cms.demo.draftTitle || "Gỡ Demo",
-              desc: cms.demo.draftSummary || "Hướng dẫn và công cụ hỗ trợ xử lý gỡ demo.",
-              status: "Đang cập nhật",
-            },
-          ],
+      items: [{
+        title: cms.demo.published ? cms.demo.title : "Gỡ Demo",
+        desc: "Chọn hãng để xem hướng dẫn gỡ demo và công cụ hỗ trợ.",
+        href: "/p/demo",
+      }],
     },
     {
       number: "05",

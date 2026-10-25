@@ -79,12 +79,12 @@ export async function POST(req: NextRequest) {
 
     if (action === "PUBLISH") {
       await publishHomeCmsItem(slug, admin?.name || "Admin");
-      return NextResponse.json({ success: true, message: "Đã xuất bản nội dung ra trang chủ." });
+      return NextResponse.json({ success: true, message: slug === "demo" ? "Đã xuất bản thông tin chung bên dưới danh mục hãng." : "Đã xuất bản nội dung ra trang chủ." });
     }
 
     if (action === "UNPUBLISH") {
       await unpublishHomeCmsItem(slug, admin?.name || "Admin");
-      return NextResponse.json({ success: true, message: "Đã ngừng xuất bản. Trang chủ sẽ hiện Đang cập nhật." });
+      return NextResponse.json({ success: true, message: slug === "demo" ? "Đã ẩn thông tin chung. Danh mục hãng vẫn hoạt động." : "Đã ngừng xuất bản. Trang chủ sẽ hiện Đang cập nhật." });
     }
 
     return NextResponse.json({ success: false, message: "Action không hợp lệ." }, { status: 400 });

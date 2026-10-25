@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getHomeCmsItem } from "@/lib/home-cms-store";
 import { sanitizeHtml } from "@/lib/html-sanitize";
 import styles from "./page.module.css";
+import DemoCatalog from "@/components/DemoCatalog";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ function bodyToHtml(value: string) {
 
 export default async function PublishedCmsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  if (slug === "demo") return <DemoCatalog />;
   const item = await getHomeCmsItem(slug);
 
   if (!item || !item.published) {
