@@ -25,40 +25,6 @@ type GuideSection = {
 
 const GUIDES: GuideSection[] = [
   {
-    id: "tra-gia-nhan-vien",
-    group: "TRA GIÁ TCDM",
-    title: "Tra giá TCDM nhân viên",
-    subtitle: "Dùng để tra bảng giá thu cũ đổi mới, chọn luồng và báo giá cho khách tại siêu thị.",
-    intro: "Mục này dùng khi nhân viên cần tra nhanh giá tham khảo trước khi kiểm tra máy thực tế. Luôn chọn đúng luồng và đọc thông báo hệ thống trước khi báo khách.",
-    blocks: [
-      {
-        title: "Dùng khi nào",
-        tone: "success",
-        items: [
-          "Khách cần đổi máy cũ lên máy mới hoặc chỉ bán máy cũ.",
-          "Nhân viên cần xem nhanh giá theo model, bộ nhớ và tình trạng máy.",
-        ],
-      },
-      {
-        title: "Quy trình đúng",
-        items: [
-          "Chọn đúng luồng Thu cũ đổi mới hoặc Chỉ thu cũ.",
-          "Chọn máy mới trước, sau đó chọn máy cũ, bộ nhớ và loại máy.",
-          "Kiểm tra tổng tiền dự kiến và ghi chú cảnh báo trước khi báo khách.",
-        ],
-      },
-      {
-        title: "Lỗi thường gặp",
-        tone: "warning",
-        items: [
-          "Không thấy máy mới: kiểm tra lại hãng/ngành hàng hoặc báo Admin kiểm tra Data_Moi.",
-          "Không thấy máy cũ: thử tìm gần đúng theo tên máy, mã máy hoặc bộ nhớ.",
-          "Giá bất thường: chụp màn hình và báo Admin kiểm tra dữ liệu.",
-        ],
-      },
-    ],
-  },
-  {
     id: "chien-gia",
     group: "CÔNG CỤ PMH",
     title: "Tổng giá TCDM thấp hơn đối thủ",
@@ -164,10 +130,6 @@ const GUIDES: GuideSection[] = [
 
 const NAV_GROUPS = [
   {
-    title: "TRA GIÁ TCDM",
-    items: GUIDES.filter((guide) => guide.group === "TRA GIÁ TCDM"),
-  },
-  {
     title: "CÔNG CỤ PMH",
     items: GUIDES.filter((guide) => guide.group === "CÔNG CỤ PMH"),
   },
@@ -212,7 +174,7 @@ export default function InternalGuidePage() {
           <div>
             <p>TÀI LIỆU NỘI BỘ</p>
             <h1>Hướng dẫn sử dụng công cụ</h1>
-            <span>Dành cho nhân viên thao tác tra giá, gửi hồ sơ PMH và in sticker trợ giá.</span>
+            <span>Dành cho nhân viên gửi hồ sơ PMH và in sticker trợ giá.</span>
           </div>
           <GuideCopyButton />
         </header>

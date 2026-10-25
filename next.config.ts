@@ -43,6 +43,15 @@ const noStoreHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/tradein-price/sticker-tcdm",
+        destination: "/sticker-tcdm",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

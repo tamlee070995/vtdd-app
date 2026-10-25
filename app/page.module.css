@@ -146,7 +146,7 @@
   width: min(100%, 1480px);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: clamp(12px, 1.2vw, 18px);
 }
 
@@ -166,6 +166,7 @@
 .moduleCard:nth-child(3) { background: radial-gradient(circle at 100% 0%, rgba(16, 185, 129, .16), transparent 40%), #fff; }
 .moduleCard:nth-child(4) { background: radial-gradient(circle at 100% 0%, rgba(168, 85, 247, .16), transparent 40%), #fff; }
 .moduleCard:nth-child(5) { background: radial-gradient(circle at 100% 0%, rgba(244, 114, 182, .14), transparent 40%), #fff; }
+.moduleCard:nth-child(6) { background: radial-gradient(circle at 100% 0%, rgba(249, 115, 22, .16), transparent 40%), #fff; }
 
 .moduleTop {
   display: grid;
@@ -227,11 +228,6 @@
   color: #020617;
 }
 
-.toolItemMuted {
-  opacity: .56;
-  filter: grayscale(.25);
-}
-
 .toolItemDisabled {
   background: rgba(248, 250, 252, .75);
   color: #94a3b8;
@@ -257,18 +253,6 @@
   font-size: 12px;
   line-height: 1.35;
   font-weight: 780;
-}
-
-.lockText {
-  width: fit-content;
-  margin-top: 2px;
-  padding: 7px 9px;
-  border-radius: 999px;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  color: #c2410c !important;
-  font-size: 10.5px !important;
-  font-weight: 1000 !important;
 }
 
 .toolItem i {

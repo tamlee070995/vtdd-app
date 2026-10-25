@@ -341,7 +341,7 @@ export default function RegisterPage() {
 
       <section className="register-vtd-shell">
         <header className="register-vtd-brand">
-          <Link href="/tradein-price" className="register-vtd-logo" aria-label="Quay lại bảng giá">
+          <Link href="/" className="register-vtd-logo" aria-label="Về trang chủ">
             <img src="/mwg-logo.svg" alt="MWG" />
           </Link>
 

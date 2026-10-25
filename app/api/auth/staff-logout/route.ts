@@ -6,19 +6,23 @@ export const dynamic = "force-dynamic";
 function getSafeLogoutPath(req: NextRequest, raw?: string | null) {
   const value = String(raw || new URL(req.url).searchParams.get("next") || "").trim();
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/tradein-price";
+    return "/";
   }
 
   try {
     const target = new URL(value, req.url);
     const current = new URL(req.url);
     if (target.origin !== current.origin) {
-      return "/tradein-price";
+      return "/";
+    }
+
+    if (["/staff", "/khach-hang", "/tradein-price"].includes(target.pathname.replace(/\/$/, ""))) {
+      return "/";
     }
 
     return `${target.pathname}${target.search}${target.hash}`;
   } catch {
-    return "/tradein-price";
+    return "/";
   }
 }
 

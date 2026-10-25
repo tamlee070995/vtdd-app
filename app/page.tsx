@@ -1,8 +1,6 @@
 import Link from "next/link";
 import styles from "./page.module.css";
 import { getHomeCmsItems } from "@/lib/home-cms-store";
-import { getPublicSystemSettings } from "@/lib/system-store";
-import { getActiveSystemLock, settingEnabled } from "@/lib/system-lock";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +9,6 @@ type ToolItem = {
   desc: string;
   href?: string;
   status?: string;
-  locked?: boolean;
-  disabled?: boolean;
-  lockText?: string;
-  notice?: boolean;
 };
 
 type ToolGroup = {
@@ -26,48 +20,13 @@ type ToolGroup = {
 
 export default async function HomePage() {
   const cms = await getHomeCmsItems();
-  const settings = await getPublicSystemSettings();
-  const scheduleLockActive = getActiveSystemLock(settings).scheduled;
-  const staffPageLocked = settingEnabled(settings, "STAFF_PAGE_LOCKED");
-  const customerPageLocked = settingEnabled(settings, "CUSTOMER_PAGE_LOCKED");
-  const tradePriceHasPageLock = staffPageLocked || customerPageLocked;
-  const tradePriceFullyLocked = scheduleLockActive;
-  const tradePriceLockText = scheduleLockActive
-    ? "Cập nhật hệ thống"
-    : staffPageLocked && customerPageLocked
-    ? "Trang nhân viên và trang khách hàng đang tạm khóa theo cài đặt Admin."
-    : staffPageLocked
-      ? "Trang nhân viên đang tạm khóa, luồng khách hàng vẫn truy cập được."
-      : customerPageLocked
-        ? "Trang khách hàng đang tạm khóa, luồng nhân viên vẫn truy cập được."
-        : "";
-
-  const tradePriceNoticeText = scheduleLockActive
-    ? "Cập nhật hệ thống"
-    : staffPageLocked && customerPageLocked
-      ? "Luồng nhân viên và khách hàng đang tạm khóa, vẫn có thể vào công cụ in sticker."
-      : staffPageLocked
-        ? "Trang nhân viên đang tạm khóa, luồng khách hàng vẫn truy cập được."
-        : customerPageLocked
-          ? "Trang khách hàng đang tạm khóa, luồng nhân viên vẫn truy cập được."
-          : tradePriceLockText;
 
   const groups: ToolGroup[] = [
     {
       number: "01",
       title: "Hệ Thu Cũ Đổi Mới",
-      desc: "Công cụ, quy trình và bảng giá phục vụ vận hành Thu cũ đổi mới.",
+      desc: "Quy trình và tài liệu phục vụ vận hành Thu cũ đổi mới.",
       items: [
-        {
-          title: "Bảng giá thu cũ đổi mới",
-          desc: "Tra cứu bảng giá, trợ giá và chọn luồng nhân viên / khách hàng.",
-          href: "/tradein-price",
-          locked: tradePriceFullyLocked,
-          disabled: tradePriceFullyLocked,
-          status: scheduleLockActive ? "Cập nhật hệ thống" : tradePriceFullyLocked ? "Tạm khóa" : undefined,
-          lockText: tradePriceNoticeText,
-          notice: tradePriceHasPageLock && !tradePriceFullyLocked,
-        },
         cms["quy-trinh-thu-cu"].published
           ? {
               title: cms["quy-trinh-thu-cu"].title,
@@ -153,6 +112,18 @@ export default async function HomePage() {
         },
       ],
     },
+    {
+      number: "06",
+      title: "In Sticker Trợ Giá",
+      desc: "Tạo và in tem trợ giá phục vụ trưng bày tại siêu thị.",
+      items: [
+        {
+          title: "In sticker trợ giá",
+          desc: "Chọn mẫu, chỉnh nội dung và in tối đa 6 sticker trên một trang A4.",
+          href: "/sticker-tcdm",
+        },
+      ],
+    },
   ];
 
   return (
@@ -201,15 +172,14 @@ export default async function HomePage() {
                     <span>
                       <b>{item.title}</b>
                       <small>{item.desc}</small>
-                      {(item.locked || item.notice) && item.lockText ? <small className={styles.lockText}>{item.lockText}</small> : null}
                     </span>
-                    {item.href && !item.disabled ? <i>›</i> : <em>{item.status}</em>}
+                    {item.href ? <i>›</i> : <em>{item.status}</em>}
                   </>
                 );
 
-                return item.href && !item.disabled ? (
+                return item.href ? (
                   <Link
-                    className={`${styles.toolItem} ${item.locked ? styles.toolItemMuted : ""}`}
+                    className={styles.toolItem}
                     href={item.href}
                     key={item.title}
                   >
@@ -217,9 +187,8 @@ export default async function HomePage() {
                   </Link>
                 ) : (
                   <div
-                    className={`${styles.toolItemDisabled} ${item.locked ? styles.toolItemMuted : ""}`}
+                    className={styles.toolItemDisabled}
                     key={item.title}
-                    aria-disabled={item.disabled ? "true" : undefined}
                   >
                     {content}
                   </div>

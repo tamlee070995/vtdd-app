@@ -29,19 +29,23 @@ function getSafeNextPath(req: NextRequest, nextValue?: unknown) {
   const raw = fromBody || fromQuery;
 
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) {
-    return "/staff";
+    return "/cong-cu-ho-tro";
   }
 
   try {
     const target = new URL(raw, req.url);
     const current = new URL(req.url);
     if (target.origin !== current.origin) {
-      return "/staff";
+      return "/cong-cu-ho-tro";
+    }
+
+    if (["/staff", "/khach-hang", "/tradein-price"].includes(target.pathname.replace(/\/$/, ""))) {
+      return "/cong-cu-ho-tro";
     }
 
     return `${target.pathname}${target.search}${target.hash}`;
   } catch {
-    return "/staff";
+    return "/cong-cu-ho-tro";
   }
 }
 
@@ -72,7 +76,7 @@ function redirectLogin(
 
   const url = new URL("/login", req.url);
   url.searchParams.set("error", message);
-  if (nextPath && nextPath !== "/staff") {
+  if (nextPath && nextPath !== "/cong-cu-ho-tro") {
     url.searchParams.set("next", nextPath);
   }
 

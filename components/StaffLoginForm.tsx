@@ -54,7 +54,7 @@ export default function StaffLoginForm({ initialError = "", next = "" }: StaffLo
         return;
       }
 
-      window.location.assign(data.redirectTo || next || "/staff");
+      window.location.assign(data.redirectTo || next || "/cong-cu-ho-tro");
     } catch {
       setError("Không đăng nhập được. Vui lòng kiểm tra kết nối và thử lại.");
       setLoading(false);

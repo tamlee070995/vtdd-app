@@ -163,7 +163,7 @@ export default function StickerTcdmPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link href="/tradein-price" className={styles.brand}>
+        <Link href="/" className={styles.brand}>
           <span className={styles.logoBox}>
             <img src="/mwg-logo.svg" alt="MWG" />
           </span>
@@ -178,8 +178,8 @@ export default function StickerTcdmPage() {
           <Link href="/huong-dan-noi-bo#in-sticker" className={styles.guideButton}>
             Hướng dẫn
           </Link>
-          <Link href="/tradein-price" className={styles.backButton}>
-            Quay lại
+          <Link href="/" className={styles.backButton}>
+            Về trang chủ
           </Link>
         </div>
       </header>
