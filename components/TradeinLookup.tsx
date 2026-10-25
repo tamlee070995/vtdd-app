@@ -4,10 +4,18 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { calculateTradeinQuote, formatTradeinRange, TRADEIN_GRADES, tradeinMatches,
-  type NewTradeinProduct, type OldTradeinProduct, type TradeinData } from "@/lib/tradein-pricing";
+  type NewTradeinProduct, type OldTradeinProduct, type PriceRange, type TradeinData } from "@/lib/tradein-pricing";
 import styles from "./Tradein.module.css";
 
 type SearchProduct = { id: string; brand: string; model: string; storage?: string };
+const priceNumber = new Intl.NumberFormat("vi-VN");
+function RangeValue({ range, allowZero = false }: { range: Pick<PriceRange, "min" | "max"> & { incomplete?: boolean }; allowZero?: boolean }) {
+  const label = formatTradeinRange(range, allowZero);
+  if (range.incomplete || (!allowZero && !range.min && !range.max)) return <span className={styles.rangeValue}>{label}</span>;
+  return <span className={styles.rangeValue} aria-label={label}>
+    <span>{priceNumber.format(range.min)}</span>{range.min !== range.max ? <><span aria-hidden="true">–</span><span>{priceNumber.format(range.max)}</span></> : null}
+  </span>;
+}
 function ProductSearch<T extends SearchProduct>({ label, placeholder, products, selected, disabled, onSelect, onClear }: {
   label: string; placeholder: string; products: T[]; selected: T | null; disabled?: boolean;
   onSelect: (product: T) => void; onClear: () => void;
@@ -24,14 +32,14 @@ function ProductSearch<T extends SearchProduct>({ label, placeholder, products, 
     return () => document.removeEventListener("pointerdown", close);
   }, []);
   useEffect(() => { if (open && active >= 0) root.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" }); }, [active, open]);
-  const pick = (product: T) => { onSelect(product); setQuery(""); setOpen(false); setActive(-1); };
+  const pick = (product: T) => { root.current?.querySelector("input")?.blur(); onSelect(product); setQuery(""); setOpen(false); setActive(-1); };
   return <div className={styles.searchField} ref={root} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
     <label htmlFor={selected ? undefined : id}>{label}</label>
     {selected ? <div className={styles.selection}><span><b>{selected.model}</b><small>{selected.brand}{selected.storage ? ` · ${selected.storage}` : ""}</small></span>
       <button type="button" onClick={() => { onClear(); setQuery(""); setOpen(false); }}>Đổi máy</button></div> : <>
       <div className={styles.inputWrap}><span aria-hidden="true">⌕</span><input id={id} value={query} placeholder={placeholder} disabled={disabled}
         role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-list`} aria-activedescendant={open && active >= 0 ? `${id}-${active}` : undefined}
-        autoComplete="off" maxLength={150}
+        autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="search" maxLength={150}
         onFocus={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(-1); setOpen(true); }}
         onKeyDown={event => {
           if (event.key === "Escape") { setOpen(false); return; }
@@ -44,7 +52,7 @@ function ProductSearch<T extends SearchProduct>({ label, placeholder, products, 
       {open && !disabled ? <div className={styles.suggestions} role="listbox" id={`${id}-list`} aria-label={`Kết quả ${label.toLowerCase()}`}>
         {matches.length ? matches.map((product, index) => <div key={product.id} id={`${id}-${index}`} role="option" aria-selected={active === index}
           className={`${styles.option} ${active === index ? styles.activeOption : ""}`}
-          onPointerDown={event => event.preventDefault()} onClick={() => pick(product)}>
+          onMouseDown={event => event.preventDefault()} onClick={() => pick(product)}>
           <b>{product.model}</b><small>{product.brand}{product.storage ? ` · ${product.storage}` : ""}</small>
         </div>) : <p className={styles.noResults}>Không tìm thấy máy phù hợp. Thử tên model hoặc dung lượng khác.</p>}
         {matches.length === 40 ? <p className={styles.resultHint}>Nhập thêm model hoặc dung lượng để thu hẹp kết quả.</p> : null}
@@ -81,8 +89,8 @@ export default function TradeinLookup() {
     </Link><Link className={styles.homeLink} href="/">Trang chủ <span aria-hidden="true">↗</span></Link></header>
     <div className={styles.shell}>
       <nav className={styles.breadcrumb} aria-label="Đường dẫn"><Link href="/">Trang chủ</Link><span>›</span><Link href="/#he-thu-cu-doi-moi">Hệ Thu Cũ Đổi Mới</Link><span>›</span><span aria-current="page">Tra giá</span></nav>
-      <section className={styles.hero}><div><p className={styles.eyebrow}>THU CŨ ĐỔI MỚI</p><h1>Máy cũ của bạn.<br /><span>Giá trị lên đời mới.</span></h1><p className={styles.intro}>Tra giá thu theo tình trạng máy và xem mức trợ giá khi đổi lên máy mới.</p></div>
-        <div className={styles.heroAside}><span className={styles.publicBadge}>● Tra cứu không cần đăng nhập</span><p>Chọn máy cũ <span>→</span> Xem giá thu<br />Chọn máy mới <span>→</span> Xem tổng trợ giá</p></div>
+      <section className={styles.hero}><div><p className={styles.eyebrow}>HỆ THU CŨ ĐỔI MỚI</p><h1>Tra giá thu cũ đổi mới</h1><p className={styles.intro}>Chọn máy cũ để xem giá thu. Chọn thêm máy mới để xem trợ giá lên đời.</p></div>
+        <span className={styles.publicBadge}>● Không cần đăng nhập</span>
       </section>
       <div className={styles.dataBar} aria-live="polite"><span>{loading ? "Đang tải bảng giá…" : data ? <>Cập nhật: <b>{updatedAt}</b></> : "Bảng giá thu cũ đổi mới"}</span>
         <button type="button" disabled={loading} onClick={() => void load()}>{loading ? "Đang tải…" : "Tải lại bảng giá ↻"}</button></div>
@@ -92,22 +100,25 @@ export default function TradeinLookup() {
         <section className={styles.step} aria-labelledby="old-heading"><div className={styles.stepHeading}><span className={styles.stepNumber}>01</span><div><p>MÁY ĐANG SỬ DỤNG</p><h2 id="old-heading">Tra giá máy cũ</h2></div><span className={styles.stepTag}>5 loại tình trạng</span></div>
           <ProductSearch key={`old-${data.version}`} label="Tìm máy cũ" placeholder="Nhập tên máy, hãng hoặc dung lượng…" products={data.oldProducts} selected={old} disabled={loading}
             onSelect={setOld} onClear={() => { setOld(null); setNext(null); }} />
-          <div className={styles.priceGrid} aria-live="polite">{TRADEIN_GRADES.map(grade => <article className={`${styles.priceCard} ${old ? styles.filled : ""}`} key={grade}>
-            <span className={styles.grade}>Loại {grade}</span><strong>{old ? formatTradeinRange(old.ranges[grade]) : "—"}</strong><small>{old ? "Giá thu máy cũ" : "Chọn máy để xem giá"}</small>
-          </article>)}</div>
-          <p className={styles.note}>Giá hiển thị theo từng loại tình trạng. Giá thu cụ thể được xác định sau khi kiểm tra máy.</p>
+          {old ? <div aria-live="polite"><div className={styles.resultsHeading}><h3>Giá thu theo tình trạng máy</h3><span>Đơn vị: đ</span></div>
+            <div className={styles.priceGrid}>{TRADEIN_GRADES.map(grade => <article className={styles.priceCard} key={grade} aria-label={`Giá thu Loại ${grade}`}>
+              <span className={styles.grade}>Loại {grade}</span><strong><RangeValue range={old.ranges[grade]} /></strong>
+            </article>)}</div>
+            <p className={styles.note}>Giá thu cụ thể được xác định sau khi kiểm tra tình trạng máy.</p>
+            <a className={styles.nextStep} href="#may-moi">Tiếp: chọn máy mới để xem trợ giá <span aria-hidden="true">↓</span></a>
+          </div> : <p className={styles.searchHint}>Tìm model và dung lượng máy để xem giá thu Loại 1–5.</p>}
         </section>
-        <section className={`${styles.step} ${!old ? styles.pendingStep : ""}`} aria-labelledby="new-heading"><div className={styles.stepHeading}><span className={styles.stepNumber}>02</span><div><p>MÁY MUỐN ĐỔI LÊN</p><h2 id="new-heading">Xem trợ giá lên đời</h2></div><span className={styles.stepTag}>{next ? "Đã chọn máy mới" : "Chọn thêm máy mới"}</span></div>
+        <section id="may-moi" className={`${styles.step} ${!old ? styles.pendingStep : ""}`} aria-labelledby="new-heading"><div className={styles.stepHeading}><span className={styles.stepNumber}>02</span><div><p>MÁY MUỐN ĐỔI LÊN</p><h2 id="new-heading">Xem trợ giá lên đời</h2></div><span className={styles.stepTag}>{next ? "Đã chọn máy mới" : "Chọn thêm máy mới"}</span></div>
           <ProductSearch key={`new-${data.version}-${old?.id || "none"}`} label="Tìm máy mới" placeholder={old ? "Nhập tên máy mới muốn đổi lên…" : "Chọn máy cũ ở bước 1 trước"} products={data.newProducts} selected={next} disabled={!old || loading}
             onSelect={setNext} onClear={() => setNext(null)} />
-          {old && next ? <div className={styles.quoteGrid} aria-live="polite">{TRADEIN_GRADES.map(grade => {
+          {old && next ? <div aria-live="polite"><div className={styles.resultsHeading}><h3>Giá thu + trợ giá theo tình trạng</h3><span>Đơn vị: đ</span></div><div className={styles.quoteGrid}>{TRADEIN_GRADES.map(grade => {
             const quote = calculateTradeinQuote(old, next, grade);
-            return <article className={styles.quoteCard} key={grade}><span className={styles.grade}>Loại {grade}</span>
-              <div><small>Giá thu máy cũ</small><b>{formatTradeinRange(old.ranges[grade])}</b></div>
-              <div className={styles.support}><small>Trợ giá lên đời</small><b>{quote ? formatTradeinRange(quote.support, true) : "—"}</b></div>
-              <div className={styles.total}><small>Tổng giá thu + trợ giá</small><strong>{quote ? formatTradeinRange(quote.total) : "Chưa đủ dữ liệu"}</strong></div>
+            return <article className={styles.quoteCard} key={grade} aria-label={`Giá thu và trợ giá Loại ${grade}`}><span className={styles.grade}>Loại {grade}</span>
+              <div className={styles.oldValue}><small>Giá thu máy cũ</small><b><RangeValue range={old.ranges[grade]} /></b></div>
+              <div className={styles.support}><small>Trợ giá lên đời</small><b>{quote ? <RangeValue range={quote.support} allowZero /> : "—"}</b></div>
+              <div className={styles.total}><small>Tổng giá thu + trợ giá</small><strong>{quote ? <RangeValue range={quote.total} /> : "Chưa đủ dữ liệu"}</strong></div>
             </article>;
-          })}</div> : <div className={styles.emptyQuote}><span aria-hidden="true">↗</span><p>{old ? "Chọn máy mới để xem trợ giá và tổng giá trị thu đổi cho cả 5 loại." : "Bắt đầu bằng việc chọn máy cũ. Mức trợ giá sẽ được tính theo máy mới bạn chọn."}</p></div>}
+          })}</div></div> : <div className={styles.emptyQuote}><span aria-hidden="true">↗</span><p>{old ? "Chọn máy mới để xem trợ giá và tổng giá trị thu đổi cho cả 5 loại." : "Bắt đầu bằng việc chọn máy cũ. Mức trợ giá sẽ được tính theo máy mới bạn chọn."}</p></div>}
         </section>
       </div> : null}
       <footer className={styles.footer}><span>VIỄN THÔNG DI ĐỘNG</span><Link href="/#he-thu-cu-doi-moi">Hệ Thu Cũ Đổi Mới <span aria-hidden="true">↗</span></Link></footer>
