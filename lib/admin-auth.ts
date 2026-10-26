@@ -1,7 +1,9 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { redirect } from "next/navigation";
 import { createSignedSessionToken, verifySignedSessionToken } from "@/lib/auth-session";
 import { findStaffByMaNV } from "@/lib/staff-store";
+import { shouldForceStaffPasswordChange, shouldForceStaffSetup } from "@/lib/staff-auth";
 
 export type AdminPermission = "admin" | "mod";
 export type AdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools" | "people";
@@ -175,13 +177,14 @@ export async function getCurrentAdmin() {
   let permission = normalizePermission(session.data?.permission || "");
   let access = parseAdminAccess(session.data?.modules || "");
   let name = String(session.data?.name || "").trim() || safeDecode(cookieStore.get(ADMIN_NAME_COOKIE)?.value || "Admin");
+  let forceSetup = true;
+  let mustChangePassword = true;
 
   if (!permission || !maNV) {
     return null;
   }
 
-  // Lấy Google Sheet làm nguồn quyền chuẩn để tránh lỗi cookie cũ.
-  // Nếu Sheet lỗi tạm thời thì fallback về payload đã ký, không tin cookie quyền rời rạc.
+  // Recheck current security state as well as permissions, including existing sessions after a reset.
   try {
     const staff = await findStaffByMaNV(maNV);
     const sheetPermission = normalizePermission(staff?.permission);
@@ -190,13 +193,17 @@ export async function getCurrentAdmin() {
       return null;
     }
 
+    if (!sheetPermission) return null;
     if (sheetPermission) {
       permission = sheetPermission;
       access = parseAdminAccess(staff?.modulePermissions || "");
       name = staff?.staffName || name || maNV;
     }
+    forceSetup = shouldForceStaffSetup(staff, "", "");
+    mustChangePassword = shouldForceStaffPasswordChange(staff);
   } catch {
-    // Giữ session đã ký để tránh chặn toàn bộ Admin khi Google Sheet lỗi ngắn hạn.
+    // A stale signed role must not bypass a security reset when the source is unavailable.
+    return null;
   }
 
   return {
@@ -208,12 +215,15 @@ export async function getCurrentAdmin() {
     hasExplicitActions: access.hasExplicitActions,
     isAdmin: permission === "admin",
     isMod: permission === "mod",
+    forceSetup,
+    mustChangePassword,
   };
 }
 
 export async function requireAdminPage() {
   const admin = await getCurrentAdmin();
   if (!admin) return null;
+  if (admin.forceSetup) redirect("/admin/setup");
   return admin;
 }
 
@@ -229,6 +239,16 @@ export async function requireAdminApi(
       response: NextResponse.json(
         { success: false, message: "Bạn chưa đăng nhập Admin." },
         { status: 401 }
+      ),
+    };
+  }
+
+  if (admin.forceSetup) {
+    return {
+      admin,
+      response: NextResponse.json(
+        { success: false, code: "STAFF_SETUP_REQUIRED", redirectTo: "/admin/setup", message: "Vui lòng hoàn tất cập nhật thông tin bảo mật trước khi sử dụng quản trị." },
+        { status: 403 }
       ),
     };
   }

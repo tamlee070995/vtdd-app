@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { findStaffByMaNV, ensureStaffAdminHeaders, getStaffRows } from "@/lib/staff-store";
 import { verifyPassword, normalizeCode, decryptText } from "@/lib/staff-security";
 import { setAdminCookies } from "@/lib/admin-auth";
-import { setStaffSessionCookies } from "@/lib/staff-auth";
+import { setStaffSessionCookies, shouldForceStaffSetup } from "@/lib/staff-auth";
 import { sendAdminLoginFailedAlertMail } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
@@ -213,11 +213,13 @@ export async function POST(req: NextRequest) {
     }
 
     clearFailedAdminLogin(req, maNV);
+    const forceSetup = shouldForceStaffSetup(staff, safeDecrypt(staff.gmail), safeDecrypt(staff.securityQuestion));
 
     const res = NextResponse.json({
       success: true,
       message: "Đăng nhập Admin thành công.",
-      redirectTo: "/admin",
+      forceSetup,
+      redirectTo: forceSetup ? "/admin/setup" : "/admin",
     });
 
     setAdminCookies(res, {
@@ -234,7 +236,7 @@ export async function POST(req: NextRequest) {
       storeName: staff.storeName || "",
       department: staff.department || "",
       gmail: "",
-      forceSetup: false,
+      forceSetup,
     });
 
     return res;

@@ -65,10 +65,9 @@ export function shouldForceStaffSetup(staff: StaffRow, gmail: string, securityQu
   const hasSecurityQuestion = Boolean(securityQuestion) || hasConfiguredSecureValue(staff.securityQuestion);
   const hasSecurityAnswer = Boolean(String(staff.securityAnswer || "").trim());
   const needSetupByMissingSecurity = !hasGmail || !hasSecurityQuestion || !hasSecurityAnswer;
-  const needSetupByFlagStillRelevant = needSetupByFlag && needSetupByMissingSecurity;
 
   return (
-    needSetupByFlagStillRelevant ||
+    needSetupByFlag ||
     needSetupByMissingSecurity ||
     shouldForceStaffPasswordChange(staff)
   );
@@ -139,7 +138,7 @@ async function buildCurrentStaff(maNV: string) {
 
   if (!staff) return null;
   if (String(staff.status || "").trim().toLowerCase() !== "active") return null;
-  if (!staff.maST) return null;
+  if (!staff.maST && staff.permission !== "admin" && staff.permission !== "mod") return null;
 
   const gmail = safeDecrypt(staff.gmail);
   const securityQuestion = safeDecrypt(staff.securityQuestion);
