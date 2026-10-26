@@ -7,8 +7,51 @@ import HomeNavigationFeedback from "./HomeNavigationFeedback";
 import styles from "@/app/page.module.css";
 
 type IconName = "tradein" | "phone" | "used" | "demo" | "tools" | "search" | "printer" | "document";
-export type HomeTool = { title: string; desc: string; href?: string; status?: string; icon: IconName };
-export type HomeGroup = { id: string; title: string; navTitle: string; shortTitle: string; desc: string; icon: IconName; items: HomeTool[] };
+export type HomeTool = { title: string; desc: string; mobileDesc?: string; featured?: boolean; href?: string; status?: string; icon: IconName };
+export type HomeGroup = { id: string; title: string; navTitle: string; shortTitle: string; desc: string; mobileDesc?: string; icon: IconName; items: HomeTool[] };
+
+const quickGuides: Record<string, { title: string; steps: { title: string; desc: string }[] }> = {
+  "he-thu-cu-doi-moi": {
+    title: "Tra giá và chuẩn bị hồ sơ thu cũ",
+    steps: [
+      { title: "Tìm đúng máy", desc: "Chọn tên máy cũ và dung lượng để xem giá theo Loại 1–5." },
+      { title: "Xem trợ giá lên đời", desc: "Chọn thêm máy mới trong trang tra giá để xem mức trợ giá." },
+      { title: "In tem, xem quy trình", desc: "Mở công cụ in sticker hoặc tài liệu quy trình để thực hiện bước tiếp theo." },
+    ],
+  },
+  "he-may-moi": {
+    title: "Tra cứu chính sách sản phẩm mới",
+    steps: [
+      { title: "Mở tài liệu", desc: "Chọn chính sách bảo hành trong nhóm Hệ máy mới." },
+      { title: "Kiểm tra phạm vi áp dụng", desc: "Đối chiếu sản phẩm và các điều kiện được nêu trong tài liệu." },
+      { title: "Xem nội dung hiện hành", desc: "Mở lại tài liệu khi cần tư vấn để đọc nội dung đang được xuất bản." },
+    ],
+  },
+  "he-may-cu": {
+    title: "Tìm nghiệp vụ dành cho máy cũ",
+    steps: [
+      { title: "Mở tài liệu máy cũ", desc: "Chọn mục máy đã sử dụng và máy cũ thu mua trong nhóm này." },
+      { title: "Chọn nội dung phù hợp", desc: "Tìm phần liên quan đến loại máy và nghiệp vụ cần xử lý." },
+      { title: "Đối chiếu quy trình", desc: "Đọc các bước và lưu ý trong tài liệu trước khi thực hiện." },
+    ],
+  },
+  demo: {
+    title: "Mở hướng dẫn gỡ demo theo hãng",
+    steps: [
+      { title: "Mở Gỡ Demo", desc: "Chọn công cụ Gỡ Demo để vào danh mục hãng." },
+      { title: "Chọn đúng hãng", desc: "Mở trang hãng phù hợp với thiết bị đang xử lý." },
+      { title: "Làm theo hướng dẫn", desc: "Xem các bước, ảnh minh họa hoặc tệp công cụ được đính kèm." },
+    ],
+  },
+  "cong-cu-ho-tro": {
+    title: "Bắt đầu một nghiệp vụ hỗ trợ",
+    steps: [
+      { title: "Vào cổng công cụ", desc: "Mở danh mục công cụ hỗ trợ siêu thị." },
+      { title: "Chọn nghiệp vụ", desc: "Tìm công cụ phù hợp như PMH, chiến giá hoặc thẩm định hồ sơ." },
+      { title: "Chuẩn bị thông tin", desc: "Điền thông tin theo yêu cầu của công cụ đang sử dụng." },
+    ],
+  },
+};
 
 function Icon({ name }: { name: IconName }) {
   const paths = {
@@ -36,6 +79,7 @@ export default function HomePortal({ groups }: { groups: HomeGroup[] }) {
   const active = groups.find(group => group.id === activeId) || groups[0];
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
   const searching = terms.length > 0;
+  const guide = quickGuides[active.id];
   const entries = (searching ? groups : [active]).flatMap(group => group.items
     .filter(item => !searching || terms.every(term => normalize(`${item.title} ${item.desc} ${group.title}`).includes(term)))
     .map(item => ({ ...item, group })));
@@ -84,7 +128,7 @@ export default function HomePortal({ groups }: { groups: HomeGroup[] }) {
       <aside className={styles.sidebar}>
         <header className={styles.brandRow}>
           <Link className={styles.brand} href="/" aria-label="Viễn Thông Di Động — Trang chủ">
-            <Image src="/brand/vtdd-logo-v2.webp" width={52} height={52} alt="Viễn Thông Di Động" unoptimized priority />
+            <Image src="/brand/vtdd-logo-header-v3.webp" width={52} height={52} alt="Viễn Thông Di Động" unoptimized priority />
             <span><strong>ICT</strong><small>Viễn Thông Di Động</small></span>
           </Link>
           <Link className={styles.mobileAdmin} href="/admin">Admin</Link>
@@ -106,22 +150,44 @@ export default function HomePortal({ groups }: { groups: HomeGroup[] }) {
       <main className={styles.main} id="noi-dung" tabIndex={-1}>
         <div className={styles.content} id="home-tools-panel" role="tabpanel" aria-labelledby={`tab-${active.id}`} tabIndex={0}>
           <header className={styles.contentHeader}>
-            <div className={styles.heading}><p>Viễn Thông Di Động</p><h1>{searching ? "Kết quả tìm kiếm" : active.title}</h1></div>
+            <div className={styles.heading}>
+              <p className={styles.eyebrow}>Viễn Thông Di Động</p>
+              <div className={styles.titleRow}>
+                <h1>{searching ? "Kết quả tìm kiếm" : active.title}</h1>
+                <span className={styles.count} role="status" aria-live="polite" aria-atomic="true">{entries.length} {searching ? "kết quả" : "mục"}</span>
+              </div>
+              <p className={styles.groupDescription}>
+                <span className={styles.desktopDescription}>{searching ? "Tìm trong tất cả nhóm nghiệp vụ" : active.desc}</span>
+                <span className={styles.mobileDescription}>{searching ? "Tìm trong tất cả nhóm nghiệp vụ" : active.mobileDesc || active.desc}</span>
+              </p>
+            </div>
             <form className={styles.search} role="search" onSubmit={event => event.preventDefault()}>
               <Icon name="search" />
               <input ref={search} type="search" aria-label="Tìm nhanh công cụ" placeholder="Tìm nhanh…" autoComplete="off" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Escape") setQuery(""); }} />
               {query && <button type="button" aria-label="Xóa tìm kiếm" onClick={() => { setQuery(""); search.current?.focus(); }}>×</button>}
             </form>
           </header>
-          <div className={styles.sectionIntro}><p>{searching ? "Tìm trong tất cả nhóm nghiệp vụ" : active.desc}</p><span role="status" aria-live="polite" aria-atomic="true">{entries.length} {searching ? "kết quả" : "mục"}</span></div>
-          <section className={styles.toolGrid} aria-label={searching ? "Kết quả tìm kiếm công cụ" : `Công cụ ${active.title}`}>
+          <section className={styles.toolGrid} data-single={entries.length === 1 || undefined} aria-label={searching ? "Kết quả tìm kiếm công cụ" : `Công cụ ${active.title}`}>
             {entries.map(item => {
-              const body = <><span className={styles.toolIcon}><Icon name={item.icon} /></span><span className={styles.toolText}>{searching && <span className={styles.category}>{item.group.title}</span>}<b>{item.title}</b><small>{item.desc}</small>{!item.href && <em>{item.status || "Đang cập nhật"}</em>}</span>{item.href && <i className={styles.arrow} aria-hidden="true">›</i>}</>;
-              return item.href ? <Link className={styles.toolItem} href={item.href} key={`${item.group.id}-${item.title}`}>{body}</Link> : <div className={styles.toolItemDisabled} key={`${item.group.id}-${item.title}`}>{body}</div>;
+              const body = <>
+                <span className={styles.toolVisual}><span className={styles.toolIcon}><Icon name={item.icon} /></span>{item.featured && <span className={styles.featuredBadge}>Dùng nhiều</span>}</span>
+                <span className={styles.toolText}>
+                  {searching && <span className={styles.category}>{item.group.title}</span>}
+                  <b>{item.title}</b>
+                  <small className={styles.desktopDescription}>{item.desc}</small>
+                  <small className={styles.mobileDescription} title={item.desc}>{item.mobileDesc || item.desc}</small>
+                  {!item.href && <em>{item.status || "Đang cập nhật"}</em>}
+                </span>
+                {item.href && <span className={styles.openAction} aria-hidden="true"><span className={styles.actionLabel}>Xem ngay</span><i className={styles.arrow}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg></i></span>}
+              </>;
+              return item.href ? <Link className={styles.toolItem} data-featured={item.featured || undefined} href={item.href} key={`${item.group.id}-${item.title}`}>{body}</Link> : <div className={styles.toolItemDisabled} key={`${item.group.id}-${item.title}`}>{body}</div>;
             })}
           </section>
           {!entries.length && <div className={styles.empty}><span className={styles.emptyIcon}><Icon name="search" /></span><h2>Chưa tìm thấy công cụ</h2><p>Thử tên ngắn hơn như “giá”, “sticker” hoặc “demo”.</p><button type="button" onClick={() => { setQuery(""); search.current?.focus(); }}>Xóa tìm kiếm</button></div>}
-          <footer className={styles.footer}>Trung tâm chính sách &amp; nghiệp vụ sản phẩm</footer>
+          {!searching && guide && <section className={styles.quickGuide} aria-label="Hướng dẫn nhanh">
+            <div className={styles.guideHeading}><span><Icon name="document" /></span><div><p>HƯỚNG DẪN NHANH</p><h2>{guide.title}</h2></div></div>
+            <ol className={styles.guideSteps}>{guide.steps.map((step, index) => <li key={step.title}><span className={styles.guideNumber}>{index + 1}</span><div><h3>{step.title}</h3><p>{step.desc}</p></div></li>)}</ol>
+          </section>}
         </div>
       </main>
     </div>
