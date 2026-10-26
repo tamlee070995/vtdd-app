@@ -1,5 +1,5 @@
 .page {
-  --home-tab-height: 76px;
+  --home-tab-height: 68px;
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
@@ -22,6 +22,7 @@
 .tabs { display: grid; gap: 8px; }
 .tab { position: relative; min-height: 50px; display: flex; gap: 12px; align-items: center; padding: 13px 14px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: #b6c1d0; text-align: left; font-size: 14px; font-weight: 500; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .15s ease, color .15s ease; }
 .tab svg { flex: 0 0 auto; width: 21px; height: 21px; }
+.navIcon { display: inline-grid; place-items: center; width: 24px; height: 24px; flex: 0 0 auto; }
 .tab[aria-selected="true"] { background: #202b3d; color: #ffda26; font-weight: 700; }
 .tab[aria-selected="true"]::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 3px; background: #ffd400; }
 .sidebarFooter { margin-top: auto; padding: 30px 10px 0; }
@@ -111,13 +112,15 @@
   .mobileAdmin { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 68px; padding: 8px 14px; border: 1px solid #ffffff30; border-radius: 22px; color: #e8edf4; font-size: 12px; font-weight: 500; }
   .navHeading, .sidebarFooter, .desktopLabel, .desktopDescription, .quickGuide, .featuredBadge, .actionLabel { display: none; }
   .mobileLabel, .mobileDescription { display: block; }
-  .navigation { position: fixed; z-index: 50; left: 0; right: 0; bottom: 0; margin: 0; padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); background: #fff; border-top: 1px solid #dce2eb; box-shadow: 0 -4px 20px #0b122005; }
-  .tabs { height: var(--home-tab-height); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 8px 6px; }
-  .tab { min-width: 0; min-height: 0; height: 60px; flex-direction: column; justify-content: center; gap: 4px; padding: 11px 1px 5px; border: 0; border-radius: 12px; text-align: center; font-size: 11px; font-weight: 500; line-height: 1.25; white-space: nowrap; color: #596577; }
-  .tab svg { width: 22px; height: 22px; }
-  .tab[aria-selected="true"] { background: #fff6d9; color: #80520c; font-weight: 700; }
-  .tab[aria-selected="true"]::before { top: 5px; left: 50%; right: auto; bottom: auto; width: 22px; height: 3px; transform: translateX(-50%); border-radius: 99px; background: #d29a0c; }
-  .main { min-height: calc(100dvh - 66px); padding: 20px max(18px, env(safe-area-inset-right, 0px)) calc(var(--home-tab-height) + env(safe-area-inset-bottom, 0px) + 40px) max(18px, env(safe-area-inset-left, 0px)); }
+  .navigation { position: fixed; z-index: 50; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); max-width: 600px; margin: 0 auto; padding: 0; background: #fff; border: 1px solid #dce2eb; border-radius: 17px; box-shadow: 0 4px 20px #0b122009; }
+  .tabs { height: var(--home-tab-height); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 6px 4px; }
+  .tab { min-width: 0; min-height: 0; height: 56px; flex-direction: column; justify-content: center; gap: 4px; padding: 0 1px; border: 0; border-radius: 10px; text-align: center; font-size: 11px; font-weight: 500; line-height: 1.25; white-space: nowrap; color: #6b7280; }
+  .tab .navIcon { width: 48px; height: 32px; border-radius: 99px; background: transparent; }
+  .tab .navIcon svg { width: 23px; height: 23px; }
+  .tab[aria-selected="true"] { background: transparent; color: #07111f; font-weight: 700; }
+  .tab[aria-selected="true"] .navIcon { background: #ffd400; color: #07111f; }
+  .tab[aria-selected="true"]::before { content: none; }
+  .main { min-height: calc(100dvh - 66px); padding: 20px max(18px, env(safe-area-inset-right, 0px)) calc(var(--home-tab-height) + env(safe-area-inset-bottom, 0px) + 52px) max(18px, env(safe-area-inset-left, 0px)); }
   .contentHeader { flex-direction: column; align-items: stretch; gap: 16px; margin-bottom: 18px; }
   .eyebrow { margin-bottom: 5px; font-size: 12px; }
   .titleRow { gap: 10px; }

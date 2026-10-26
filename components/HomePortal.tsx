@@ -55,16 +55,16 @@ const quickGuides: Record<string, { title: string; steps: { title: string; desc:
 
 function Icon({ name }: { name: IconName }) {
   const paths = {
-    tradein: <><path d="m8 4 2-2 3 5-5 1 1-2H6L3 11" /><path d="m20 10 2 2-3 5-3-4 2 1 1-3-3-5" /><path d="m13 21-3 1-3-5 5-1-1 2h4l3-5" /></>,
-    phone: <><rect x="6" y="2" width="12" height="20" rx="2.5" /><path d="M10 5h4M11 19h2" /></>,
-    used: <><path d="M3 9a9 9 0 0 1 15-4l3 3M21 3v5h-5M21 15a9 9 0 0 1-15 4l-3-3M3 21v-5h5" /><path d="M10 8h4v8h-4z" /></>,
-    demo: <><rect x="3" y="3" width="18" height="13" rx="2" /><path d="m7 12 3-4 3 3 4-5M8 21h8M12 16v5" /></>,
-    tools: <><path d="m14 6 4 4M3 21l9-9M3 3l18 18M3 3l5 1-4 4-1-5ZM17 3a5 5 0 0 0-6 6l4 4a5 5 0 0 0 6-6l-4 4-4-4 4-4Z" /></>,
+    tradein: <use href="/icons/home-navigation-v1.svg#icon-thu-cu-doi-moi" />,
+    phone: <use href="/icons/home-navigation-v1.svg#icon-may-moi" />,
+    used: <use href="/icons/home-navigation-v1.svg#icon-may-cu" />,
+    demo: <use href="/icons/home-navigation-v1.svg#icon-demo" />,
+    tools: <use href="/icons/home-navigation-v1.svg#icon-cong-cu" />,
     search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>,
     printer: <><path d="M7 8V3h10v5M7 17H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-3" /><path d="M7 14h10v7H7zM17 11h1" /></>,
     document: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" /><path d="M14 2v6h6M8 12h8M8 16h6" /></>,
   };
-  return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+  return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={name === "search" || name === "printer" || name === "document" ? 1.7 : 1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
 function normalize(value: string) {
@@ -137,7 +137,7 @@ export default function HomePortal({ groups }: { groups: HomeGroup[] }) {
           <div className={styles.navHeading}>DANH MỤC NGHIỆP VỤ</div>
           <div className={styles.tabs} role="tablist" aria-label="Nhóm nghiệp vụ">
             {groups.map((group, index) => <button className={styles.tab} key={group.id} ref={node => { tabs.current[index] = node; }} type="button" role="tab" id={`tab-${group.id}`} aria-selected={active.id === group.id} aria-controls="home-tools-panel" tabIndex={active.id === group.id ? 0 : -1} onClick={() => selectGroup(group.id)} onKeyDown={event => handleTabKey(event, index)}>
-              <Icon name={group.icon} /><span className={styles.desktopLabel}>{group.navTitle}</span><span className={styles.mobileLabel}>{group.shortTitle}</span>
+              <span className={styles.navIcon}><Icon name={group.icon} /></span><span className={styles.desktopLabel}>{group.navTitle}</span><span className={styles.mobileLabel}>{group.shortTitle}</span>
             </button>)}
           </div>
         </nav>
