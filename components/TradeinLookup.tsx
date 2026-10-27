@@ -10,6 +10,7 @@ import TradeinUpdateNotice from "./TradeinUpdateNotice";
 import styles from "./Tradein.module.css";
 import { suggestTradeinProducts } from "@/lib/tradein-search";
 import UiNotice from "./UiNotice";
+import TradeinGradeInfo from "./TradeinGradeInfo";
 
 type SearchProduct = { id: string; brand: string; model: string; storage?: string };
 const priceNumber = new Intl.NumberFormat("vi-VN");
@@ -44,7 +45,7 @@ function ProductSearch<T extends SearchProduct>({ label, placeholder, products, 
   }, []);
   useEffect(() => { if (open && active >= 0) root.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" }); }, [active, open]);
   const pick = (product: T) => { root.current?.querySelector("input")?.blur(); onSelect(product); setQuery(""); setOpen(false); setActive(-1); };
-  return <div className={styles.searchField} ref={root} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
+  return <div className={styles.searchField} ref={root} onBlur={event => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
     <label htmlFor={selected ? undefined : id}>{label}</label>
     {selected ? <div className={styles.selection}><span><b>{selected.model}</b><small>{selected.brand}{selected.storage ? ` · ${selected.storage}` : ""}</small></span>
       <button type="button" onClick={() => { onClear(); setQuery(""); setOpen(false); }}>Đổi máy</button></div> : <>
@@ -74,12 +75,12 @@ function ProductSearch<T extends SearchProduct>({ label, placeholder, products, 
 }
 
 export default function TradeinLookup() {
-  const { data, status, loading, error, refreshReason, retry } = useTradeinPage();
+  const { data, gradeGuide, status, loading, error, refreshReason, retry } = useTradeinPage();
   const [old, setOld] = useState<OldTradeinProduct | null>(null);
   const [next, setNext] = useState<NewTradeinProduct | null>(null);
   const updatedAt = data ? new Date(data.syncedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false }) : "";
-  return <><main className={styles.page} inert={Boolean(refreshReason)}>
-    <header className={`${styles.topbar} ui-topbar`}><Link className={styles.brand} href="/" aria-label="Viễn Thông Di Động — Trang chủ">
+  return <><main data-portal-page className={styles.page} inert={Boolean(refreshReason)}>
+    <header data-page-header className={`${styles.topbar} ui-topbar`}><Link className={styles.brand} href="/" aria-label="Viễn Thông Di Động — Trang chủ">
       <Image src="/brand/vtdd-logo-header-v3.webp" width={46} height={46} alt="" /><span><b>Viễn Thông Di Động</b><small>Chính sách &amp; nghiệp vụ sản phẩm</small></span>
     </Link><Link className={styles.homeLink} href="/">Trang chủ <span aria-hidden="true">↗</span></Link></header>
     <div className={styles.shell}>
@@ -93,12 +94,12 @@ export default function TradeinLookup() {
       {error ? <UiNotice onRetry={retry} busy={loading}>{error}</UiNotice> : null}
       {!data && loading ? <UiNotice tone="loading">Đang chuẩn bị danh sách máy và bảng giá…</UiNotice> : null}
       {data ? <div className={styles.steps} aria-busy={loading}>
-        <section className={styles.step} aria-labelledby="old-heading"><div className={styles.stepHeading}><span className={styles.stepNumber}>01</span><div><p>MÁY ĐANG SỬ DỤNG</p><h2 id="old-heading">Tra giá máy cũ</h2></div><span className={styles.stepTag}>5 loại tình trạng</span></div>
+        <section className={styles.step} aria-labelledby="old-heading"><div className={styles.stepHeading}><span className={styles.stepNumber}>01</span><div><p>MÁY ĐANG SỬ DỤNG</p><h2 id="old-heading">Tra giá máy cũ</h2></div><TradeinGradeInfo descriptions={gradeGuide} /></div>
           <ProductSearch key={`old-${data.version}`} label="Tìm máy cũ" placeholder="Nhập tên máy, hãng hoặc dung lượng…" products={data.oldProducts} selected={old} disabled={loading}
             onSelect={setOld} onClear={() => { setOld(null); setNext(null); }} />
           {old ? <div aria-live="polite"><div className={styles.resultsHeading}><h3>Giá thu theo tình trạng máy</h3><span>Đơn vị: đ</span></div>
             <div className={styles.priceGrid}>{TRADEIN_GRADES.map(grade => <article className={styles.priceCard} key={grade} aria-label={`Giá thu Loại ${grade}`}>
-              <span className={styles.grade}>Loại {grade}</span><strong><RangeValue range={old.ranges[grade]} /></strong>
+              <TradeinGradeInfo grade={grade} descriptions={gradeGuide} /><strong><RangeValue range={old.ranges[grade]} /></strong>
             </article>)}</div>
             <p className={styles.note}>Giá thu cụ thể được xác định sau khi kiểm tra tình trạng máy.</p>
             <a className={styles.nextStep} href="#may-moi">Tiếp: chọn máy mới để xem trợ giá <span aria-hidden="true">↓</span></a>
@@ -109,7 +110,7 @@ export default function TradeinLookup() {
             onSelect={setNext} onClear={() => setNext(null)} />
           {old && next ? <div aria-live="polite"><div className={styles.resultsHeading}><h3>Giá thu + trợ giá theo tình trạng</h3><span>Đơn vị: đ</span></div><div className={styles.quoteGrid}>{TRADEIN_GRADES.map(grade => {
             const quote = calculateTradeinQuote(old, next, grade);
-            return <article className={styles.quoteCard} key={grade} aria-label={`Giá thu và trợ giá Loại ${grade}`}><span className={styles.grade}>Loại {grade}</span>
+            return <article className={styles.quoteCard} key={grade} aria-label={`Giá thu và trợ giá Loại ${grade}`}><TradeinGradeInfo grade={grade} descriptions={gradeGuide} />
               <div className={styles.oldValue}><small>Giá thu máy cũ</small><b><RangeValue range={old.ranges[grade]} /></b></div>
               <div className={styles.support}><small>Trợ giá lên đời</small><b>{quote ? <RangeValue range={quote.support} allowZero /> : "—"}</b></div>
               <div className={styles.total}><small>Tổng giá thu + trợ giá</small><strong>{quote ? <RangeValue range={quote.total} /> : "Chưa đủ dữ liệu"}</strong></div>

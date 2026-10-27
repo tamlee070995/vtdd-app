@@ -10,6 +10,8 @@
   --ui-visual-top: 0px;
 }
 .vtdd-ui { color: var(--ui-navy); background: var(--ui-page); }
+[data-portal-shell] [data-page-header] { display:none; }
+@media screen { body.vtdd-ui [data-portal-shell] [data-portal-page] { min-height:0; background:var(--ui-page); } }
 body.vtdd-ui .ui-public-page { background: var(--ui-page); }
 body.vtdd-ui .ui-topbar { background: var(--ui-navy); border-radius: 16px; box-shadow: none; }
 body.vtdd-ui .ui-topbar a { min-height: 44px; }

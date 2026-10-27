@@ -118,3 +118,23 @@
 }
 @media(hover:hover) { .option:hover { background:#fff7d5; }.nextStep:hover { background:#ffed9b; } }
 @media(prefers-reduced-motion:reduce) { .page * { scroll-behavior:auto; } }
+.gradeInfo { display:inline-flex; align-items:center; justify-content:space-between; gap:8px; min-height:38px; padding:5px 0; border:0; background:transparent; color:#735600; font:inherit; font-size:12px; font-weight:800; cursor:pointer; text-align:left; }
+.gradeInfo > span:last-child { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:#fff1b0; font-size:18px; }
+.stepHeading > .gradeInfo { margin-left:auto; flex-shrink:0; }
+.gradeDialog { position:fixed; inset:0; margin:auto; padding:0; width:min(540px,calc(100vw - 24px)); max-width:calc(100vw - 24px); max-height:calc(var(--ui-visual-height,100dvh) - 32px); overflow-y:auto; overscroll-behavior:contain; border:1px solid #dce2eb; border-radius:20px; background:#fff; color:#07111f; box-shadow:0 20px 80px #07111f40; }
+.gradeDialog::backdrop { background:#07111f99; }
+.gradeDialogBody { padding:24px; }
+.gradeDialogBody header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.gradeDialogBody header p { margin:0 0 8px; color:#816300; font-size:10px; font-weight:800; letter-spacing:.05em; }
+.gradeDialogBody h2 { margin:0; font-size:23px; line-height:1.4; }
+.gradeDialogBody header button { width:44px; height:44px; flex-shrink:0; border:1px solid #dce2eb; border-radius:12px; background:#f7f8fa; color:#07111f; font-size:25px; cursor:pointer; }
+.gradeChoices { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; margin:22px 0; }
+.gradeChoices button { min-height:44px; padding:4px; border:1px solid #dce2eb; border-radius:10px; background:#fff; color:#526176; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.gradeChoices button[aria-pressed=true] { background:#ffd400; border-color:#c5a300; color:#07111f; }
+.gradeDialog .gradeDefinition { margin:0; padding:18px; border:1px solid #e4e8ef; border-radius:12px; background:#f8fafc; color:#07111f; font-size:16px; font-weight:400; letter-spacing:0; line-height:1.8; white-space:pre-line; overflow-wrap:anywhere; }
+.gradeDialog .gradeCaution { margin:18px 0; color:#596577; font-size:13px; font-weight:400; letter-spacing:0; line-height:1.7; }
+.gradeGuideLink { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:46px; color:#145db5; font-size:14px; font-weight:700; text-decoration:none; }
+.gradeGuideLink span { font-size:24px; }
+.gradeEditor { margin-top:16px; }
+.gradeEditor textarea { width:100%; }
+@media(max-width:420px) { .stepHeading { flex-wrap:wrap; } .gradeDialogBody { padding:18px; } .gradeDialogBody h2 { font-size:20px; } .gradeChoices button { font-size:12px; } }

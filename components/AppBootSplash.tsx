@@ -8,6 +8,9 @@ export default function AppBootSplash() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    const installed = window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (!installed) return;
     try {
       if (sessionStorage.getItem(BOOT_SPLASH_KEY) === "1") return;
       sessionStorage.setItem(BOOT_SPLASH_KEY, "1");

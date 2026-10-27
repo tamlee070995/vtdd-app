@@ -3,9 +3,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TRADEIN_POLL_MS, tradeinRefreshReason, type TradeinRefreshReason, type TradeinStatus } from "@/lib/tradein-control";
 import type { TradeinData } from "@/lib/tradein-pricing";
 import { clientErrorMessage } from "@/lib/client-request";
+import { defaultGradeGuide, type GradeDescriptions } from "@/lib/tradein-grade-guide";
 
 export default function useTradeinPage() {
   const [data, setData] = useState<TradeinData | null>(null);
+  const [gradeGuide, setGradeGuide] = useState<GradeDescriptions>(defaultGradeGuide().descriptions);
   const [status, setStatus] = useState<TradeinStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,7 +36,7 @@ export default function useTradeinPage() {
         if (payload.code === "TRADEIN_LOCKED" && payload.status?.locked) { receiveStatus(payload.status); return; }
         if (!response.ok || !payload.success) throw new Error(payload.message || "Chưa tải được bảng giá.");
         // A lock detected during this request takes priority over its price response.
-        if (!lastStatus.current?.locked) { loadedAt.current = payload.data.syncedAt; setData(payload.data); }
+        if (!lastStatus.current?.locked) { loadedAt.current = payload.data.syncedAt; setData(payload.data); setGradeGuide(payload.gradeGuide || defaultGradeGuide().descriptions); }
       } catch (reason) {
         if (!stopped) setError(clientErrorMessage(reason, "Chưa tải được bảng giá."));
       } finally { window.clearTimeout(timeout); if (!stopped) setLoading(false); }
@@ -72,5 +74,5 @@ export default function useTradeinPage() {
       window.removeEventListener("pageshow", wake);
     };
   }, [receiveStatus]);
-  return { data, status, loading, error, refreshReason, retry: () => setAttempt(value => value + 1) };
+  return { data, gradeGuide, status, loading, error, refreshReason, retry: () => setAttempt(value => value + 1) };
 }

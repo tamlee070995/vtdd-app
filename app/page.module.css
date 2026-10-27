@@ -23,8 +23,8 @@
 .tab { position: relative; min-height: 50px; display: flex; gap: 12px; align-items: center; padding: 13px 14px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: #b6c1d0; text-align: left; font-size: 14px; font-weight: 500; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .15s ease, color .15s ease; }
 .tab svg { flex: 0 0 auto; width: 21px; height: 21px; }
 .navIcon { display: inline-grid; place-items: center; width: 24px; height: 24px; flex: 0 0 auto; }
-.tab[aria-selected="true"] { background: #202b3d; color: #ffda26; font-weight: 700; }
-.tab[aria-selected="true"]::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 3px; background: #ffd400; }
+.tab[aria-current="page"] { background: #202b3d; color: #ffda26; font-weight: 700; }
+.tab[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 3px; background: #ffd400; }
 .sidebarFooter { margin-top: auto; padding: 30px 10px 0; }
 .sidebarFooter p { padding-bottom: 18px; color: #a7b6ca; font-size: 14px; line-height: 1.65; }
 .adminButton { display: flex; gap: 12px; justify-content: space-between; align-items: center; min-height: 44px; padding: 12px 0; border-top: 1px solid #ffffff1c; color: #dce3ed; font-size: 13px; font-weight: 500; }
@@ -43,6 +43,7 @@
 .search:focus-within { border-color: #b88212; box-shadow: 0 0 0 3px #ffcf552b; }
 .search input { width: 100%; min-width: 0; height: 100%; padding: 0 12px 0 0; border: 0; border-radius: inherit; outline: none; background: transparent; color: #111827; font-size: 16px; -webkit-appearance: none; appearance: none; }
 .search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.page .search input:focus-visible { outline:none; box-shadow:none; }
 .search button { flex: 0 0 44px; height: 44px; border: 0; background: transparent; color: #596577; border-radius: 10px; font-size: 24px; cursor: pointer; }
 .toolGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .toolItem, .toolItemDisabled { position: relative; min-width: 0; min-height: 252px; display: flex; flex-direction: column; align-items: stretch; padding: 24px; border: 1px solid #dce2eb; border-radius: 18px; background: #fff; }
@@ -91,7 +92,7 @@
 .empty button { min-height: 44px; margin-top: 20px; padding: 10px 18px; border: 1px solid #d8c08d; border-radius: 10px; background: #fff6d9; color: #80520c; cursor: pointer; font-size: 14px; font-weight: 500; }
 @keyframes opening { to { transform: rotate(360deg); } }
 @media (hover: hover) { .toolItem:hover { border-color: #c39426; box-shadow: 0 8px 24px #0b12200d; transform: translateY(-2px); }.toolItem:hover .openAction { color: #08478f; } }
-@media (min-width: 1024px) and (hover: hover) { .tab:hover { background: #1a2536; color: #fff; }.tab[aria-selected="true"]:hover { color: #ffda26; } }
+@media (min-width: 1024px) and (hover: hover) { .tab:hover { background: #1a2536; color: #fff; }.tab[aria-current="page"]:hover { color: #ffda26; } }
 @media (max-width: 1199px) and (min-width: 1024px) {
   .page { grid-template-columns: 224px minmax(0, 1fr); }
   .sidebar { padding-left: 14px; padding-right: 14px; }
@@ -117,9 +118,9 @@
   .tab { min-width: 0; min-height: 0; height: 56px; flex-direction: column; justify-content: center; gap: 4px; padding: 0 1px; border: 0; border-radius: 10px; text-align: center; font-size: 11px; font-weight: 500; line-height: 1.25; white-space: nowrap; color: #6b7280; }
   .tab .navIcon { width: 48px; height: 32px; border-radius: 99px; background: transparent; }
   .tab .navIcon svg { width: 23px; height: 23px; }
-  .tab[aria-selected="true"] { background: transparent; color: #07111f; font-weight: 700; }
-  .tab[aria-selected="true"] .navIcon { background: #ffd400; color: #07111f; }
-  .tab[aria-selected="true"]::before { content: none; }
+  .tab[aria-current="page"] { background: transparent; color: #07111f; font-weight: 700; }
+  .tab[aria-current="page"] .navIcon { background: #ffd400; color: #07111f; }
+  .tab[aria-current="page"]::before { content: none; }
   .main { min-height: calc(100dvh - 66px); padding: 20px max(18px, env(safe-area-inset-right, 0px)) calc(var(--home-tab-height) + env(safe-area-inset-bottom, 0px) + 52px) max(18px, env(safe-area-inset-left, 0px)); }
   .contentHeader { flex-direction: column; align-items: stretch; gap: 16px; margin-bottom: 18px; }
   .eyebrow { margin-bottom: 5px; font-size: 12px; }
@@ -154,3 +155,26 @@
   .tab { font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .tab, .toolItem { transition: none; }.toolItem[data-opening="true"] .arrow::after { animation: none; } }
+
+/* Shared frame survives client navigation. */
+.page { --portal-sidebar-width:252px; --portal-bottom-nav-space:0px; }
+.tab { text-decoration:none; }
+.portalBody { position:relative; min-width:0; min-height:100dvh; }
+.routeContent { min-width:0; }
+.routeSkeleton { position:fixed; inset:0 0 0 var(--portal-sidebar-width); z-index:10; padding:40px; background:var(--ui-page); }
+.routeSkeleton > section { padding:0; }
+.openingLabel { display:none; align-items:center; gap:7px; color:#80520c; font-size:13px; font-weight:700; line-height:1.5; }
+.openingLabel i { width:14px; height:14px; border:2px solid #d9c78e; border-top-color:#80520c; border-radius:50%; animation:opening .8s linear infinite; }
+.toolItem[data-opening="true"] .openingLabel { display:inline-flex; }
+.toolItem[data-opening="true"] .toolText small, .toolItem[data-opening="true"] .openAction { display:none; }
+@media(min-width:1024px) and (max-width:1199px) { .page { --portal-sidebar-width:224px; } }
+@media(max-width:1023px) {
+ .page { --portal-sidebar-width:0px; --portal-bottom-nav-space:90px; }
+ .portalBody { min-height:calc(100dvh - 66px); padding-bottom:calc(94px + env(safe-area-inset-bottom,0px)); }
+ .routeSkeleton { top:calc(66px + env(safe-area-inset-top,0px)); bottom:calc(90px + env(safe-area-inset-bottom,0px)); padding:22px 18px; }
+}
+@media print {
+ .page { display:block; min-height:0; background:#fff; }
+ .sidebar,.skipLink,.routeSkeleton { display:none!important; }
+ .portalBody,.routeContent { display:block; min-height:0; width:auto; margin:0; padding:0; }
+}

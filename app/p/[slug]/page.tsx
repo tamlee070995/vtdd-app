@@ -29,8 +29,8 @@ export default async function PublishedCmsPage({ params }: { params: Promise<{ s
   }
 
   return (
-    <main className={`${styles.page} ui-public-page`}>
-      <header className={`${styles.topbar} ui-topbar`}>
+    <main data-portal-page className={`${styles.page} ui-public-page`}>
+      <header data-page-header className={`${styles.topbar} ui-topbar`}>
         <Link href="/" className={styles.brand}>
           <span><img src="/brand/vtdd-logo-header-v3.webp" alt="Viễn Thông Di Động" /></span>
           <b>Viễn Thông Di Động</b>

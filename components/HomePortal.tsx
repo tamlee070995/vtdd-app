@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import HomeNavigationFeedback from "./HomeNavigationFeedback";
+import { useEffect, useRef, useState } from "react";
+import { usePortalGroup } from "./PortalShell";
 import styles from "@/app/page.module.css";
 
 type IconName = "tradein" | "phone" | "used" | "demo" | "tools" | "search" | "printer" | "document";
@@ -72,9 +71,8 @@ function normalize(value: string) {
 }
 
 export default function HomePortal({ groups }: { groups: HomeGroup[] }) {
-  const [activeId, setActiveId] = useState(groups[0].id);
+  const { activeId } = usePortalGroup();
   const [query, setQuery] = useState("");
-  const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const search = useRef<HTMLInputElement>(null);
   const active = groups.find(group => group.id === activeId) || groups[0];
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
@@ -84,71 +82,10 @@ export default function HomePortal({ groups }: { groups: HomeGroup[] }) {
     .filter(item => !searching || terms.every(term => normalize(`${item.title} ${item.desc} ${group.title}`).includes(term)))
     .map(item => ({ ...item, group })));
 
-  useEffect(() => {
-    function restoreGroup() {
-      const id = window.location.hash.slice(1);
-      const selected = groups.find(group => group.id === id);
-      if (selected || !id) {
-        setActiveId(selected?.id || groups[0].id);
-        setQuery("");
-      }
-    }
-    restoreGroup();
-    window.addEventListener("hashchange", restoreGroup);
-    window.addEventListener("popstate", restoreGroup);
-    return () => {
-      window.removeEventListener("hashchange", restoreGroup);
-      window.removeEventListener("popstate", restoreGroup);
-    };
-  }, [groups]);
+  useEffect(() => { setQuery(""); }, [activeId]);
 
-  function selectGroup(id: string) {
-    setActiveId(id);
-    setQuery("");
-    // Keep the selected category when opening a tool and returning with Back.
-    window.history.replaceState(window.history.state, "", `#${id}`);
-    window.scrollTo({ top: 0, behavior: "instant" });
-  }
-
-  function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    let next = index;
-    if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % groups.length;
-    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index - 1 + groups.length) % groups.length;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = groups.length - 1;
-    else return;
-    event.preventDefault();
-    selectGroup(groups[next].id);
-    tabs.current[next]?.focus();
-  }
-
-  return <HomeNavigationFeedback>
-    <div className={styles.page}>
-      <a className={styles.skipLink} href="#noi-dung">Đến nội dung</a>
-      <aside className={styles.sidebar}>
-        <header className={styles.brandRow}>
-          <Link className={styles.brand} href="/" aria-label="Viễn Thông Di Động — Trang chủ">
-            <Image src="/brand/vtdd-logo-header-v3.webp" width={52} height={52} alt="Viễn Thông Di Động" unoptimized priority />
-            <span><strong>ICT</strong><small>Viễn Thông Di Động</small></span>
-          </Link>
-          <Link className={styles.mobileAdmin} href="/admin">Admin</Link>
-        </header>
-        <nav className={styles.navigation} data-ui-bottom-nav aria-label="Danh mục nghiệp vụ">
-          <div className={styles.navHeading}>DANH MỤC NGHIỆP VỤ</div>
-          <div className={styles.tabs} role="tablist" aria-label="Nhóm nghiệp vụ">
-            {groups.map((group, index) => <button className={styles.tab} key={group.id} ref={node => { tabs.current[index] = node; }} type="button" role="tab" id={`tab-${group.id}`} aria-selected={active.id === group.id} aria-controls="home-tools-panel" tabIndex={active.id === group.id ? 0 : -1} onClick={() => selectGroup(group.id)} onKeyDown={event => handleTabKey(event, index)}>
-              <span className={styles.navIcon}><Icon name={group.icon} /></span><span className={styles.desktopLabel}>{group.navTitle}</span><span className={styles.mobileLabel}>{group.shortTitle}</span>
-            </button>)}
-          </div>
-        </nav>
-        <div className={styles.sidebarFooter}>
-          <p>Chính sách &amp; nghiệp vụ<br />sản phẩm viễn thông</p>
-          <Link className={styles.adminButton} href="/admin"><span>Quản trị hệ thống</span><span aria-hidden="true">↗</span></Link>
-        </div>
-      </aside>
-
-      <main className={styles.main} id="noi-dung" tabIndex={-1}>
-        <div className={styles.content} id="home-tools-panel" role="tabpanel" aria-labelledby={`tab-${active.id}`} tabIndex={0}>
+  return <main className={styles.main}>
+        <div className={styles.content} id="home-tools-panel">
           <header className={styles.contentHeader}>
             <div className={styles.heading}>
               <p className={styles.eyebrow}>Viễn Thông Di Động</p>
@@ -174,6 +111,7 @@ export default function HomePortal({ groups }: { groups: HomeGroup[] }) {
                 <span className={styles.toolText}>
                   {searching && <span className={styles.category}>{item.group.title}</span>}
                   <b>{item.title}</b>
+                  {item.href && <span className={styles.openingLabel}><i aria-hidden="true" />Đang mở…</span>}
                   <small className={styles.desktopDescription}>{item.desc}</small>
                   <small className={styles.mobileDescription} title={item.desc}>{item.mobileDesc || item.desc}</small>
                   {!item.href && <em>{item.status || "Đang cập nhật"}</em>}
@@ -189,7 +127,5 @@ export default function HomePortal({ groups }: { groups: HomeGroup[] }) {
             <ol className={styles.guideSteps}>{guide.steps.map((step, index) => <li key={step.title}><span className={styles.guideNumber}>{index + 1}</span><div><h3>{step.title}</h3><p>{step.desc}</p></div></li>)}</ol>
           </section>}
         </div>
-      </main>
-    </div>
-  </HomeNavigationFeedback>;
+      </main>;
 }

@@ -439,11 +439,11 @@
 }
 .page .paperInput {
   position:absolute;
-  left:11.5%;
-  top:52.5%;
-  width:79%;
-  max-width:79%;
-  height:26%;
+  left:10%;
+  top:44%;
+  width:80%;
+  max-width:80%;
+  height:30%;
   margin:0;
   padding:0;
   border:1px dashed transparent;
@@ -451,25 +451,25 @@
   background:transparent;
   text-align:center;
   color:transparent;
-  caret-color:#fff;
+  caret-color:#000;
   font-family:Roboto,Arial,sans-serif;
   font-weight:900;
   letter-spacing:-.025em;
   text-transform:uppercase;
   line-height:1;
-  transform:rotate(-5deg);
+  transform:none;
   box-shadow:none;
   cursor:text;
 }
 .paperInput:hover {
-  border-color:#ffffff88;
+  border-color:#777;
 }
 .stickerItem:focus-within .artAmount {
   visibility:hidden;
 }
 .page .paperInput:focus {
-  color:#fff;
-  border-color:#fff9;
+  color:#000;
+  border-color:#555;
   background:transparent;
   box-shadow:none;
   outline:none;
@@ -911,3 +911,10 @@
 .notice button {
   pointer-events:auto;
 }
+
+/* Keep the print action above the shared mobile navigation. */
+.printBar { left:calc(50% + var(--portal-sidebar-width,0px) / 2); width:min(1240px,calc(100% - var(--portal-sidebar-width,0px) - 44px)); bottom:calc(18px + var(--portal-bottom-nav-space,0px)); }
+.page { padding-bottom:110px; }
+.notice { bottom:calc(110px + var(--portal-bottom-nav-space,0px)); }
+@media(max-width:760px) { .printBar { width:calc(100% - 24px); bottom:calc(12px + var(--portal-bottom-nav-space,0px)); } .page .paperInput:focus { outline:2px solid #888; } }
+@media print { .page { padding:0; } }

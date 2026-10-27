@@ -9,6 +9,8 @@ import CmsImageLightbox from "@/components/CmsImageLightbox";
 import FrontendErrorReporter from "@/components/FrontendErrorReporter";
 import PwaRegister from "@/components/PwaRegister";
 import AppBootSplash from "@/components/AppBootSplash";
+import AppNavigationFeedback from "@/components/AppNavigationFeedback";
+import PortalShell from "@/components/PortalShell";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://vienthongdidong.com"),
@@ -105,7 +107,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <FrontendErrorReporter />
         <PwaRegister />
         <AppBootSplash />
-        {children}
+        <AppNavigationFeedback><PortalShell>{children}</PortalShell></AppNavigationFeedback>
         <CmsImageLightbox />
       </body>
     </html>
