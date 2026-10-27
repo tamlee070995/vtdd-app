@@ -1,318 +1,144 @@
 "use client";
-
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import TradeinStickerArt, { stickerAmountSize, type StickerStyle } from "@/components/TradeinStickerArt";
 import styles from "./page.module.css";
-
-type StickerTemplate = {
-  id: string;
-  name: string;
-  styleClass: string;
-};
-
-type StickerText = {
-  title: string;
-  amount: string;
-  footer: string;
-};
-
-const TEMPLATES: StickerTemplate[] = [
-  { id: "classic-red", name: "01 - Trợ giá đỏ", styleClass: "classicRed" },
-  { id: "ticket", name: "02 - Vé trợ giá", styleClass: "ticket" },
-  { id: "bubble", name: "03 - Bong bóng", styleClass: "bubble" },
-  { id: "tag", name: "04 - Tag dán máy", styleClass: "tag" },
+const TEMPLATES: Array<{
+    id: StickerStyle;
+    name: string;
+}> = [
+    { id: "classic-red", name: "Trợ giá đỏ" }, { id: "ticket", name: "Vé trợ giá" },
+    { id: "bubble", name: "Cam nổi bật" }, { id: "tag", name: "Tag vàng" },
 ];
-
-const DEFAULT_TEXT: StickerText = {
-  title: "TRỢ GIÁ",
-  amount: "0 TRIỆU",
-  footer: "LÊN ĐỜI !",
-};
-
-function clampQuantity(value: string) {
-  const n = Number(value.replace(/\D/g, ""));
-  if (!n || n < 1) return 1;
-  if (n > 6) return 6;
-  return n;
+const DEFAULT_AMOUNTS = Array<string>(6).fill("0 TRIỆU");
+function PrintIcon() {
+    return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 8V3h10v5M7 17H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-3"/><path d="M7 14h10v7H7zM17 11h1"/></svg>;
 }
-
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
-
-function css(name: string) {
-  return styles[name as keyof typeof styles] || "";
-}
-
-function EditableText({
-  value,
-  onChange,
-  className,
-  ariaLabel,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  className: string;
-  ariaLabel: string;
-}) {
-  return (
-    <span
-      className={className}
-      contentEditable
-      suppressContentEditableWarning
-      spellCheck={false}
-      aria-label={ariaLabel}
-      onInput={(event) => onChange(event.currentTarget.textContent || "")}
-      onBlur={(event) => onChange((event.currentTarget.textContent || "").trim())}
-    >
-      {value}
-    </span>
-  );
-}
-
-function StickerPreview({
-  template,
-  text,
-  onChange,
-  editable = true,
-}: {
-  template: StickerTemplate;
-  text: StickerText;
-  onChange: (next: StickerText) => void;
-  editable?: boolean;
-}) {
-  const shapeClass = css(template.styleClass);
-
-  const setTitle = (title: string) => onChange({ ...text, title });
-  const setAmount = (amount: string) => onChange({ ...text, amount });
-  const setFooter = (footer: string) => onChange({ ...text, footer });
-
-  return (
-    <div className={cx(styles.sticker, shapeClass)}>
-      <div className={styles.leftBlank} aria-hidden="true" />
-
-      <div className={styles.stickerArtwork}>
-        <div className={styles.topLayer}>
-          {editable ? (
-            <EditableText
-              value={text.title}
-              onChange={setTitle}
-              ariaLabel="Sửa dòng tiêu đề"
-              className={styles.titleText}
-            />
-          ) : (
-            <span className={styles.titleText}>{text.title}</span>
-          )}
-        </div>
-
-        <div className={styles.mainLayer}>
-          {editable ? (
-            <EditableText
-              value={text.amount}
-              onChange={setAmount}
-              ariaLabel="Sửa số tiền trợ giá"
-              className={styles.amountText}
-            />
-          ) : (
-            <span className={styles.amountText}>{text.amount}</span>
-          )}
-
-          {editable ? (
-            <EditableText
-              value={text.footer}
-              onChange={setFooter}
-              ariaLabel="Sửa dòng phụ"
-              className={styles.footerText}
-            />
-          ) : (
-            <span className={styles.footerText}>{text.footer}</span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function StickerTcdmPage() {
-  const [selectedId, setSelectedId] = useState(TEMPLATES[0].id);
-  const [quantity, setQuantity] = useState(6);
-  const [text, setText] = useState<StickerText>(DEFAULT_TEXT);
-
-  useEffect(() => {
-    document.title = "In Sticker Trợ Giá | Viễn Thông Di Động";
-  }, []);
-
-  const selectedTemplate = useMemo(
-    () => TEMPLATES.find((template) => template.id === selectedId) || TEMPLATES[0],
-    [selectedId]
-  );
-
-  const printItems = useMemo(
-    () => Array.from({ length: quantity }, (_, index) => index),
-    [quantity]
-  );
-
-  function handlePrint() {
-    window.print();
-  }
-
-  function resetText() {
-    setText(DEFAULT_TEXT);
-  }
-
-  return (
-    <main className={`${styles.page} ui-public-page`}>
-      <header className={`${styles.header} ui-topbar`}>
-        <Link href="/" className={styles.brand}>
-          <span className={styles.logoBox}>
-            <img src="/brand/vtdd-logo-header-v3.webp" alt="Viễn Thông Di Động" />
-          </span>
-
-          <span>
-            <strong>Viễn Thông Di Động</strong>
-            <small>Sticker trợ giá thu cũ đổi mới</small>
-          </span>
-        </Link>
-
-        <div className={styles.headerActions}>
-          <Link href="/huong-dan-noi-bo#in-sticker" className={styles.guideButton}>
-            Hướng dẫn
-          </Link>
-          <Link href="/" className={styles.backButton}>
-            Về trang chủ
-          </Link>
-        </div>
-      </header>
-
-      <section className={`${styles.hero} ui-hero`}>
-        <div>
-          <span className={styles.kicker}>PRINT CENTER</span>
-          <h1>In Sticker Trợ Giá</h1>
-          <p>
-            Chọn mẫu, sửa chữ trực tiếp trên sticker hoặc nhập nhanh bên dưới.
-            Một trang A4 in tối đa 6 sticker.
-          </p>
-        </div>
-
-        <div className={styles.printGuide}>
-          <b>Gợi ý in A4</b>
-          <span>Số lượng: tối đa 6 sticker / trang</span>
-          <span>Lề: Không hoặc Minimum</span>
-          <span>In màu hoặc trắng đen đều rõ chữ</span>
-        </div>
-      </section>
-
-      <section className={styles.workspace}>
-        <aside className={styles.controlPanel}>
-          <div className={styles.panelTitle}>
-            <span>01</span>
-            <div>
-              <h2>Chọn mẫu sticker</h2>
-              <p>Mẫu số 1 bám sát kiểu sticker đỏ như hình mẫu.</p>
-            </div>
-          </div>
-
-          <div className={styles.templateGrid}>
-            {TEMPLATES.map((template) => (
-              <button
-                key={template.id}
-                type="button"
-                className={cx(
-                  styles.templateButton,
-                  selectedId === template.id && styles.templateActive
-                )}
-                onClick={() => setSelectedId(template.id)}
-              >
-                <span>{template.name}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className={styles.quickEdit}>
-            <label>
-              <span>Dòng tiêu đề</span>
-              <input
-                value={text.title}
-                onChange={(event) => setText({ ...text, title: event.target.value })}
-                placeholder="TRỢ GIÁ"
-              />
-            </label>
-
-            <label>
-              <span>Số tiền</span>
-              <input
-                value={text.amount}
-                onChange={(event) => setText({ ...text, amount: event.target.value })}
-                placeholder="0 TRIỆU"
-              />
-            </label>
-
-            <label>
-              <span>Dòng phụ</span>
-              <input
-                value={text.footer}
-                onChange={(event) => setText({ ...text, footer: event.target.value })}
-                placeholder="LÊN ĐỜI !"
-              />
-            </label>
-
-            <label>
-              <span>Số lượng in</span>
-              <input
-                value={quantity}
-                inputMode="numeric"
-                onChange={(event) => setQuantity(clampQuantity(event.target.value))}
-              />
-              <small>Tối đa 6 sticker / 1 trang A4.</small>
-            </label>
-          </div>
-
-          <div className={`${styles.panelActions} ui-form-actions`}>
-            <button type="button" className={styles.clearButton} onClick={resetText}>
-              Về mặc định
-            </button>
-            <button type="button" className={styles.printButton} onClick={handlePrint}>
-              In ngay
-            </button>
-          </div>
+    const [template, setTemplate] = useState<StickerStyle>("classic-red");
+    const [quantity, setQuantity] = useState(6);
+    const [amounts, setAmounts] = useState(DEFAULT_AMOUNTS);
+    const [commonAmount, setCommonAmount] = useState("0 TRIỆU");
+    const [title, setTitle] = useState("TRỢ GIÁ");
+    const [footer, setFooter] = useState("LÊN ĐỜI !");
+    const [mobileView, setMobileView] = useState<"edit" | "preview">("preview");
+    const [printing, setPrinting] = useState(false);
+    const [notice, setNotice] = useState("");
+    const [paperWidth, setPaperWidth] = useState(794);
+    const paperRef = useRef<HTMLDivElement>(null);
+    const lastReset = useRef<{
+        template: StickerStyle;
+        quantity: number;
+        amounts: string[];
+        commonAmount: string;
+        title: string;
+        footer: string;
+    } | null>(null);
+    const currentTemplate = TEMPLATES.find(item => item.id === template)!;
+    useEffect(() => { document.title = "In Sticker Trợ Giá | Viễn Thông Di Động"; }, []);
+    useEffect(() => {
+        const node = paperRef.current;
+        if (!node)
+            return;
+        const measure = () => { if (node.clientWidth)
+            setPaperWidth(node.clientWidth); };
+        measure();
+        const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+        observer?.observe(node);
+        window.addEventListener("resize", measure);
+        return () => { observer?.disconnect(); window.removeEventListener("resize", measure); };
+    }, []);
+    useEffect(() => {
+        if (!notice)
+            return;
+        const timer = window.setTimeout(() => setNotice(""), notice === "Đã về mẫu mặc định." ? 7000 : 3500);
+        return () => window.clearTimeout(timer);
+    }, [notice]);
+    function updateAmount(index: number, value: string) {
+        setNotice("");
+        setAmounts(previous => previous.map((amount, position) => position === index ? value.slice(0, 20) : amount));
+    }
+    function applyAmount(value: string) {
+        const next = value.trim().toUpperCase().slice(0, 20) || "0 TRIỆU";
+        setCommonAmount(next);
+        setAmounts(Array(6).fill(next));
+        setNotice("Đã áp dụng " + next + " cho cả 6 sticker.");
+    }
+    function reset() {
+        lastReset.current = { template, quantity, amounts: [...amounts], commonAmount, title, footer };
+        setTemplate("classic-red");
+        setQuantity(6);
+        setAmounts([...DEFAULT_AMOUNTS]);
+        setCommonAmount("0 TRIỆU");
+        setTitle("TRỢ GIÁ");
+        setFooter("LÊN ĐỜI !");
+        setNotice("Đã về mẫu mặc định.");
+    }
+    function undoReset() {
+        const previous = lastReset.current;
+        if (!previous)
+            return;
+        setTemplate(previous.template);
+        setQuantity(previous.quantity);
+        setAmounts(previous.amounts);
+        setCommonAmount(previous.commonAmount);
+        setTitle(previous.title);
+        setFooter(previous.footer);
+        lastReset.current = null;
+        setNotice("Đã khôi phục nội dung vừa nhập.");
+    }
+    async function print() {
+        setPrinting(true);
+        try {
+            await document.fonts.ready;
+            window.print();
+        }
+        finally {
+            setPrinting(false);
+        }
+    }
+    return <main className={styles.page} data-mobile-view={mobileView}>
+    <header className={styles.header}>
+      <Link className={styles.brand} href="/"><img src="/brand/vtdd-logo-header-v3.webp" width="42" height="42" alt=""/><span><b>Viễn Thông Di Động</b><small>Công cụ thu cũ đổi mới</small></span></Link>
+      <Link className={styles.homeLink} href="/#he-thu-cu-doi-moi"><span aria-hidden="true">←</span> Hệ thu cũ</Link>
+    </header>
+    <div className={styles.shell}>
+      <nav className={styles.breadcrumb} aria-label="Đường dẫn"><Link href="/">Trang chủ</Link><span>›</span><Link href="/#he-thu-cu-doi-moi">Hệ thu cũ đổi mới</Link><span>›</span><span aria-current="page">In sticker</span></nav>
+      <section className={styles.heading}><div><span className={styles.eyebrow}>CÔNG CỤ TRƯNG BÀY</span><h1>In sticker trợ giá</h1><p>Nhập giá, chọn mẫu và in. Mỗi sticker có thể mang một mức trợ giá riêng.</p></div><span className={styles.a4Badge}>▤ &nbsp; A4 · Tối đa 6 sticker</span></section>
+      <div className={styles.mobileTabs} role="tablist" aria-label="Chế độ sticker"><button type="button" role="tab" aria-selected={mobileView === "edit"} aria-controls="sticker-controls" onClick={() => setMobileView("edit")}>Nhập nội dung</button><button type="button" role="tab" aria-selected={mobileView === "preview"} aria-controls="sticker-preview" onClick={() => setMobileView("preview")}>Xem trang in</button></div>
+      <div className={styles.workspace}>
+        <aside className={styles.controls} id="sticker-controls" aria-label="Nội dung sticker">
+          <section className={styles.controlSection}><div className={styles.sectionHeading}><span>01</span><div><h2>Chọn mẫu</h2><p>4 phong cách, cùng một khổ in.</p></div></div>
+            <div className={styles.templateGrid}>{TEMPLATES.map(item => <button type="button" key={item.id} aria-pressed={template === item.id} className={styles.templateButton + (template === item.id ? " " + styles.selectedTemplate : "")} onClick={() => setTemplate(item.id)}><TradeinStickerArt style={item.id} amount="2 TRIỆU" id={"thumb-" + item.id}/><span>{item.name}</span>{template === item.id && <i aria-hidden="true">✓</i>}</button>)}</div>
+          </section>
+          <section className={styles.controlSection}><div className={styles.sectionHeading}><span>02</span><div><h2>Nội dung trợ giá</h2><p>Dùng cùng một giá hoặc sửa riêng từng tem.</p></div></div>
+            <label className={styles.label} htmlFor="common-amount">Áp dụng nhanh cùng một giá</label><div className={styles.applyRow}><input id="common-amount" maxLength={20} value={commonAmount} onChange={event => setCommonAmount(event.target.value)} placeholder="Ví dụ: 2 TRIỆU" onKeyDown={event => { if (event.key === "Enter") {
+        event.preventDefault();
+        applyAmount(commonAmount);
+    } }}/><button type="button" onClick={() => applyAmount(commonAmount)}>Áp dụng</button></div>
+            <div className={styles.quickAmounts} aria-label="Mức trợ giá gợi ý">{["500 NGHÌN", "1 TRIỆU", "2 TRIỆU", "3 TRIỆU"].map(amount => <button type="button" key={amount} onClick={() => applyAmount(amount)}>{amount}</button>)}</div>
+            <div className={styles.amountGrid}>{amounts.slice(0, quantity).map((amount, index) => <label className={styles.amountField} key={index}><span><i>{String(index + 1).padStart(2, "0")}</i> Sticker {index + 1}</span><input aria-label={"Giá sticker " + (index + 1)} maxLength={20} value={amount} placeholder="0 TRIỆU" onChange={event => updateAmount(index, event.target.value)}/></label>)}</div>
+            <details className={styles.moreText}><summary>Chỉnh tiêu đề &amp; dòng phụ</summary><label className={styles.label}>Dòng tiêu đề<input maxLength={18} value={title} onChange={event => setTitle(event.target.value)} placeholder="TRỢ GIÁ"/></label><label className={styles.label}>Dòng phụ<input maxLength={24} value={footer} onChange={event => setFooter(event.target.value)} placeholder="LÊN ĐỜI !"/></label></details>
+          </section>
+          <section className={styles.controlSection}><div className={styles.sectionHeading}><span>03</span><div><h2>Số lượng trên trang</h2><p>Giữ vị trí 2 cột × 3 hàng trên A4.</p></div></div><div className={styles.quantity} aria-label="Số lượng sticker">{[1, 2, 3, 4, 5, 6].map(value => <button type="button" aria-label={"In " + value + " sticker"} aria-pressed={quantity === value} key={value} onClick={() => setQuantity(value)}>{value}</button>)}</div></section>
+          <div className={styles.controlFooter}><button type="button" onClick={reset}>↺ &nbsp; Về mặc định</button><span>{currentTemplate.name}</span></div>
         </aside>
-
-        <section className={styles.previewPanel}>
-          <div className={styles.previewHeader}>
-            <div>
-              <span>02</span>
-              <div>
-                <h2>Bản xem trước</h2>
-                <p>Bấm trực tiếp vào chữ trên sticker để sửa nhanh.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.livePreview}>
-            <StickerPreview
-              template={selectedTemplate}
-              text={text}
-              onChange={setText}
-              editable
-            />
-          </div>
-
-          <div className={styles.printSheetWrap}>
-            <div className={styles.printSheet}>
-              {printItems.map((index) => (
-                <div className={styles.printSlot} key={index}>
-                  <StickerPreview
-                    template={selectedTemplate}
-                    text={text}
-                    onChange={setText}
-                    editable={false}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
+        <section className={styles.preview} id="sticker-preview" aria-label="Trang in A4">
+          <div className={styles.previewToolbar}><div><h2>Trang in A4</h2><p>Chạm vào số tiền trên từng sticker để sửa.</p></div><span>{quantity}/6 sticker</span></div>
+          <div className={styles.paperStage}><div className={styles.paper} ref={paperRef} style={{ "--paper-width": paperWidth + "px" } as CSSProperties}>
+            {Array.from({ length: 6 }, (_, index) => <div className={styles.slot + (index >= quantity ? " " + styles.emptySlot : "")} key={index}>
+              {index < quantity ? <><span className={styles.slotNumber} aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><div className={styles.stickerItem + (template === "tag" ? " " + styles.darkInk : "")}>
+                <TradeinStickerArt style={template} title={title} amount={amounts[index]} footer={footer} id={"paper-" + index} amountClassName={styles.artAmount}/>
+                <input aria-label={"Sửa trực tiếp giá sticker " + (index + 1)} className={styles.paperInput} maxLength={20} value={amounts[index]} onChange={event => updateAmount(index, event.target.value)} style={{ fontSize: "max(16px, calc(var(--paper-width) * " + stickerAmountSize(amounts[index]) * .001083333 + "))" }}/>
+              </div></> : <span className={styles.emptyText}>Vị trí trống · Không in</span>}
+            </div>)}
+          </div></div>
+          <div className={styles.paperCaption}><span>210 × 297 mm</span><span>Màu hiển thị có thể khác bản in thực tế.</span></div>
+          <details className={styles.printHelp}><summary>Cài đặt in để ra đúng khổ</summary><ol><li>Chọn khổ giấy <b>A4</b> và hướng <b>Dọc</b>.</li><li>Đặt tỷ lệ <b>100%</b>, lề <b>Không</b>.</li><li>Tắt <b>Đầu trang và chân trang</b>. Chọn in màu để giữ màu mẫu.</li></ol><p>Trên điện thoại, dùng chức năng In hoặc Chia sẻ → In của trình duyệt nếu nút In không mở hộp thoại.</p></details>
         </section>
-      </section>
-    </main>
-  );
+      </div>
+      {notice && <div className={styles.notice} role="status"><span>✓ {notice}</span>{notice === "Đã về mẫu mặc định." && <button type="button" onClick={undoReset}>Hoàn tác</button>}<button type="button" aria-label="Đóng thông báo" onClick={() => setNotice("")}>×</button></div>}
+      <div className={styles.printBar}><div><b>{quantity} sticker <span>trên 1 trang A4</span></b><small>{currentTemplate.name} · Sẵn sàng in</small></div><button type="button" className={styles.printButton} onClick={() => void print()} disabled={printing}><PrintIcon />{printing ? "Đang mở…" : "In ngay"}</button></div>
+    </div>
+  </main>;
 }
