@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import UiNotice from "./UiNotice";
+import { clientErrorMessage } from "@/lib/client-request";
 
 type Summary = {
   staff: number;
@@ -185,7 +187,7 @@ export default function AdminDataSyncPanel() {
       setBusy("");
     } catch (err: any) {
       setBusy("");
-      setSummaryError(err?.message || "Không tải được trạng thái dữ liệu.");
+      setSummaryError(clientErrorMessage(err, "Không tải được trạng thái dữ liệu."));
     }
   }
 
@@ -419,7 +421,7 @@ export default function AdminDataSyncPanel() {
 
       </div>
 
-      {summaryError ? <div className="sync-error">{summaryError}</div> : null}
+      {summaryError ? <UiNotice onRetry={() => void loadSummary()} busy={busy === "summary"}>{summaryError}</UiNotice> : null}
 
       <div className="sync-metrics">
         <div><span>Data_Moi</span><b>{number(summary.productsNew)}</b></div>

@@ -3,14 +3,22 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { calculateTradeinQuote, formatTradeinRange, TRADEIN_GRADES, tradeinMatches,
+import { calculateTradeinQuote, formatTradeinRange, TRADEIN_GRADES,
   type NewTradeinProduct, type OldTradeinProduct, type PriceRange } from "@/lib/tradein-pricing";
 import useTradeinPage from "./useTradeinPage";
 import TradeinUpdateNotice from "./TradeinUpdateNotice";
 import styles from "./Tradein.module.css";
+import { suggestTradeinProducts } from "@/lib/tradein-search";
+import UiNotice from "./UiNotice";
 
 type SearchProduct = { id: string; brand: string; model: string; storage?: string };
 const priceNumber = new Intl.NumberFormat("vi-VN");
+function ProductName({ name, query }: { name: string; query: string }) {
+  const tokens = query.trim().split(/[\s_]+/).filter(Boolean).map(token => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (!tokens.length) return <>{name}</>;
+  const pattern = new RegExp(`(${tokens.join("|")})`, "ig");
+  return <>{name.split(pattern).map((part, index) => index % 2 ? <mark key={index}>{part}</mark> : part)}</>;
+}
 function RangeValue({ range, allowZero = false }: { range: Pick<PriceRange, "min" | "max"> & { incomplete?: boolean }; allowZero?: boolean }) {
   const label = formatTradeinRange(range, allowZero);
   if (range.incomplete || (!allowZero && !range.min && !range.max)) return <span className={styles.rangeValue}>{label}</span>;
@@ -27,7 +35,8 @@ function ProductSearch<T extends SearchProduct>({ label, placeholder, products, 
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  const matches = useMemo(() => products.filter(product => tradeinMatches(product, query)).slice(0, 40), [products, query]);
+  const result = useMemo(() => suggestTradeinProducts(products, query), [products, query]);
+  const matches = result.products;
   useEffect(() => {
     const close = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
     document.addEventListener("pointerdown", close);
@@ -40,7 +49,7 @@ function ProductSearch<T extends SearchProduct>({ label, placeholder, products, 
     {selected ? <div className={styles.selection}><span><b>{selected.model}</b><small>{selected.brand}{selected.storage ? ` · ${selected.storage}` : ""}</small></span>
       <button type="button" onClick={() => { onClear(); setQuery(""); setOpen(false); }}>Đổi máy</button></div> : <>
       <div className={styles.inputWrap}><span aria-hidden="true">⌕</span><input id={id} value={query} placeholder={placeholder} disabled={disabled}
-        role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-list`} aria-activedescendant={open && active >= 0 ? `${id}-${active}` : undefined}
+        role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={open ? `${id}-list` : undefined} aria-describedby={`${id}-hint`} aria-activedescendant={open && active >= 0 && active < matches.length ? `${id}-${active}` : undefined}
         autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="search" maxLength={150}
         onFocus={() => setOpen(true)} onChange={event => { setQuery(event.target.value); setActive(-1); setOpen(true); }}
         onKeyDown={event => {
@@ -49,28 +58,29 @@ function ProductSearch<T extends SearchProduct>({ label, placeholder, products, 
             event.preventDefault(); setOpen(true);
             setActive(current => event.key === "ArrowDown" ? Math.min(current + 1, matches.length - 1) : Math.max(0, current - 1));
           }
-          if (event.key === "Enter" && open && active >= 0 && matches[active]) { event.preventDefault(); pick(matches[active]); }
+          if (event.key === "Enter" && open && matches.length) { event.preventDefault(); pick(matches[Math.max(active, 0)]); }
         }} /></div>
       {open && !disabled ? <div className={styles.suggestions} role="listbox" id={`${id}-list`} aria-label={`Kết quả ${label.toLowerCase()}`}>
-        {matches.length ? matches.map((product, index) => <div key={product.id} id={`${id}-${index}`} role="option" aria-selected={active === index}
+        {matches.length ? matches.map((product, index) => <button type="button" tabIndex={-1} key={product.id} id={`${id}-${index}`} role="option" aria-selected={active === index}
           className={`${styles.option} ${active === index ? styles.activeOption : ""}`}
           onMouseDown={event => event.preventDefault()} onClick={() => pick(product)}>
-          <b>{product.model}</b><small>{product.brand}{product.storage ? ` · ${product.storage}` : ""}</small>
-        </div>) : <p className={styles.noResults}>Không tìm thấy máy phù hợp. Thử tên model hoặc dung lượng khác.</p>}
-        {matches.length === 40 ? <p className={styles.resultHint}>Nhập thêm model hoặc dung lượng để thu hẹp kết quả.</p> : null}
+          <b><ProductName name={product.model} query={query} /></b><small>{product.brand}{product.storage ? ` · ${product.storage}` : ""}</small>
+        </button>) : <p className={styles.noResults}>{query.trim() ? "Không tìm thấy máy phù hợp. Thử tên model hoặc dung lượng khác." : "Nhập tên máy để xem gợi ý ngay. Ví dụ: iPhone 11 256 hoặc OPPO A60."}</p>}
+        {result.total > matches.length ? <p className={styles.resultHint}>Đang hiện {matches.length}/{result.total} máy. Nhập thêm dung lượng để thu hẹp.</p> : null}
       </div> : null}
+      <small className={styles.liveHint} id={`${id}-hint`} role="status">{query.trim() ? result.total ? `${result.total} máy phù hợp. Chọn gợi ý hoặc nhấn Enter.` : "Thử tên model hoặc dung lượng khác." : "Gợi ý theo tên máy, hãng và dung lượng."}</small>
     </>}
   </div>;
 }
 
 export default function TradeinLookup() {
-  const { data, status, loading, error, refreshReason } = useTradeinPage();
+  const { data, status, loading, error, refreshReason, retry } = useTradeinPage();
   const [old, setOld] = useState<OldTradeinProduct | null>(null);
   const [next, setNext] = useState<NewTradeinProduct | null>(null);
   const updatedAt = data ? new Date(data.syncedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false }) : "";
   return <><main className={styles.page} inert={Boolean(refreshReason)}>
-    <header className={styles.topbar}><Link className={styles.brand} href="/" aria-label="Viễn Thông Di Động — Trang chủ">
-      <Image src="/brand/vtdd-logo-v2.webp" width={46} height={46} alt="" /><span><b>Viễn Thông Di Động</b><small>Chính sách &amp; nghiệp vụ sản phẩm</small></span>
+    <header className={`${styles.topbar} ui-topbar`}><Link className={styles.brand} href="/" aria-label="Viễn Thông Di Động — Trang chủ">
+      <Image src="/brand/vtdd-logo-header-v3.webp" width={46} height={46} alt="" /><span><b>Viễn Thông Di Động</b><small>Chính sách &amp; nghiệp vụ sản phẩm</small></span>
     </Link><Link className={styles.homeLink} href="/">Trang chủ <span aria-hidden="true">↗</span></Link></header>
     <div className={styles.shell}>
       <nav className={styles.breadcrumb} aria-label="Đường dẫn"><Link href="/">Trang chủ</Link><span>›</span><Link href="/#he-thu-cu-doi-moi">Hệ Thu Cũ Đổi Mới</Link><span>›</span><span aria-current="page">Tra giá</span></nav>
@@ -80,8 +90,8 @@ export default function TradeinLookup() {
       <div className={styles.dataBar} aria-live="polite"><span>{loading ? "Đang tải bảng giá…" : data ? <>Cập nhật: <b>{updatedAt}</b></> : "Bảng giá thu cũ đổi mới"}</span>
         <button type="button" disabled={loading} onClick={() => window.location.reload()}>{loading ? "Đang tải…" : "Tải lại trang ↻"}</button></div>
       {status?.locked ? <section className={styles.maintenance} role="status"><span aria-hidden="true">⌁</span><h2>Trang tra giá đang tạm khóa</h2><p>{status.message}</p><small>Trang tự kiểm tra mỗi 30 giây. Khi mở lại, bạn sẽ nhận thông báo tải lại trang.</small></section> : <>
-      {error ? <div role="alert" className={styles.error}>{error}</div> : null}
-      {!data && loading ? <div className={styles.loading} role="status">Đang chuẩn bị danh sách máy và bảng giá…</div> : null}
+      {error ? <UiNotice onRetry={retry} busy={loading}>{error}</UiNotice> : null}
+      {!data && loading ? <UiNotice tone="loading">Đang chuẩn bị danh sách máy và bảng giá…</UiNotice> : null}
       {data ? <div className={styles.steps} aria-busy={loading}>
         <section className={styles.step} aria-labelledby="old-heading"><div className={styles.stepHeading}><span className={styles.stepNumber}>01</span><div><p>MÁY ĐANG SỬ DỤNG</p><h2 id="old-heading">Tra giá máy cũ</h2></div><span className={styles.stepTag}>5 loại tình trạng</span></div>
           <ProductSearch key={`old-${data.version}`} label="Tìm máy cũ" placeholder="Nhập tên máy, hãng hoặc dung lượng…" products={data.oldProducts} selected={old} disabled={loading}

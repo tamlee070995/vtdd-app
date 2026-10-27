@@ -1,4 +1,6 @@
 "use client";
+import UiNotice from "./UiNotice";
+import { clientErrorMessage } from "@/lib/client-request";
 
 import { useEffect, useMemo, useState } from "react";
 import AdminDataSyncPanel from "@/components/AdminDataSyncPanel";
@@ -157,6 +159,7 @@ export default function AdminToolsDashboard({
   });
   const [saving, setSaving] = useState("");
   const [toast, setToast] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   const pmhAvailability = useMemo(() => getPmhToolAvailability(settings), [settings]);
   const checkinAvailability = useMemo(() => getCheckinToolAvailability(settings), [settings]);
@@ -204,6 +207,7 @@ export default function AdminToolsDashboard({
   async function saveToolSettings(updates: Record<string, string>, busyKey = "settings") {
     try {
       setSaving(busyKey);
+      setSaveError("");
 
       const payload = {
         ...settings,
@@ -224,7 +228,7 @@ export default function AdminToolsDashboard({
       showToast(data.message || "Đã lưu cấu hình tool.");
     } catch (err: any) {
       setSaving("");
-      showToast(err?.message || "Không lưu được cấu hình tool.");
+      setSaveError(clientErrorMessage(err, "Không lưu được cấu hình công cụ."));
     }
   }
 
@@ -478,6 +482,8 @@ export default function AdminToolsDashboard({
 
   return (
     <section className="admin-tools-v5">
+      {saveError && <UiNotice>{saveError}<p>Cấu hình đã nhập vẫn được giữ. Kiểm tra kết nối rồi bấm Lưu cấu hình để thử lại.</p></UiNotice>}
+      {saving && <UiNotice tone="loading">Đang lưu cấu hình. Vui lòng chờ kết quả…</UiNotice>}
       <style>{STYLE}</style>
 
       <div className="tools-v5-head">

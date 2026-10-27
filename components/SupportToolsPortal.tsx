@@ -50,13 +50,13 @@ export default function SupportToolsPortal({
   const checkinEnabled = checkinAvailability.enabled;
 
   return (
-    <main className="support-page">
+    <main className="support-page ui-public-page">
       <style>{STYLE}</style>
 
-      <header className="support-topbar">
+      <header className="support-topbar ui-topbar">
         <Link className="support-brand" href="/" aria-label="Về trang chủ">
           <span className="support-logo-shell">
-            <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
+            <img src="/brand/vtdd-logo-header-v3.webp" alt="Viễn Thông Di Động" />
           </span>
           <span>
             <strong>Viễn Thông Di Động</strong>

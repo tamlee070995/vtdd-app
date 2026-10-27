@@ -161,11 +161,11 @@ export default function StickerTcdmPage() {
   }
 
   return (
-    <main className={styles.page}>
-      <header className={styles.header}>
+    <main className={`${styles.page} ui-public-page`}>
+      <header className={`${styles.header} ui-topbar`}>
         <Link href="/" className={styles.brand}>
           <span className={styles.logoBox}>
-            <img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" />
+            <img src="/brand/vtdd-logo-header-v3.webp" alt="Viễn Thông Di Động" />
           </span>
 
           <span>
@@ -184,7 +184,7 @@ export default function StickerTcdmPage() {
         </div>
       </header>
 
-      <section className={styles.hero}>
+      <section className={`${styles.hero} ui-hero`}>
         <div>
           <span className={styles.kicker}>PRINT CENTER</span>
           <h1>In Sticker Trợ Giá</h1>
@@ -267,7 +267,7 @@ export default function StickerTcdmPage() {
             </label>
           </div>
 
-          <div className={styles.panelActions}>
+          <div className={`${styles.panelActions} ui-form-actions`}>
             <button type="button" className={styles.clearButton} onClick={resetText}>
               Về mặc định
             </button>

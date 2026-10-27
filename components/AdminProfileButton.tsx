@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import PasswordInput from "@/components/PasswordInput";
+import UiNotice from "./UiNotice";
+import { clientErrorMessage, requestJson } from "@/lib/client-request";
 
 const QUESTIONS = [
   "Tên thú cưng đầu tiên của bạn là gì?",
@@ -30,15 +32,17 @@ export default function AdminProfileButton({ required = false, mustChangePasswor
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     let active = true;
     async function loadProfile() {
-      setLoading(true);
+      setLoading(true); setLoadError(false);
       try {
-        const res = await fetch("/api/staff/profile", { cache: "no-store" });
-        const data = await res.json();
+        const data = await requestJson<{ success: boolean; message?: string; profile: { gmail: string; securityQuestion: string; forceSetup: boolean; mustChangePassword: boolean } }>("/api/staff/profile");
         if (!active) return;
         if (data?.success) {
           setGmail(safeProfileDisplayText(data.profile?.gmail));
@@ -49,32 +53,33 @@ export default function AdminProfileButton({ required = false, mustChangePasswor
         } else {
           setMsg(data?.message || "Không tải được thông tin. Vui lòng tải lại trang.");
         }
-      } catch { if (active) setMsg("Không tải được thông tin. Vui lòng tải lại trang."); }
+      } catch (reason) { if (active) { setLoadError(true); setMsg(clientErrorMessage(reason, "Không tải được thông tin.")); } }
       finally { if (active) setLoading(false); }
     }
     loadProfile();
     return () => { active = false; };
-  }, [open, required]);
+  }, [open, required, attempt]);
 
   async function saveProfile() {
     setMsg("");
+    setSaved(false);
     if (!currentPassword) { setMsg("Vui lòng nhập mật khẩu hiện tại."); return; }
     if (!gmail || !question) { setMsg("Vui lòng nhập Gmail và câu hỏi bảo mật."); return; }
     if (forceSetup && !answer.trim()) { setMsg("Vui lòng nhập câu trả lời bảo mật."); return; }
     if (changePassword && (!newPassword || newPassword !== confirmPassword)) { setMsg("Mật khẩu mới chưa hợp lệ hoặc xác nhận chưa khớp."); return; }
     try {
       setSaving(true);
-      const res = await fetch("/api/staff/update-security", {
+      const data = await requestJson<{ success: boolean; message: string }>("/api/staff/update-security", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword, changePassword, newPassword: changePassword ? newPassword : "", confirmPassword: changePassword ? confirmPassword : "", question, answer, gmail }),
       });
-      const data = await res.json();
       if (!data.success) { setMsg(data.message || "Không cập nhật được."); setSaving(false); return; }
       if (forceSetup) { window.location.assign("/admin"); return; }
       setMsg("Đã cập nhật thông tin thành công.");
+      setSaved(true);
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); setAnswer(""); setSaving(false);
-    } catch { setMsg("Lỗi kết nối. Không lưu được thông tin."); setSaving(false); }
+    } catch (reason) { setMsg(clientErrorMessage(reason, "Không lưu được thông tin.")); setSaving(false); }
   }
 
   const panel = (
@@ -93,10 +98,10 @@ export default function AdminProfileButton({ required = false, mustChangePasswor
                 <label htmlFor="profile-gmail">Gmail nhận OTP</label><input id="profile-gmail" type="email" value={gmail} onChange={(e) => setGmail(e.target.value)} placeholder="ten@gmail.com" required />
                 <label htmlFor="profile-question">Câu hỏi bảo mật</label><select id="profile-question" value={question} onChange={(e) => setQuestion(e.target.value)} required><option value="">Chọn câu hỏi bảo mật</option>{QUESTIONS.map((q) => <option key={q} value={q}>{q}</option>)}</select>
                 <label htmlFor="profile-answer">Câu trả lời bảo mật</label><textarea id="profile-answer" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={forceSetup ? "Nhập câu trả lời bảo mật" : "Để trống nếu không đổi"} required={forceSetup} rows={2} />
-                <button type="submit" className="admin-profile-save" disabled={saving || loading}>{loading ? "Đang tải thông tin..." : saving ? "Đang lưu..." : forceSetup ? "Lưu và vào quản trị" : "Lưu thay đổi"}</button>
+                <button type="submit" className="admin-profile-save" disabled={saving || loading || loadError}>{loading ? "Đang tải thông tin..." : saving ? "Đang lưu..." : forceSetup ? "Lưu và vào quản trị" : "Lưu thay đổi"}</button>
               </fieldset>
             </form>
-            {msg && <div className="admin-profile-msg" role="status">{msg}</div>}
+            {msg && <UiNotice tone={saved ? "success" : "error"} onRetry={loadError ? () => { setMsg(""); setAttempt(value => value + 1); } : undefined} busy={loading}>{msg}</UiNotice>}
             {forceSetup && <a className="admin-profile-exit" href="/api/auth/admin-logout">Đăng xuất</a>}
           </div>
         </section>

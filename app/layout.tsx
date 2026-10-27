@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import OnlineHeartbeat from "@/components/OnlineHeartbeat";
 import "./roboto.css";
 import "./globals.css";
+import "./portal-ui.css";
+import MobileViewport from "@/components/MobileViewport";
+import NetworkStatus from "@/components/NetworkStatus";
 import CmsImageLightbox from "@/components/CmsImageLightbox";
 import FrontendErrorReporter from "@/components/FrontendErrorReporter";
 import PwaRegister from "@/components/PwaRegister";
@@ -95,7 +98,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preload" href="/fonts/roboto/roboto-vietnamese-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="preload" href="/fonts/roboto/roboto-latin-ext-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
-      <body suppressHydrationWarning>
+      <body suppressHydrationWarning className="vtdd-ui">
+        <MobileViewport />
+        <NetworkStatus />
         <OnlineHeartbeat />
         <FrontendErrorReporter />
         <PwaRegister />

@@ -133,7 +133,7 @@ export default function HomePortal({ groups }: { groups: HomeGroup[] }) {
           </Link>
           <Link className={styles.mobileAdmin} href="/admin">Admin</Link>
         </header>
-        <nav className={styles.navigation} aria-label="Danh mục nghiệp vụ">
+        <nav className={styles.navigation} data-ui-bottom-nav aria-label="Danh mục nghiệp vụ">
           <div className={styles.navHeading}>DANH MỤC NGHIỆP VỤ</div>
           <div className={styles.tabs} role="tablist" aria-label="Nhóm nghiệp vụ">
             {groups.map((group, index) => <button className={styles.tab} key={group.id} ref={node => { tabs.current[index] = node; }} type="button" role="tab" id={`tab-${group.id}`} aria-selected={active.id === group.id} aria-controls="home-tools-panel" tabIndex={active.id === group.id ? 0 : -1} onClick={() => selectGroup(group.id)} onKeyDown={event => handleTabKey(event, index)}>

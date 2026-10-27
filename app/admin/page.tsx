@@ -118,7 +118,7 @@ export default async function AdminPage() {
       <section className="admin-cms-pro-shell">
         <header className="admin-cms-pro-hero">
           <div className="admin-cms-pro-brand">
-            <span className="admin-cms-pro-logo"><img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" /></span>
+            <span className="admin-cms-pro-logo"><img src="/brand/vtdd-logo-header-v3.webp" alt="Viễn Thông Di Động" /></span>
             <div>
               <b>Viễn Thông Di Động</b>
             </div>
@@ -132,7 +132,7 @@ export default async function AdminPage() {
           <div className="admin-cms-pro-meta">
             <span>{admin.permission.toUpperCase()}: {admin.name}</span>
             <span>NV: {admin.maNV}</span>
-            <span>Modules: {admin.permission === "admin" ? "ALL" : admin.modules.join(", ") || "Chưa cấp"}</span>
+            <span>{admin.permission === "admin" ? "Toàn quyền quản trị" : "Quản trị theo phân quyền"}</span>
           </div>
 
           <div className="admin-cms-pro-actions">

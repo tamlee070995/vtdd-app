@@ -3,6 +3,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { TradeinAccess } from "@/lib/tradein-control";
 import styles from "./Tradein.module.css";
+import UiNotice from "./UiNotice";
+import { clientErrorMessage, requestJson } from "@/lib/client-request";
 
 type Summary = { version: string; syncedAt: string; oldCount: number; newCount: number; importedBy: string;
   quality: { incompleteRanges: number; unavailableRanges: number; excludedTablets: number } };
@@ -16,29 +18,28 @@ export default function TradeinAdminTool({ canSync, canManage }: { canSync: bool
   const load = useCallback(async () => {
     setBusy("LOAD"); setError(""); setMessage("");
     try {
-      const response = await fetch("/api/admin/tradein", { cache: "no-store" });
-      const result = await response.json();
-      if (!response.ok || !result.success) throw new Error(result.message || "Chưa đọc được trạng thái bảng giá.");
+      const result = await requestJson<{ success: boolean; summary: Summary | null; access: TradeinAccess }>("/api/admin/tradein");
       setSummary(result.summary); setAccess(result.access); setLockMessage(result.access.message);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Không đồng bộ được bảng giá."); }
+    } catch (reason) { setError(clientErrorMessage(reason, "Chưa đọc được trạng thái bảng giá.")); }
     finally { setBusy(""); }
   }, []);
   useEffect(() => { void load(); }, [load]);
   async function mutate(action: "SYNC" | "SET_ACCESS", locked = false) {
     setBusy(action); setError(""); setMessage("");
     try {
-      const response = await fetch("/api/admin/tradein", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action === "SYNC"
-        ? { action, version: summary?.version || "" } : { action, revision: access?.revision, locked, message: lockMessage }) });
-      const result = await response.json();
-      if (!response.ok || !result.success) throw new Error(result.message || "Chưa lưu được thay đổi.");
+      const result = await requestJson<{ success: boolean; summary: Summary; access: TradeinAccess; message: string }>("/api/admin/tradein", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action === "SYNC"
+        ? { action, version: summary?.version || "" } : { action, revision: access?.revision, locked, message: lockMessage }) }, 120_000);
       if (action === "SYNC") {
         setSummary(result.summary);
         setMessage(access?.locked ? "Đã đồng bộ giá. Bấm “Mở lại trang tra giá” khi bạn sẵn sàng." : "Đã đồng bộ giá. Trang đang mở sẽ nhận thông báo và đếm ngược 7 giây để tải lại.");
       } else { setAccess(result.access); setLockMessage(result.access.message); setMessage(result.message); }
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Không lưu được thay đổi."); }
+    } catch (reason) { setError(clientErrorMessage(reason, "Không lưu được thay đổi.")); }
     finally { setBusy(""); }
   }
-  return <section className={styles.admin} aria-label="Đồng bộ giá thu cũ đổi mới">
+  return <section className={styles.admin} aria-label="Đồng bộ giá thu cũ đổi mới" aria-busy={Boolean(busy)}>
+    {busy && <UiNotice tone="loading">{busy === "SYNC" ? "Đang đồng bộ giá từ Google Sheet. Vui lòng chờ kết quả…" : busy === "SET_ACCESS" ? "Đang lưu trạng thái trang tra giá…" : "Đang tải thông tin bảng giá…"}</UiNotice>}
+    {error && <UiNotice onRetry={() => void load()} retryLabel={access ? "Kiểm tra trạng thái" : "Thử lại"} busy={Boolean(busy)}>{error}{access && <p>Chưa xác nhận được kết quả. Kiểm tra trạng thái trước khi thực hiện lại thao tác.</p>}</UiNotice>}
+    {message && <UiNotice tone="success">{message}</UiNotice>}
     <div className={styles.adminTop}><div><h3>Bảng giá thu cũ đổi mới công khai</h3><p>Đọc giá từ Data_Moi và Data_Cu_PhoneMWG trong Google Sheet đã kết nối. Sau khi đồng bộ thành công, người dùng tra cứu ngay mà không cần đăng nhập.</p></div><Link href="/tra-gia-thu-cu" target="_blank">Mở trang tra giá ↗</Link></div>
     {summary ? <><div className={styles.adminStats}><span><b>{summary.oldCount}</b> máy cũ</span><span><b>{summary.newCount}</b> máy mới</span><span>Cập nhật: <b>{new Date(summary.syncedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false })}</b></span><span>Bởi: <b>{summary.importedBy}</b></span></div>
       {summary.quality.incompleteRanges || summary.quality.unavailableRanges ? <p className={styles.adminNote}>Có {summary.quality.incompleteRanges} cặp thiếu mốc và {summary.quality.unavailableRanges} cặp chưa có giá. Các loại này sẽ không tính trợ giá.</p> : null}
@@ -56,7 +57,5 @@ export default function TradeinAdminTool({ canSync, canManage }: { canSync: bool
       {!canManage ? <p className={styles.adminNote}>Cần quyền “Đóng/mở trang tra giá” để sử dụng chức năng này.</p> : null}
     </div>
     <p className={styles.adminNote}>Nếu Sheet lỗi hoặc sai cấu trúc, lần đồng bộ không thay bảng giá đang lưu.</p>
-    {error ? <div className={styles.error} role="alert" style={{ marginTop: 16 }}>{error}</div> : null}
-    {message ? <div className={styles.success} role="status">{message}</div> : null}
   </section>;
 }

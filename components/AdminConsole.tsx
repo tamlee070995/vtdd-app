@@ -7,6 +7,11 @@ import AdminToolsDashboard from "@/components/AdminToolsDashboard";
 import PasswordInput from "@/components/PasswordInput";
 import DemoAdminTool from "@/components/DemoAdminTool";
 import TradeinAdminTool from "@/components/TradeinAdminTool";
+import AdminSystemStatus from "@/components/AdminSystemStatus";
+import AdminSectionIcon from "@/components/AdminSectionIcon";
+import UiNotice from "@/components/UiNotice";
+import { clientErrorMessage, requestJson } from "@/lib/client-request";
+import { ADMIN_SECTIONS, visibleAdminScreens, type AdminScreen } from "@/lib/admin-navigation";
 
 type AdminStaff = {
   rowNumber: number;
@@ -274,6 +279,7 @@ const TOOL_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: str
 const ALL_ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
   ...ADMIN_ACTION_OPTIONS,
   ...TOOL_ACTION_OPTIONS,
+  { key: "dashboard-view", label: "Xem tình trạng hệ thống", desc: "Theo dõi kết nối dữ liệu, email, Telegram và lỗi vận hành." },
 ];
 
 const TOOL_ACTION_KEYS = new Set(TOOL_ACTION_OPTIONS.map((item) => item.key));
@@ -323,6 +329,11 @@ function stripHiddenClientSettings(values: Record<string, string>) {
 
 const PERMISSION_TREE = [
   {
+    title: "Tình trạng hệ thống",
+    desc: "Cho phép theo dõi vận hành trong nhóm Hệ thống.",
+    children: ALL_ADMIN_ACTION_OPTIONS.filter(item => item.key === "dashboard-view"),
+  },
+  {
     title: "Quản trị vận hành TCDM",
     desc: "Đồng bộ giá từ Google Sheet và đóng/mở trang tra giá hiện tại.",
     module: "tcdm",
@@ -366,7 +377,7 @@ function money(value: number) {
 }
 
 function getErrorMessage(err: any) {
-  return err?.message || "Không thực hiện được thao tác.";
+  return clientErrorMessage(err);
 }
 
 function formatNumber(value: number) {
@@ -656,6 +667,7 @@ function TcdmAdminConsole({
     summary: EMPTY_SUMMARY,
   });
   const [staffLoading, setStaffLoading] = useState(false);
+  const [staffLoadError, setStaffLoadError] = useState("");
   const [staffSearchInput, setStaffSearchInput] = useState("");
   const [staffQuery, setStaffQuery] = useState("");
   const [staffStatusFilter, setStaffStatusFilter] = useState<"ALL" | "Active" | "Standby">("ALL");
@@ -764,7 +776,7 @@ function TcdmAdminConsole({
 
   function showToast(type: "success" | "error", text: string) {
     setToast({ type, text });
-    window.setTimeout(() => setToast(null), 2800);
+    if (type === "success") window.setTimeout(() => setToast(current => current?.text === text ? null : current), 5000);
   }
 
   function openConfirmDialog(dialog: NonNullable<ConfirmDialogState>) {
@@ -778,7 +790,7 @@ function TcdmAdminConsole({
   }
 
   async function postJSON(url: string, body: any) {
-    const res = await fetch(url, {
+    return requestJson<any>(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -788,13 +800,6 @@ function TcdmAdminConsole({
       body: JSON.stringify(body),
     });
 
-    const data = await res.json().catch(() => null);
-
-    if (!res.ok || !data?.success) {
-      throw new Error(data?.message || "Không thực hiện được thao tác.");
-    }
-
-    return data;
   }
 
   function getDownloadFileName(res: Response, fallback: string) {
@@ -933,6 +938,7 @@ function TcdmAdminConsole({
 
   async function loadStaff(nextPage = staffPage, options?: { silent?: boolean }) {
     try {
+      setStaffLoadError("");
       if (!options?.silent) setStaffLoading(true);
 
       const params = new URLSearchParams({
@@ -969,7 +975,7 @@ function TcdmAdminConsole({
       setStaffLoading(false);
     } catch (err: any) {
       setStaffLoading(false);
-      showToast("error", getErrorMessage(err));
+      setStaffLoadError(getErrorMessage(err));
     }
   }
 
@@ -1445,6 +1451,9 @@ function TcdmAdminConsole({
 
   return (
     <section className="adminx-console">
+      {staffLoadError && <UiNotice onRetry={() => void loadStaff()} busy={staffLoading}>{staffLoadError}</UiNotice>}
+      {staffLoading && <UiNotice tone="loading">Đang tải danh sách tài khoản…</UiNotice>}
+      {busy && <UiNotice tone="loading">Đang xử lý thay đổi. Vui lòng chờ kết quả…</UiNotice>}
       <style suppressHydrationWarning>{ADMINX_STYLE}</style>
       <style suppressHydrationWarning>{ADMINX_ONLINE_STYLE}</style>
 
@@ -2982,7 +2991,7 @@ function TcdmAdminConsole({
         </div>
       )}
 
-      {toast && <div className={toast.type === "success" ? "adminx-toast success" : "adminx-toast error"}>{toast.text}</div>}
+      {toast && <UiNotice tone={toast.type} onRetry={toast.type === "error" ? () => void loadStaff() : undefined} retryLabel="Tải lại danh sách" busy={staffLoading}>{toast.text}</UiNotice>}
     </section>
   );
 }
@@ -6178,7 +6187,7 @@ function StaffAdminAccessBox({
   );
 }
 type CmsSlug = "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo";
-type AdminModuleKey = "tcdm" | CmsSlug | "tools" | "people";
+type AdminModuleKey = AdminScreen;
 
 type CmsItem = {
   slug: CmsSlug;
@@ -6251,6 +6260,7 @@ const ADMIN_MODULES: Array<{
     desc: "Duyệt tài khoản, reset bảo mật, phân quyền Admin / Mod / User.",
     badge: "Nhân sự / phân quyền",
   },
+  { key: "system", no: "07", title: "Tình trạng hệ thống", desc: "Kết nối dữ liệu, email, Telegram và lỗi gần đây.", badge: "Theo dõi vận hành" },
 ];
 
 const EMPTY_CMS: CmsItems = {
@@ -6342,6 +6352,9 @@ function CmsEditor({
   const [body, setBody] = useState(legacyTextToHtml(item.draftBody || item.body || ""));
   const [busy, setBusy] = useState("");
   const editorRef = useRef<any>(null);
+  const [saveError, setSaveError] = useState("");
+  const [savedMessage, setSavedMessage] = useState("");
+  const lastAction = useRef<"SAVE_DRAFT" | "PUBLISH" | "UNPUBLISH">("SAVE_DRAFT");
 
   useEffect(() => {
     setTitle(item.draftTitle || item.title || "");
@@ -6354,6 +6367,7 @@ function CmsEditor({
   async function post(action: "SAVE_DRAFT" | "PUBLISH" | "UNPUBLISH") {
     try {
       setBusy(action);
+      lastAction.current = action; setSaveError(""); setSavedMessage("");
 
       let finalBody = body;
       const editor = editorRef.current;
@@ -6369,17 +6383,12 @@ function CmsEditor({
       }
 
       async function sendCms(nextAction: "SAVE_DRAFT" | "PUBLISH" | "UNPUBLISH") {
-        const res = await fetch("/api/admin/home-cms", {
+        const data = await requestJson<{ success: boolean; message: string }>("/api/admin/home-cms", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
           cache: "no-store",
           body: JSON.stringify({ action: nextAction, slug, title, summary, body: finalBody }),
         });
-
-        const data = await res.json().catch(() => null);
-        if (!res.ok || !data?.success) {
-          throw new Error(data?.message || "Không lưu được nội dung.");
-        }
 
         return data;
       }
@@ -6394,11 +6403,12 @@ function CmsEditor({
       }
 
       showToast("success", data.message || "Đã lưu.");
+      setSavedMessage(data.message || "Đã lưu nội dung thành công.");
       await onSaved();
       setBusy("");
     } catch (err: any) {
       setBusy("");
-      showToast("error", err?.message || "Không lưu được nội dung.");
+      setSaveError(clientErrorMessage(err, "Không lưu được nội dung."));
     }
   }
 
@@ -6555,6 +6565,9 @@ function CmsEditor({
         </aside>
       </div>
 
+      {busy && <UiNotice tone="loading">{busy === "PUBLISH" ? "Đang xuất bản nội dung…" : "Đang lưu thay đổi…"}</UiNotice>}
+      {saveError && <UiNotice onRetry={() => void post(lastAction.current)} busy={!!busy}>{saveError}<p>Nội dung đã nhập vẫn được giữ trong trình soạn thảo.</p></UiNotice>}
+      {savedMessage && <UiNotice tone="success">{savedMessage}</UiNotice>}
       <div className="cms-actions">
         <button type="button" onClick={() => post("SAVE_DRAFT")} disabled={!!busy}>
           {busy === "SAVE_DRAFT" ? "Đang lưu..." : "Lưu bản nháp"}
@@ -6598,51 +6611,38 @@ export default function AdminConsole({
   });
   const [cmsItems, setCmsItems] = useState<CmsItems>(EMPTY_CMS);
   const [cmsLoading, setCmsLoading] = useState(false);
+  const [cmsError, setCmsError] = useState("");
   const [toast, setToast] = useState<ToastState>(null);
 
   const isAdmin = adminRole === "admin";
   const allowedModules = parseModuleList(adminModules);
   const allowedActions = parseAdminActionItems(adminActions);
-  const canUseRootAction = (action: AdminActionKey) => isAdmin || allowedActions.includes(action);
-  const hasAnyRootAction = (keys: Set<AdminActionKey>) => Array.from(keys).some((key) => canUseRootAction(key));
-  const hasTcdmRootAccess =
-    allowedModules.includes("tcdm") || hasAnyRootAction(TCDM_ACTION_KEYS) || (!adminHasExplicitActions && allowedModules.includes("tcdm"));
-  const hasPeopleRootAccess =
-    allowedModules.includes("people") || hasAnyRootAction(PERSONNEL_ACTION_KEYS) || (!adminHasExplicitActions && allowedModules.includes("people"));
-  const hasToolsRootAccess = allowedModules.includes("tools") || hasAnyRootAction(TOOL_ACTION_KEYS);
-  const visibleAdminModules = isAdmin
-    ? ADMIN_MODULES
-    : ADMIN_MODULES.filter((item) => canAccess(item.key));
+  const screens = visibleAdminScreens(adminRole, allowedModules, allowedActions);
+  const visibleAdminModules = ADMIN_MODULES.filter(item => screens.includes(item.key));
+  const groups = ADMIN_SECTIONS.filter(section => section.screens.some(key => screens.includes(key)));
+  const activeGroup = groups.find(section => section.screens.includes(module)) || groups[0];
   const activeModuleAllowed = visibleAdminModules.some((item) => item.key === module);
   const firstVisibleModule = visibleAdminModules[0]?.key || "tcdm";
 
   function canAccess(key: AdminModuleKey) {
-    if (isAdmin) return true;
-    if (key === "tcdm") return hasTcdmRootAccess;
-    if (key === "people") return hasPeopleRootAccess;
-    if (key === "tools") return hasToolsRootAccess;
-    return allowedModules.includes(key);
+    return screens.includes(key);
   }
 
   function showToast(type: "success" | "error", text: string) {
     setToast({ type, text });
-    window.setTimeout(() => setToast(null), 2800);
+    if (type === "success") window.setTimeout(() => setToast(current => current?.text === text ? null : current), 5000);
   }
 
   async function loadCms() {
     try {
       setCmsLoading(true);
-      const res = await fetch("/api/admin/home-cms", {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-store" },
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) throw new Error(data?.message || "Không tải được CMS.");
+      setCmsError("");
+      const data = await requestJson<{ success: boolean; items: Partial<CmsItems> }>("/api/admin/home-cms");
       setCmsItems({ ...EMPTY_CMS, ...(data.items || {}) });
       setCmsLoading(false);
     } catch (err: any) {
       setCmsLoading(false);
-      showToast("error", err?.message || "Không tải được CMS.");
+      setCmsError(clientErrorMessage(err, "Không tải được nội dung."));
     }
   }
 
@@ -6666,37 +6666,43 @@ export default function AdminConsole({
 
       <div className="admin-cms-headline-v5">
         <div>
-          <span>CMS DASHBOARD</span>
-          <h2>Quản trị theo hạng mục ngành hàng</h2>
+          <span>QUẢN TRỊ WEBSITE</span>
+          <h2>{activeGroup?.label || "Quản trị"}</h2>
           <p>Tài khoản hiện tại: <b>{adminName}</b> · Quyền: <b>{adminRole.toUpperCase()}</b></p>
         </div>
         <div className="admin-cms-permission-summary">
-          {isAdmin ? "Toàn quyền hệ thống" : allowedModules.length ? `Được cấp: ${allowedModules.join(", ")}` : "Chưa được cấp hạng mục"}
+          {isAdmin ? "Toàn quyền hệ thống" : groups.length ? `Được cấp: ${groups.map(group => group.label).join(", ")}` : "Chưa được cấp chức năng"}
         </div>
       </div>
 
-      <nav className="admin-cms-module-grid-v5">
-        {visibleAdminModules.map((item) => {
-          const allowed = canAccess(item.key);
+      <nav className="admin-group-tabs" role="tablist" aria-label="Nhóm quản trị">
+        {groups.map((group, index) => <button key={group.key} type="button" role="tab" id={`admin-group-${group.key}`} aria-selected={activeGroup?.key === group.key} aria-controls="admin-workspace" tabIndex={activeGroup?.key === group.key ? 0 : -1}
+          onClick={() => { if (activeGroup?.key !== group.key) setModule(group.screens.find(key => screens.includes(key))!); }}
+          onKeyDown={event => {
+            if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const next = event.key === "Home" ? 0 : event.key === "End" ? groups.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + groups.length) % groups.length;
+            const target = groups[next]; setModule(target.screens.find(key => screens.includes(key))!);
+            document.getElementById(`admin-group-${target.key}`)?.focus();
+          }}><i aria-hidden="true"><AdminSectionIcon section={group.key} /></i><span>{group.label}<small>{group.description}</small></span></button>)}
+      </nav>
+      {activeGroup && activeGroup.screens.filter(key => screens.includes(key)).length > 1 && <nav className="admin-module-tabs" aria-label={`Chức năng ${activeGroup.label.toLowerCase()}`}>
+        {visibleAdminModules.filter(item => activeGroup.screens.includes(item.key)).map((item) => {
           return (
             <button
               key={item.key}
               type="button"
-              className={`${module === item.key ? "active" : ""} ${!allowed ? "noAccess" : ""}`}
+              aria-pressed={module === item.key}
               onClick={() => setModule(item.key)}
             >
-              <i>{item.no}</i>
-              <span>
-                <b>{item.title}</b>
-                <em>{item.desc}</em>
-              </span>
-              <small>{allowed ? item.badge : "Không có quyền"}</small>
+              {item.title.replace("Quản trị: ", "")}
             </button>
           );
         })}
-      </nav>
+      </nav>}
 
-      <section className="admin-cms-module-panel-v5">
+      <section className="admin-cms-module-panel-v5" id="admin-workspace" role="tabpanel" aria-labelledby={activeGroup ? `admin-group-${activeGroup.key}` : undefined}>
+        {cmsError && isCmsModule(module) && <UiNotice onRetry={() => void loadCms()} busy={cmsLoading}>{cmsError}</UiNotice>}
         {!activeAccess ? (
           <NoAccessPanel moduleTitle={activeMeta.title} />
         ) : module === "tcdm" ? (
@@ -6735,20 +6741,22 @@ export default function AdminConsole({
           <>
             <DemoAdminTool showToast={showToast} />
             <details style={{ marginTop: 28 }}><summary style={{ cursor: "pointer", fontWeight: 800 }}>Thông tin / công cụ chung của trang Gỡ Demo</summary>
-              {cmsLoading ? <p>Đang tải...</p> : <CmsEditor slug="demo" item={cmsItems.demo} onSaved={loadCms} showToast={showToast} />}
+              {cmsLoading ? <UiNotice tone="loading">Đang tải nội dung…</UiNotice> : !cmsError && <CmsEditor slug="demo" item={cmsItems.demo} onSaved={loadCms} showToast={showToast} />}
             </details>
           </>
         ) : isCmsModule(module) ? (
           cmsLoading ? (
-            <div className="cms-loading">Đang tải CMS...</div>
-          ) : (
+            <UiNotice tone="loading">Đang tải nội dung…</UiNotice>
+          ) : !cmsError ? (
             <CmsEditor
               slug={module}
               item={cmsItems[module] || EMPTY_CMS[module]}
               onSaved={loadCms}
               showToast={showToast}
             />
-          )
+          ) : null
+        ) : module === "system" ? (
+          <AdminSystemStatus />
         ) : (
           <AdminToolsDashboard
             initialSettings={initialSettings}
@@ -6760,7 +6768,7 @@ export default function AdminConsole({
         )}
       </section>
 
-      {toast && <div className={`adminx-toast ${toast.type}`}>{toast.text}</div>}
+      {toast && <UiNotice tone={toast.type}>{toast.text}<button className="ui-notice-dismiss" type="button" aria-label="Đóng thông báo" onClick={() => setToast(null)}>×</button></UiNotice>}
     </section>
   );
 }

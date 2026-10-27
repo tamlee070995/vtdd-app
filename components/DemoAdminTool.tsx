@@ -6,6 +6,8 @@ import type { Editor as TinyEditor } from "tinymce";
 import { emptyDemoGuide, normalizeDemoGuide, type DemoBrand, type DemoGuide, type DemoFeatures, type DemoMedia } from "@/lib/demo-content";
 import DemoGuideContent from "./DemoGuideContent";
 import styles from "./Demo.module.css";
+import UiNotice from "./UiNotice";
+import { clientErrorMessage, requestJson } from "@/lib/client-request";
 
 const sortBrands = (brands: DemoBrand[]) => [...brands].sort((a,b) => a.order - b.order || a.draft.name.localeCompare(b.draft.name, "vi"));
 type SaveAction = "CREATE" | "SAVE_DRAFT" | "PUBLISH" | "UNPUBLISH" | "SET_VISIBILITY" | "SET_ORDER";
@@ -33,12 +35,10 @@ export default function DemoAdminTool({ showToast }: Props) {
   async function load(signal?: AbortSignal) {
     setLoading(true); setError("");
     try {
-      const res = await fetch("/api/admin/demo", { cache:"no-store", signal });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.message || "Không tải được danh mục hãng.");
+      const json = await requestJson<{ success: boolean; brands: DemoBrand[] }>("/api/admin/demo", { signal });
       const next = sortBrands(json.brands || []);
       setBrands(next); if (next[0]) choose(next[0]);
-    } catch (err) { if (!signal?.aborted) setError(err instanceof Error ? err.message : "Không tải được danh mục hãng."); }
+    } catch (err) { if (!signal?.aborted) setError(clientErrorMessage(err, "Không tải được danh mục hãng.")); }
     finally { if (!signal?.aborted) setLoading(false); }
   }
   useEffect(() => {
@@ -128,8 +128,9 @@ export default function DemoAdminTool({ showToast }: Props) {
       <button className={styles.button} disabled={!!busy || loading} type="button" onClick={() => { if(canLeave())void load(); }}>Tải lại</button>
       <button className={`${styles.button} ${styles.primary}`} disabled={!!busy || loading} type="button" onClick={() => setAdding(value=>!value)}>+ Thêm hãng</button>
     </div></div>
-    {error ? <p className={styles.error} role="alert">{error}</p> : null}
-    {message ? <p className={styles.success} role="status">{message}</p> : null}
+    {error ? <UiNotice busy={!!busy || loading} onRetry={() => { if (canLeave()) void load(); }} retryLabel={brands.length ? "Tải lại trạng thái" : "Thử lại"}>{error}{dirty && <p>Nội dung chưa lưu vẫn còn trong trình soạn thảo.</p>}</UiNotice> : null}
+    {message ? <UiNotice tone="success">{message}</UiNotice> : null}
+    {busy ? <UiNotice tone="loading">{busy === "upload" ? "Đang tải tệp…" : busy === "preview" ? "Đang chuẩn bị bản xem trước…" : "Đang lưu thay đổi. Vui lòng chờ kết quả…"}</UiNotice> : null}
     {adding ? <form className={styles.formPanel} onSubmit={event => { event.preventDefault(); if(canLeave())void save("CREATE",{name:newName}); }}>
       <label className={styles.field}>Tên hãng mới<input required maxLength={60} value={newName} placeholder="Ví dụ: Samsung" onChange={event=>setNewName(event.target.value)} disabled={!!busy} /></label>
       <div className={styles.actions}><button className={`${styles.button} ${styles.publish}`} type="submit" disabled={!!busy}>Tạo bản nháp</button><button className={styles.button} type="button" disabled={!!busy} onClick={()=>setAdding(false)}>Hủy</button></div>

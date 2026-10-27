@@ -1,4 +1,6 @@
 "use client";
+import UiNotice from "./UiNotice";
+import { clientErrorMessage } from "@/lib/client-request";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -58,6 +60,7 @@ export default function CheckinAdminTool() {
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
   const [notice, setNotice] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
 
   const visibleRows = useMemo(() => {
@@ -77,6 +80,7 @@ export default function CheckinAdminTool() {
 
   async function loadData(options?: { silent?: boolean }) {
     try {
+      setLoadError("");
       if (!options?.silent) setLoading(true);
       const res = await fetch("/api/admin/tools/checkin", {
         cache: "no-store",
@@ -91,11 +95,7 @@ export default function CheckinAdminTool() {
       setLoading(false);
     } catch (err: any) {
       setLoading(false);
-      const message = err?.message || "Không tải được dữ liệu Check-in.";
-      setRows([]);
-      setDashboard(EMPTY_DASHBOARD);
-      setNotice(message);
-      showToast(message);
+      setLoadError(clientErrorMessage(err, "Không tải được dữ liệu Check-in."));
     }
   }
 
@@ -180,6 +180,9 @@ export default function CheckinAdminTool() {
 
   return (
     <section className="checkin-admin-tool">
+      {loadError && <UiNotice onRetry={() => void loadData()} busy={loading}>{loadError}</UiNotice>}
+      {loading && <UiNotice tone="loading">Đang tải dữ liệu Check-in…</UiNotice>}
+      {busy && <UiNotice tone="loading">Đang xử lý. Vui lòng chờ kết quả…</UiNotice>}
       <style>{STYLE}</style>
 
       <div className="checkin-admin-head">

@@ -29,16 +29,16 @@ export default async function PublishedCmsPage({ params }: { params: Promise<{ s
   }
 
   return (
-    <main className={styles.page}>
-      <header className={styles.topbar}>
+    <main className={`${styles.page} ui-public-page`}>
+      <header className={`${styles.topbar} ui-topbar`}>
         <Link href="/" className={styles.brand}>
-          <span><img src="/brand/vtdd-logo-v2.webp" alt="Viễn Thông Di Động" /></span>
+          <span><img src="/brand/vtdd-logo-header-v3.webp" alt="Viễn Thông Di Động" /></span>
           <b>Viễn Thông Di Động</b>
         </Link>
         <Link href="/" className={styles.back}>Trang chủ</Link>
       </header>
 
-      <article className={styles.article}>
+      <article className={`${styles.article} ui-article`}>
         <div className={styles.kicker}>{item.label}</div>
         <h1>{item.title}</h1>
         <p className={styles.summary}>{item.summary}</p>

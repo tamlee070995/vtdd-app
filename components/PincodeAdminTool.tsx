@@ -1,4 +1,6 @@
 "use client";
+import UiNotice from "./UiNotice";
+import { clientErrorMessage } from "@/lib/client-request";
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -105,6 +107,7 @@ export default function PincodeAdminTool() {
   const [importText, setImportText] = useState("");
   const [filter, setFilter] = useState<"ALL" | "Pending" | "Approved" | "Rejected">("Pending");
   const [toast, setToast] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
 
   const visibleRequests = useMemo(() => {
@@ -129,6 +132,7 @@ export default function PincodeAdminTool() {
 
   async function loadDashboard(options?: { silent?: boolean }) {
     try {
+      setLoadError("");
       if (!options?.silent) setLoading(true);
 
       const res = await fetch("/api/admin/tools/pincode", {
@@ -143,7 +147,7 @@ export default function PincodeAdminTool() {
       setLoading(false);
     } catch (err: any) {
       setLoading(false);
-      showToast(err?.message || "Không tải được PMH.");
+      setLoadError(clientErrorMessage(err, "Không tải được PMH."));
     }
   }
 
@@ -242,6 +246,9 @@ export default function PincodeAdminTool() {
 
   return (
     <section className="pmh-admin-tool">
+      {loadError && <UiNotice onRetry={() => void loadDashboard()} busy={loading}>{loadError}</UiNotice>}
+      {loading && <UiNotice tone="loading">Đang tải hồ sơ và kho Pincode…</UiNotice>}
+      {busy && <UiNotice tone="loading">Đang xử lý. Vui lòng chờ kết quả…</UiNotice>}
       <style>{STYLE}</style>
 
       <div className="pmh-head">

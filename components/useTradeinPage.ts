@@ -2,12 +2,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TRADEIN_POLL_MS, tradeinRefreshReason, type TradeinRefreshReason, type TradeinStatus } from "@/lib/tradein-control";
 import type { TradeinData } from "@/lib/tradein-pricing";
+import { clientErrorMessage } from "@/lib/client-request";
 
 export default function useTradeinPage() {
   const [data, setData] = useState<TradeinData | null>(null);
   const [status, setStatus] = useState<TradeinStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const [refreshReason, setRefreshReason] = useState<TradeinRefreshReason | null>(null);
   const loadedAt = useRef("");
   const lastStatus = useRef<TradeinStatus | null>(null);
@@ -22,6 +24,8 @@ export default function useTradeinPage() {
   useEffect(() => {
     const controller = new AbortController();
     let stopped = false;
+    setLoading(true); setError("");
+    const timeout = window.setTimeout(() => controller.abort(), 20_000);
     void (async () => {
       try {
         const response = await fetch("/api/tradein", { cache: "no-store", signal: controller.signal });
@@ -32,11 +36,11 @@ export default function useTradeinPage() {
         // A lock detected during this request takes priority over its price response.
         if (!lastStatus.current?.locked) { loadedAt.current = payload.data.syncedAt; setData(payload.data); }
       } catch (reason) {
-        if (!stopped) setError(reason instanceof Error ? reason.message : "Chưa tải được bảng giá.");
-      } finally { if (!stopped) setLoading(false); }
+        if (!stopped) setError(clientErrorMessage(reason, "Chưa tải được bảng giá."));
+      } finally { window.clearTimeout(timeout); if (!stopped) setLoading(false); }
     })();
-    return () => { stopped = true; controller.abort(); };
-  }, [receiveStatus]);
+    return () => { stopped = true; controller.abort(); window.clearTimeout(timeout); };
+  }, [receiveStatus, attempt]);
 
   useEffect(() => {
     let stopped = false, inFlight = false, lastCheck = 0;
@@ -68,5 +72,5 @@ export default function useTradeinPage() {
       window.removeEventListener("pageshow", wake);
     };
   }, [receiveStatus]);
-  return { data, status, loading, error, refreshReason };
+  return { data, status, loading, error, refreshReason, retry: () => setAttempt(value => value + 1) };
 }
