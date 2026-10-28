@@ -1,4 +1,5 @@
 "use client";
+import { buildStandbyImportPreview, type StandbyImportPreview } from "@/lib/staff-import";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "@tinymce/tinymce-react";
@@ -64,13 +65,7 @@ type DashboardLogRow = {
 type DashboardSource = "staff" | "customer";
 type DashboardDeleteMode = "oldest-3" | "oldest-5" | "oldest-7" | "oldest-30" | "all";
 
-type StandbyImportPreview = {
-  fileName: string;
-  rawRows: number;
-  codes: string[];
-  duplicates: string[];
-  errors: string[];
-};
+
 
 type AdminDashboard = {
   topOldProducts: Array<{ product: string; count: number }>;
@@ -384,141 +379,6 @@ function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("vi-VN");
 }
 
-function normalizeImportHeader(value: any) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "d")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-}
-
-function normalizeImportStaffCode(value: any) {
-  return String(value || "")
-    .normalize("NFKC")
-    .replace(/[\u00A0\u200B-\u200D\uFEFF]/g, "")
-    .trim()
-    .replace(/\.0$/, "")
-    .replace(/^nv/i, "")
-    .replace(/\D/g, "");
-}
-
-function detectImportDelimiter(line: string) {
-  const candidates = [",", "\t", ";"];
-  return candidates
-    .map((delimiter) => ({
-      delimiter,
-      count: line.split(delimiter).length - 1,
-    }))
-    .sort((a, b) => b.count - a.count)[0]?.delimiter || ",";
-}
-
-function parseDelimitedImport(text: string) {
-  const cleanText = String(text || "").replace(/^\uFEFF/, "");
-  const firstLine = cleanText.split(/\r?\n/).find((line) => line.trim()) || "";
-  const delimiter = detectImportDelimiter(firstLine);
-  const rows: string[][] = [];
-  let current = "";
-  let row: string[] = [];
-  let inQuotes = false;
-
-  for (let index = 0; index < cleanText.length; index += 1) {
-    const char = cleanText[index];
-    const next = cleanText[index + 1];
-
-    if (char === "\"") {
-      if (inQuotes && next === "\"") {
-        current += "\"";
-        index += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (!inQuotes && char === delimiter) {
-      row.push(current.trim());
-      current = "";
-      continue;
-    }
-
-    if (!inQuotes && (char === "\n" || char === "\r")) {
-      if (char === "\r" && next === "\n") index += 1;
-      row.push(current.trim());
-      if (row.some(Boolean)) rows.push(row);
-      row = [];
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  row.push(current.trim());
-  if (row.some(Boolean)) rows.push(row);
-  return rows;
-}
-
-function buildStandbyImportPreview(text: string, fileName: string): StandbyImportPreview {
-  const rows = parseDelimitedImport(text);
-  const errors: string[] = [];
-
-  if (rows.length === 0) {
-    return { fileName, rawRows: 0, codes: [], duplicates: [], errors: ["File CSV không có dữ liệu."] };
-  }
-
-  const headerAliases = new Set([
-    "manhanvien",
-    "manv",
-    "ma_nv",
-    "nv",
-    "staffcode",
-    "employeeid",
-    "employee",
-  ]);
-  const headerRow = rows[0] || [];
-  const headerIndex = headerRow.findIndex((cell) => headerAliases.has(normalizeImportHeader(cell)));
-  const hasHeader = headerIndex >= 0;
-  const codeIndex = hasHeader ? headerIndex : 0;
-  const dataRows = hasHeader ? rows.slice(1) : rows;
-  const seen = new Set<string>();
-  const duplicates: string[] = [];
-  const codes: string[] = [];
-
-  dataRows.forEach((item, index) => {
-    const rowNumber = index + (hasHeader ? 2 : 1);
-    const code = normalizeImportStaffCode(item[codeIndex]);
-
-    if (!code) {
-      if (item.some((cell) => String(cell || "").trim())) {
-        errors.push(`Dòng ${rowNumber}: thiếu mã nhân viên.`);
-      }
-      return;
-    }
-
-    if (seen.has(code)) {
-      duplicates.push(code);
-      return;
-    }
-
-    seen.add(code);
-    codes.push(code);
-  });
-
-  if (codes.length > 5000) {
-    errors.push("Mỗi lần import tối đa 5.000 mã nhân viên.");
-  }
-
-  return {
-    fileName,
-    rawRows: dataRows.length,
-    codes,
-    duplicates,
-    errors,
-  };
-}
-
 function maskIpAddress(value: string, fullAccess: boolean) {
   const ip = String(value || "").trim();
   if (!ip || fullAccess) return ip || "—";
@@ -652,6 +512,8 @@ function TcdmAdminConsole({
   const [bulkStandbyRoles, setBulkStandbyRoles] = useState({ user: true, mod: false });
   const [bulkStandbyPassword, setBulkStandbyPassword] = useState("");
   const [standbyImportOpen, setStandbyImportOpen] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<{tone: "success" | "error" | "info"; text: string} | null>(null);
+  const [readingImport, setReadingImport] = useState(false);
   const [standbyImportPreview, setStandbyImportPreview] = useState<StandbyImportPreview>(EMPTY_STANDBY_IMPORT_PREVIEW);
   const [deleteStaffDialog, setDeleteStaffDialog] = useState<DeleteStaffDialogState>(null);
   const [deleteStaffMailEnabled, setDeleteStaffMailEnabled] = useState(true);
@@ -1223,6 +1085,7 @@ function TcdmAdminConsole({
   }
 
   function openStandbyImportDialog() {
+    setImportFeedback(null);
     setStandbyImportPreview(EMPTY_STANDBY_IMPORT_PREVIEW);
     setStandbyImportOpen(true);
   }
@@ -1249,15 +1112,22 @@ function TcdmAdminConsole({
     }
 
     try {
-      const text = await file.text();
-      setStandbyImportPreview(buildStandbyImportPreview(text, file.name));
-    } catch {
+      setReadingImport(true); setImportFeedback(null);
+      if (file.size > 2_000_000) throw new Error("File vượt quá 2 MB.");
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const encoding = bytes[0] === 255 && bytes[1] === 254 ? "utf-16le" : bytes[0] === 254 && bytes[1] === 255 ? "utf-16be" : "utf-8";
+      const preview = buildStandbyImportPreview(new TextDecoder(encoding).decode(bytes), file.name);
+      setStandbyImportPreview(preview);
+      setImportFeedback({tone: preview.codes.length ? "info" : "error", text: `Đã đọc ${preview.rawRows} dòng, có ${preview.codes.length} mã hợp lệ. Tên nhân viên (nếu có) chỉ để tham khảo. Chưa thay đổi tài khoản.`});
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Không đọc được file.";
+      setImportFeedback({tone:"error",text});
       setStandbyImportPreview({
         ...EMPTY_STANDBY_IMPORT_PREVIEW,
         fileName: file.name || "",
-        errors: ["Không đọc được file CSV. Vui lòng kiểm tra lại định dạng file."],
+        errors: [text],
       });
-    }
+    } finally { setReadingImport(false); }
   }
 
   async function runStandbyImport() {
@@ -1284,9 +1154,7 @@ function TcdmAdminConsole({
         codes: standbyImportPreview.codes,
       });
 
-      setStandbyImportOpen(false);
-      setStandbyImportPreview(EMPTY_STANDBY_IMPORT_PREVIEW);
-      showToast("success", data.message || "Đã import Standby nhân viên.");
+      setImportFeedback({tone:"success", text: (data.message || "Đã import Standby nhân viên.") + (data.result?.missing?.length ? " Mã không tồn tại: " + data.result.missing.slice(0,30).join(", ") : "")});
       setBusy("");
       if (staffPage === 1) {
         await loadStaff(1, { silent: true });
@@ -1295,7 +1163,7 @@ function TcdmAdminConsole({
       }
     } catch (err: any) {
       setBusy("");
-      showToast("error", getErrorMessage(err));
+      setImportFeedback({tone:"error",text:getErrorMessage(err) + " Hãy kiểm tra danh sách trước khi thử lại; một số dòng có thể đã được xử lý."});
     }
   }
 
@@ -2844,18 +2712,20 @@ function TcdmAdminConsole({
             <span>Import Standby CSV</span>
             <h3 id="standbyImportTitle">Chuyển Standby theo file</h3>
             <p>
-              Upload CSV/TSV có cột <b>Mã nhân viên</b>, <b>MANV</b> hoặc <b>NV</b>. Nếu file chỉ có một cột, hệ thống sẽ tự lấy cột đầu tiên làm mã nhân viên.
+              Đây là chức năng chuyển tài khoản đã tồn tại sang Standby, không tạo tài khoản mới. Có thể dùng một cột mã hoặc hai cột mã + tên. Upload CSV/TSV có cột <b>Mã nhân viên</b>, <b>MANV</b> hoặc <b>NV</b>. Nếu file chỉ có một cột, hệ thống sẽ tự lấy cột đầu tiên làm mã nhân viên.
             </p>
 
             <section className="adminx-standby-import-drop">
               <span>File CSV</span>
-              <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={handleStandbyImportFile} />
+              <input type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" disabled={readingImport || busy === "STANDBY_IMPORT"} onChange={handleStandbyImportFile} />
               <button type="button" className="adminx-standby-template-button" onClick={downloadStandbyImportTemplate}>
                 Tải file mẫu CSV
               </button>
               <small>Tài khoản quyền Admin trong file sẽ được bỏ qua để tránh khóa nhầm.</small>
             </section>
 
+            {readingImport && <UiNotice tone="loading">Đang đọc file…</UiNotice>}
+            {importFeedback && <UiNotice tone={importFeedback.tone}>{importFeedback.text}</UiNotice>}
             <section className="adminx-standby-import-stats" aria-label="Xem trước import Standby">
               <div>
                 <span>File</span>
@@ -2905,7 +2775,7 @@ function TcdmAdminConsole({
                 type="button"
                 className="danger"
                 onClick={runStandbyImport}
-                disabled={busy === "STANDBY_IMPORT" || standbyImportPreview.codes.length === 0}
+                disabled={readingImport || busy === "STANDBY_IMPORT" || importFeedback?.tone === "success" || standbyImportPreview.codes.length === 0 || standbyImportPreview.codes.length > 5000}
               >
                 {busy === "STANDBY_IMPORT" ? "Đang import..." : "Áp dụng Standby"}
               </button>
