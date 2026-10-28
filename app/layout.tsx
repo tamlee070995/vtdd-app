@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import OnlineHeartbeat from "@/components/OnlineHeartbeat";
+
 import "./roboto.css";
 import "./globals.css";
 import "./portal-ui.css";
@@ -103,7 +103,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning className="vtdd-ui">
         <MobileViewport />
         <NetworkStatus />
-        <OnlineHeartbeat />
+
         <FrontendErrorReporter />
         <PwaRegister />
         <AppBootSplash />

@@ -1,26 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getOnlineSessions, getOnlineStats } from "@/lib/online-store";
-import { requireAdminApi } from "@/lib/admin-auth";
-
-export const dynamic = "force-dynamic";
-
-export async function GET(req: NextRequest) {
-  try {
-    const { response } = await requireAdminApi(req);
-    if (response) return response;
-
-    return NextResponse.json({
-      success: true,
-      online: getOnlineStats(),
-      sessions: getOnlineSessions(),
-    });
-  } catch (err: any) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: err?.message || "Không tải được thống kê online.",
-      },
-      { status: 500 }
-    );
-  }
-}
+import { NextResponse } from "next/server";
+function retired() { return NextResponse.json({ success:false, code:"FEATURE_RETIRED", message:"Công cụ này đã ngừng sử dụng." }, { status:410, headers:{"Cache-Control":"no-store"} }); }
+export const GET=retired; export const POST=retired; export const PATCH=retired; export const DELETE=retired;
