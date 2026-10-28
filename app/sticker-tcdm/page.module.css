@@ -440,10 +440,10 @@
 .page .paperInput {
   position:absolute;
   left:10%;
-  top:44%;
+  top:40%;
   width:80%;
   max-width:80%;
-  height:30%;
+  height:25%;
   margin:0;
   padding:0;
   border:1px dashed transparent;
@@ -474,11 +474,12 @@
   box-shadow:none;
   outline:none;
 }
-.darkInk .paperInput:focus {
-  color:#07111f;
-  caret-color:#07111f;
-  border-color:#07111f88;
-}
+.stickerItem[data-template="original"] .paperInput { transform:rotate(-2deg); }
+.page .stickerItem[data-print-mode="color"] .paperInput:focus { color:#fff; caret-color:#fff; border-color:#fffb; }
+.inkSelector { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
+.inkSelector button { min-height:44px; padding:10px; border:1px solid #dce2eb; border-radius:10px; background:#fff; color:#526176; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.inkSelector button[aria-pressed="true"] { background:#07111f; color:#ffd400; border-color:#07111f; }
+.adhesiveHint { margin:12px 0 0; color:#596577; font-size:12px; line-height:1.7; }
 .emptySlot {
   background:repeating-linear-gradient(135deg,#fff,#fff 8px,#fafbfc 8px,#fafbfc 9px);
   justify-content:center;
