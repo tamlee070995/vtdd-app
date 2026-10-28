@@ -42,12 +42,7 @@ export default async function HomePage() {
       mobileDesc: "Hướng dẫn gỡ demo theo từng hãng.",
       items: [{ title: cms.demo.published ? cms.demo.title : "Gỡ Demo", desc: "Chọn hãng để xem hướng dẫn gỡ demo, ảnh minh họa và công cụ hỗ trợ được đính kèm.", mobileDesc: "Chọn hãng, xem hướng dẫn gỡ demo", href: "/p/demo", icon: "demo" }],
     },
-    {
-      id: "cong-cu-ho-tro", title: "Công cụ hỗ trợ", navTitle: "Công cụ hỗ trợ", shortTitle: "Công cụ", icon: "tools",
-      desc: "Công cụ nghiệp vụ hỗ trợ vận hành tại siêu thị.",
-      mobileDesc: "Công cụ hỗ trợ vận hành tại siêu thị.",
-      items: [{ title: "Cổng công cụ hỗ trợ siêu thị", desc: "Mở danh mục nghiệp vụ PMH, chiến giá, thẩm định hồ sơ và các công cụ hỗ trợ tại siêu thị.", mobileDesc: "PMH, chiến giá và thẩm định hồ sơ", href: "/cong-cu-ho-tro", icon: "tools" }],
-    },
+
   ];
   return <HomePortal groups={groups} />;
 }

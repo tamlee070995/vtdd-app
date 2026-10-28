@@ -5,7 +5,6 @@ export const ADMIN_SECTIONS: Array<{ key: AdminSection; label: string; descripti
   { key: "content", label: "Nội dung", description: "Bài viết & hướng dẫn", icon: "▤", screens: ["quy-trinh-thu-cu", "may-moi", "may-cu", "demo"] },
   { key: "prices", label: "Bảng giá", description: "Đồng bộ & đóng/mở", icon: "₫", screens: ["tcdm"] },
   { key: "accounts", label: "Tài khoản", description: "Nhân viên & phân quyền", icon: "♙", screens: ["people"] },
-  { key: "system", label: "Hệ thống", description: "Công cụ & trạng thái", icon: "⚙", screens: ["tools", "system"] },
 ];
 
 export function visibleAdminScreens(role: string, modules: string[], actions: string[]): AdminScreen[] {
@@ -14,7 +13,5 @@ export function visibleAdminScreens(role: string, modules: string[], actions: st
   for (const key of ["quy-trinh-thu-cu", "may-moi", "may-cu", "demo"] as const) if (modules.includes(key)) result.push(key);
   if (modules.includes("tcdm") || actions.some(action => ["settings-write", "reload-data"].includes(action))) result.push("tcdm");
   if (modules.includes("people") || actions.some(action => ["staff-manage", "staff-delete", "staff-security"].includes(action))) result.push("people");
-  if (modules.includes("tools") || actions.some(action => action.startsWith("tools-"))) result.push("tools");
-  if (actions.includes("dashboard-view")) result.push("system");
   return result;
 }

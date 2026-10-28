@@ -18,15 +18,15 @@ test('MOD sees only granted groups, including standalone action grants', () => {
   assert.deepEqual(nav.visibleAdminScreens('mod', ['demo', 'may-cu'], []), ['may-cu', 'demo']);
   assert.deepEqual(nav.visibleAdminScreens('mod', [], ['reload-data']), ['tcdm']);
   assert.deepEqual(nav.visibleAdminScreens('mod', [], ['staff-security']), ['people']);
-  assert.deepEqual(nav.visibleAdminScreens('mod', [], ['tools-checkin']), ['tools']);
-  assert.deepEqual(nav.visibleAdminScreens('mod', [], ['dashboard-view']), ['system']);
+  assert.deepEqual(nav.visibleAdminScreens('mod', [], ['tools-checkin']), []);
+  assert.deepEqual(nav.visibleAdminScreens('mod', [], ['dashboard-view']), []);
   assert.ok(!nav.visibleAdminScreens('mod', ['tools'], []).includes('system'));
 });
-test('ADMIN retains all functions under four non-overlapping groups', () => {
-  assert.deepEqual(nav.ADMIN_SECTIONS.map(section => section.label), ['Nội dung', 'Bảng giá', 'Tài khoản', 'Hệ thống']);
+test('ADMIN retains all functions under three non-overlapping groups', () => {
+  assert.deepEqual(nav.ADMIN_SECTIONS.map(section => section.label), ['Nội dung', 'Bảng giá', 'Tài khoản']);
   const screens = nav.visibleAdminScreens('admin', [], []);
   assert.equal(screens.length, new Set(screens).size);
-  for (const expected of ['tcdm', 'quy-trinh-thu-cu', 'may-moi', 'may-cu', 'demo', 'tools', 'people', 'system']) assert.ok(screens.includes(expected));
+  for (const expected of ['tcdm', 'quy-trinh-thu-cu', 'may-moi', 'may-cu', 'demo', 'people']) assert.ok(screens.includes(expected));
 });
 test('suggestions match separated tokens and accents without mixing storage or Plus variants', () => {
   const products = [

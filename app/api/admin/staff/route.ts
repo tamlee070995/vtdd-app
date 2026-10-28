@@ -330,31 +330,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message });
     }
 
-    if (action === "UPDATE_CHECKIN_ACCESS") {
-      if (!(await isFullAdmin(admin))) {
-        return NextResponse.json(
-          { success: false, message: "Chỉ Admin mới được cấp hoặc thu hồi quyền Check-in." },
-          { status: 403 }
-        );
-      }
-
-      if (normalizePermission(target.permission) === "admin") {
-        return NextResponse.json({
-          success: true,
-          message: `Tài khoản Admin ${target.maNV} mặc định có quyền truy cập Check-in.`,
-        });
-      }
-
-      const enabled = Boolean(body.enabled);
-      await updateStaffCheckinToolAccess(target.rowNumber, { maNV: target.maNV, enabled });
-
-      return NextResponse.json({
-        success: true,
-        message: enabled
-          ? `Đã cấp quyền Check-in cho NV ${target.maNV}.`
-          : `Đã thu hồi quyền Check-in của NV ${target.maNV}.`,
-      });
-    }
+    if (action === "UPDATE_CHECKIN_ACCESS") return NextResponse.json({success:false,message:"Công cụ Check-in đã ngừng sử dụng."},{status:410});
 
     if (action === "ACTIVE") {
       if (!canRunAction(admin, "staff-manage")) {

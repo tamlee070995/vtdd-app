@@ -42,14 +42,7 @@ const quickGuides: Record<string, { title: string; steps: { title: string; desc:
       { title: "Làm theo hướng dẫn", desc: "Xem các bước, ảnh minh họa hoặc tệp công cụ được đính kèm." },
     ],
   },
-  "cong-cu-ho-tro": {
-    title: "Bắt đầu một nghiệp vụ hỗ trợ",
-    steps: [
-      { title: "Vào cổng công cụ", desc: "Mở danh mục công cụ hỗ trợ siêu thị." },
-      { title: "Chọn nghiệp vụ", desc: "Tìm công cụ phù hợp như PMH, chiến giá hoặc thẩm định hồ sơ." },
-      { title: "Chuẩn bị thông tin", desc: "Điền thông tin theo yêu cầu của công cụ đang sử dụng." },
-    ],
-  },
+
 };
 
 function Icon({ name }: { name: IconName }) {

@@ -26,19 +26,13 @@ export const ADMIN_NAME_COOKIE = "vtdd_admin_name";
 export const ADMIN_PERMISSION_COOKIE = "vtdd_admin_permission";
 export const ADMIN_MODULES_COOKIE = "vtdd_admin_modules";
 
-const MODULES: AdminModuleKey[] = ["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "tools", "people"];
+const MODULES: AdminModuleKey[] = ["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "people"];
 const ACTIONS: AdminActionKey[] = [
   "staff-manage",
   "staff-delete",
   "staff-security",
   "settings-write",
   "reload-data",
-  "dashboard-view",
-  "tools-pmh",
-  "tools-coming",
-  "tools-report",
-  "tools-telegram",
-  "tools-checkin",
 ];
 const ACTION_PREFIX = "action:";
 const ADMIN_SESSION_MAX_AGE = 60 * 60 * 8;

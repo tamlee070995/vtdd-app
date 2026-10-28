@@ -2,105 +2,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import AdminConsole from "@/components/AdminConsole";
 import AdminProfileButton from "@/components/AdminProfileButton";
-import { getSystemSettings } from "@/lib/system-store";
-import { adminCanUsePmhTool, adminHasAction, requireAdminPage } from "@/lib/admin-auth";
+
+import { requireAdminPage } from "@/lib/admin-auth";
 import { ensureStaffAdminHeaders } from "@/lib/staff-store";
 
 export const dynamic = "force-dynamic";
-
-const LEGACY_PRICE_SETTING_KEYS = [
-  "MARQUEE_MESSAGE",
-  "FIXED_BANNER_MESSAGE",
-  "PUSH_NOTIFY_MESSAGE",
-  "STAFF_POPUP_TRADEIN_ENABLED",
-  "STAFF_POPUP_TRADEIN_MESSAGE",
-  "STAFF_POPUP_TRADEIN_SECONDS",
-  "STAFF_POPUP_TRADEIN_VERSION",
-  "STAFF_POPUP_BUYONLY_ENABLED",
-  "STAFF_POPUP_BUYONLY_MESSAGE",
-  "STAFF_POPUP_BUYONLY_SECONDS",
-  "STAFF_POPUP_BUYONLY_VERSION",
-  "PRICE_EFFECTIVE_FROM",
-  "PRICE_EFFECTIVE_TO",
-  "DATA_VERSION",
-  "SYSTEM_LOCK_ENABLED",
-  "SYSTEM_LOCK_MESSAGE",
-  "SYSTEM_LOCK_SCHEDULE_ENABLED",
-  "SYSTEM_LOCK_START_AT",
-  "SYSTEM_LOCK_END_AT",
-  "SYSTEM_LOCK_REASON",
-  "STAFF_PAGE_LOCKED",
-  "CUSTOMER_PAGE_LOCKED",
-  "STAFF_TRADEIN_LOCKED",
-  "STAFF_BUYONLY_LOCKED",
-  "CUSTOMER_TRADEIN_LOCKED",
-  "CUSTOMER_BUYONLY_LOCKED",
-  "FIREWALL_BLACKLIST",
-  "FIREWALL_WHITELIST",
-  "FIREWALL_MESSAGE",
-  "FIREWALL_USER_BLACKLIST",
-  "FIREWALL_USER_WHITELIST",
-  "FIREWALL_USER_MESSAGE",
-];
-
-const PMH_CLIENT_SETTING_KEYS = [
-  "TOOL_PMH_ENABLED",
-  "TOOL_PMH_SCHEDULE_ENABLED",
-  "TOOL_PMH_START_AT",
-  "TOOL_PMH_END_AT",
-  "TOOL_PMH_LOCK_REASON",
-];
-
-const CHECKIN_CLIENT_SETTING_KEYS = [
-  "TOOL_CHECKIN_ENABLED",
-  "TOOL_CHECKIN_SCHEDULE_ENABLED",
-  "TOOL_CHECKIN_START_AT",
-  "TOOL_CHECKIN_END_AT",
-  "TOOL_CHECKIN_LOCK_REASON",
-];
-
-const TELEGRAM_CLIENT_SETTING_KEYS = [
-  "TELEGRAM_CHIENGIA_ENABLED",
-  "TELEGRAM_NGOAIDS_ENABLED",
-];
-
-function isSensitiveSettingKey(key: string) {
-  return /(TOKEN|SECRET|HASH|PASSWORD|PASS|PIN)/i.test(key);
-}
-
-function isHiddenClientSettingKey(key: string) {
-  return key === "PUSH_NOTIFY_VERSION";
-}
-
-function buildClientSettings(settings: Record<string, string>, admin: Awaited<ReturnType<typeof requireAdminPage>>) {
-  if (!admin) return {};
-  if (admin.permission === "admin") {
-    return Object.fromEntries(
-      Object.entries(settings).filter(([key]) => !isSensitiveSettingKey(key) && !isHiddenClientSettingKey(key) && !LEGACY_PRICE_SETTING_KEYS.includes(key))
-    );
-  }
-
-  const keys = new Set<string>();
-
-  if (adminCanUsePmhTool(admin)) {
-    PMH_CLIENT_SETTING_KEYS.forEach((key) => keys.add(key));
-  }
-
-  if (adminHasAction(admin, "tools-checkin")) {
-    CHECKIN_CLIENT_SETTING_KEYS.forEach((key) => keys.add(key));
-  }
-
-  if (adminHasAction(admin, "tools-telegram")) {
-    TELEGRAM_CLIENT_SETTING_KEYS.forEach((key) => keys.add(key));
-  }
-
-  const filtered: Record<string, string> = {};
-  keys.forEach((key) => {
-    if (isSensitiveSettingKey(key)) return;
-    filtered[key] = String(settings[key] ?? "");
-  });
-  return filtered;
-}
 
 export default async function AdminPage() {
   const admin = await requireAdminPage();
@@ -110,8 +16,7 @@ export default async function AdminPage() {
   }
 
   await ensureStaffAdminHeaders();
-  const settings = await getSystemSettings();
-  const clientSettings = buildClientSettings(settings, admin);
+  const clientSettings = {};
 
   return (
     <main className="admin-cms-pro-page">

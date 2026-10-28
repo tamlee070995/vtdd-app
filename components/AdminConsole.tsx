@@ -4,11 +4,9 @@ import { buildStandbyImportPreview, type StandbyImportPreview } from "@/lib/staf
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "@tinymce/tinymce-react";
 import { sanitizeHtml } from "@/lib/html-sanitize";
-import AdminToolsDashboard from "@/components/AdminToolsDashboard";
 import PasswordInput from "@/components/PasswordInput";
 import DemoAdminTool from "@/components/DemoAdminTool";
 import TradeinAdminTool from "@/components/TradeinAdminTool";
-import AdminSystemStatus from "@/components/AdminSystemStatus";
 import AdminSectionIcon from "@/components/AdminSectionIcon";
 import UiNotice from "@/components/UiNotice";
 import { clientErrorMessage, requestJson } from "@/lib/client-request";
@@ -223,7 +221,7 @@ const TAB_ITEMS: Array<{
   { key: "staff", label: "Nhân viên", desc: "Duyệt & reset", icon: "02" },
   { key: "permission", label: "Phân quyền", desc: "Admin / Mod", icon: "03" },
   { key: "notify", label: "Thông báo", desc: "Banner & push", icon: "04" },
-  { key: "system", label: "Hệ thống", desc: "Lock & reload", icon: "05" },
+
   { key: "dashboard", label: "Dashboard", desc: "Tra giá & log", icon: "06" },
 ];
 
@@ -242,7 +240,7 @@ const ADMIN_MODULE_OPTIONS = [
   { key: "may-moi", label: "2 Trang máy mới" },
   { key: "may-cu", label: "3 Trang máy cũ" },
   { key: "demo", label: "4 Trang demo" },
-  { key: "tools", label: "5 Công cụ" },
+
   { key: "people", label: "6 Quyền & Nhân sự" },
 ];
 
@@ -265,16 +263,16 @@ const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: st
 ];
 
 const TOOL_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
-  { key: "tools-pmh", label: "PMH / Pincode", desc: "Duyệt hồ sơ, nạp kho PMH và cấu hình lịch chạy." },
-  { key: "tools-checkin", label: "Check-in Event", desc: "Import danh sách khách, check-in và xem thứ tự khách đến." },
-  { key: "tools-report", label: "Báo cáo hỗ trợ", desc: "Import/export CSV, xuất log và tạo file backup." },
-  { key: "tools-telegram", label: "Thông báo Telegram", desc: "Cài bot, nhóm nhận tin và test bot cho từng công cụ." },
+
+
+
+
 ];
 
 const ALL_ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
   ...ADMIN_ACTION_OPTIONS,
   ...TOOL_ACTION_OPTIONS,
-  { key: "dashboard-view", label: "Xem tình trạng hệ thống", desc: "Theo dõi kết nối dữ liệu, email, Telegram và lỗi vận hành." },
+
 ];
 
 const TOOL_ACTION_KEYS = new Set(TOOL_ACTION_OPTIONS.map((item) => item.key));
@@ -323,11 +321,7 @@ function stripHiddenClientSettings(values: Record<string, string>) {
 }
 
 const PERMISSION_TREE = [
-  {
-    title: "Tình trạng hệ thống",
-    desc: "Cho phép theo dõi vận hành trong nhóm Hệ thống.",
-    children: ALL_ADMIN_ACTION_OPTIONS.filter(item => item.key === "dashboard-view"),
-  },
+
   {
     title: "Quản trị vận hành TCDM",
     desc: "Đồng bộ giá từ Google Sheet và đóng/mở trang tra giá hiện tại.",
@@ -349,12 +343,7 @@ const PERMISSION_TREE = [
       desc: "Cho phép mở và chỉnh nội dung module này.",
     })),
   },
-  {
-    title: "Công cụ hỗ trợ",
-    desc: "Module số 5 cho PMH/Pincode và các tool gắn thêm sau này.",
-    module: "tools",
-    children: TOOL_ACTION_OPTIONS,
-  },
+
 ] as const;
 
 function isOn(value: string) {
@@ -470,15 +459,9 @@ function parseStaffPermissionTokens(value: any) {
     .filter((item, index, arr) => Boolean(item) && arr.indexOf(item) === index);
 }
 
-function hasCheckinToolAccess(item: AdminStaff) {
-  if (item.permission === "admin") return true;
-  const tokens = new Set(parseStaffPermissionTokens(item.modulePermissions));
-  return tokens.has(STAFF_CHECKIN_PERMISSION_TOKEN) || tokens.has("action:tools-checkin");
-}
 
-function hasDirectCheckinGrant(item: AdminStaff) {
-  return parseStaffPermissionTokens(item.modulePermissions).includes(STAFF_CHECKIN_PERMISSION_TOKEN);
-}
+
+
 
 function TcdmAdminConsole({
   initialSettings,
@@ -924,26 +907,13 @@ function TcdmAdminConsole({
     });
   }
 
-  useEffect(() => {
-    loadOnlineStats({ silent: true });
-    loadOpsHealth({ silent: true });
-
-    const timer = window.setInterval(() => {
-      loadOnlineStats({ silent: true });
-    }, 10000);
-
-    return () => window.clearInterval(timer);
-    // Admin health polling is intentionally started once; calling changing loaders here would restart the timer on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   function runCommandSearch() {
     const raw = commandInput.trim();
     const q = raw.toLowerCase();
     if (!q) return;
 
     const routeMap: Array<{ match: RegExp; tab: TabKey; action?: () => void }> = [
-      { match: /(nhan|nhân|staff|nv|active|standby|otp|reset|delete|xoa|xóa)/i, tab: "staff" },
+      { match: /(nhan|nhân|staff|nv|active|standby|otp|reset|delete|xoa|xóa|import)/i, tab: "staff" },
       { match: /(quyen|quyền|permission|mod|admin)/i, tab: "permission" },
       { match: /(thong bao|thông báo|notify|push|popup|banner)/i, tab: "notify" },
       { match: /(khoa|khóa|lock|reload|firewall|ip|tuong lua|tường lửa)/i, tab: "system" },
@@ -955,11 +925,6 @@ function TcdmAdminConsole({
       setTab(found.tab);
       found.action?.();
       showToast("success", `Đã mở nhanh mục phù hợp cho "${raw}".`);
-      return;
-    }
-
-    if (/pmh|pincode|telegram|import|export|tool|cong cu|công cụ/i.test(q)) {
-      showToast("success", "Module công cụ hỗ trợ nằm ở thẻ số 05 bên ngoài khu vực quản trị TCDM.");
       return;
     }
 
@@ -1349,7 +1314,7 @@ function TcdmAdminConsole({
           onKeyDown={(e) => {
             if (e.key === "Enter") runCommandSearch();
           }}
-          placeholder="Tìm nhanh: NV12345, PMH, backup, khóa trang, log lỗi..."
+          placeholder="Tìm nhanh: mã nhân viên, Standby, reset bảo mật, phân quyền..."
         />
         <button type="button" onClick={runCommandSearch}>Tìm chức năng</button>
       </div>
@@ -1554,239 +1519,7 @@ function TcdmAdminConsole({
         </section>
       )}
 
-      {tab === "staff" && (
-        <section className="adminx-panel">
-          <div className="adminx-panel-head adminx-panel-head-row">
-            <div>
-              <span className="adminx-eyebrow">Staff Access</span>
-              <h2>Nhân viên & phê duyệt</h2>
-              <p>Quản lý trạng thái tài khoản, reset bảo mật và OTP cho nhân viên.</p>
-            </div>
-            <div className="adminx-panel-actions">
-              {isFullAdmin && (
-                <button
-                  className="adminx-action-btn standby"
-                  type="button"
-                  onClick={() => {
-                    setBulkStandbyRoles({ user: true, mod: false });
-                    setBulkStandbyPassword("");
-                    setBulkStandbyOpen(true);
-                  }}
-                  disabled={staffLoading || busy === "STANDBY_BULK"}
-                >
-                  {busy === "STANDBY_BULK" ? "Đang xử lý..." : "Standby"}
-                </button>
-              )}
-              {isFullAdmin && (
-                <button
-                  className="adminx-action-btn import"
-                  type="button"
-                  onClick={openStandbyImportDialog}
-                  disabled={staffLoading || busy === "STANDBY_IMPORT"}
-                >
-                  {busy === "STANDBY_IMPORT" ? "Đang import..." : "Import Standby CSV"}
-                </button>
-              )}
-              <button className="adminx-action-btn" type="button" onClick={() => loadStaff(staffPage)} disabled={staffLoading}>
-                {staffLoading ? "Đang tải..." : "Tải lại"}
-              </button>
-            </div>
-          </div>
 
-          <div className="adminx-staff-summary">
-            <div>
-              <span>Tất cả</span>
-              <b>{formatNumber(summary.total)}</b>
-            </div>
-            <div>
-              <span>Active</span>
-              <b>{formatNumber(summary.active)}</b>
-            </div>
-            <div>
-              <span>Standby</span>
-              <b>{formatNumber(summary.standby)}</b>
-            </div>
-            <div>
-              <span>Need setup</span>
-              <b>{formatNumber(summary.needSetup)}</b>
-            </div>
-          </div>
-
-          <div className="adminx-filter-bar">
-            <input
-              value={staffSearchInput}
-              onChange={(e) => setStaffSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") applyStaffSearch();
-              }}
-              placeholder="Tìm mã NV, tên, mã ST, siêu thị, phòng ban"
-            />
-            <select
-              value={staffStatusFilter}
-              onChange={(e) => {
-                setStaffPage(1);
-                setStaffStatusFilter(e.target.value as "ALL" | "Active" | "Standby");
-              }}
-            >
-              <option value="ALL">Tất cả</option>
-              <option value="Standby">Standby</option>
-              <option value="Active">Active</option>
-            </select>
-            <button type="button" onClick={applyStaffSearch} disabled={staffLoading}>
-              Tìm
-            </button>
-          </div>
-
-          <div className="adminx-table-card">
-            <div className="adminx-table-toolbar">
-              <span>
-                Hiển thị <b>{formatNumber(staff.length)}</b> / <b>{formatNumber(staffMeta.total)}</b> kết quả
-              </span>
-              <em>
-                Trang {formatNumber(staffMeta.page)} / {formatNumber(staffMeta.pages)}
-              </em>
-            </div>
-
-            <div className="adminx-staff-list">
-              {staffLoading ? (
-                <div className="adminx-empty-state">
-                  <div className="adminx-spinner"></div>
-                  <b>Đang tải danh sách</b>
-                  <p>Vui lòng chờ trong giây lát.</p>
-                </div>
-              ) : staff.length === 0 ? (
-                <div className="adminx-empty-state">
-                  <b>Không tìm thấy nhân viên</b>
-                  <p>Thử đổi từ khóa hoặc trạng thái lọc.</p>
-                </div>
-              ) : (
-                staff.map((item) => (
-                  <article className="adminx-staff-card" key={`${item.maNV}-${item.rowNumber}`}>
-                    <div className="adminx-staff-main">
-                      <div className="adminx-staff-topline">
-                        <span className={item.status === "Active" ? "adminx-badge active" : "adminx-badge standby"}>
-                          {item.status || "Standby"}
-                        </span>
-                        <em>NV {item.maNV}</em>
-                      </div>
-
-                      <h3>{item.staffName || "Chưa có tên"}</h3>
-
-                      <div className="adminx-staff-meta">
-                        <span>ST: {item.maST || "—"}</span>
-                        <span>{item.storeName || "Chưa có siêu thị"}</span>
-                        <span>{item.department || "Chưa có phòng ban"}</span>
-                      </div>
-
-                      <div className="adminx-staff-flags">
-                        <span>OTP: {item.resetOtpCount || "0"}</span>
-                        <span>SETUP: {item.needSetup || "0"}</span>
-                        {hasCheckinToolAccess(item) ? (
-                          <span>CHECK-IN: {item.permission === "admin" ? "ADMIN" : "ĐƯỢC CẤP"}</span>
-                        ) : (
-                          <span>CHECK-IN: —</span>
-                        )}
-                        {item.gmail ? <span>{item.gmail}</span> : null}
-                        {item.permission ? <span>QUYỀN: {item.permission.toUpperCase()}</span> : <span>QUYỀN: —</span>}
-                        {item.permission === "mod" ? <span>PHẠM VI: {summarizeAdminAccess(item.modulePermissions)}</span> : null}
-                        {isStaffAdminLocked(item) ? <span>MOD KHÔNG THỂ THAO TÁC ADMIN</span> : null}
-                      </div>
-
-                    </div>
-
-                    {isStaffAdminLocked(item) ? (
-                      <div className="adminx-staff-viewonly">
-                        <b>Chỉ xem</b>
-                        <span>Tài khoản Admin chỉ cho phép quyền Admin thao tác.</span>
-                      </div>
-                    ) : (
-                    <div className="adminx-staff-actions">
-                      <button
-                        type="button"
-                        className="primary"
-                        disabled={!canManageStaff || busy === `ACTIVE-${item.maNV}`}
-                        onClick={() => {
-                          if (item.status === "Active") {
-                            openConfirmDialog({
-                              title: "Gửi lại Gmail Active",
-                              message: `Gửi lại Gmail thông báo tài khoản đã Active cho NV ${item.maNV}?`,
-                              confirmText: "Gửi mail",
-                              onConfirm: () => runStaffAction("ACTIVE", item.maNV),
-                            });
-                            return;
-                          }
-
-                          runStaffAction("ACTIVE", item.maNV);
-                        }}
-                      >
-                        {item.status === "Active" ? "Gửi mail Active" : "Active"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!canManageStaff || busy === `STANDBY-${item.maNV}` || item.status === "Standby"}
-                        onClick={() => runStaffAction("STANDBY", item.maNV)}
-                      >
-                        Standby
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!canResetStaffSecurity || busy === `RESET_SECURITY-${item.maNV}`}
-                        onClick={() => {
-                          openConfirmDialog({
-                            title: "Reset bảo mật",
-                            message: `Reset tài khoản ${item.maNV}: mật khẩu về 123123, xóa bảo mật/Gmail, NEED_SETUP=1 và OTP count=0?`,
-                            confirmText: "Reset",
-                            danger: true,
-                            onConfirm: () => runStaffAction("RESET_SECURITY", item.maNV),
-                          });
-                        }}
-                      >
-                        Reset bảo mật
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!canResetStaffOtp || busy === `RESET_OTP_COUNT-${item.maNV}`}
-                        onClick={() => runStaffAction("RESET_OTP_COUNT", item.maNV)}
-                      >
-                        Reset OTP
-                      </button>
-                      <button
-                        type="button"
-                        className="danger"
-                        disabled={!canDeleteStaff || busy === `DELETE-${item.maNV}`}
-                        onClick={() => openDeleteStaffDialog(item)}
-                      >
-                        Xóa nhân viên
-                      </button>
-                    </div>
-                    )}
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="adminx-pagination">
-            <button
-              type="button"
-              disabled={staffLoading || staffMeta.page <= 1}
-              onClick={() => setStaffPage((v) => Math.max(1, v - 1))}
-            >
-              Trang trước
-            </button>
-            <span>
-              {formatNumber(staffMeta.page)} / {formatNumber(staffMeta.pages)}
-            </span>
-            <button
-              type="button"
-              disabled={staffLoading || staffMeta.page >= staffMeta.pages}
-              onClick={() => setStaffPage((v) => Math.min(staffMeta.pages, v + 1))}
-            >
-              Trang sau
-            </button>
-          </div>
-        </section>
-      )}
 
 
       {tab === "permission" && (
@@ -1864,19 +1597,9 @@ function TcdmAdminConsole({
                     item={item}
                     disabled={!isFullAdmin || busy === `UPDATE_PERMISSION-${item.maNV}`}
                     onSave={runStaffAdminAccess}
-                    checkinBusy={busy === `UPDATE_CHECKIN_ACCESS-${item.maNV}`}
-                    checkinDisabled={!isFullAdmin || busy === `UPDATE_CHECKIN_ACCESS-${item.maNV}`}
-                    onCheckinToggle={(target, enabled) => {
-                      openConfirmDialog({
-                        title: enabled ? "Cấp quyền Check-in" : "Tắt quyền Check-in",
-                        message: enabled
-                          ? `Cấp quyền truy cập công cụ Check-in cho NV ${target.maNV}?`
-                          : `Thu hồi quyền truy cập công cụ Check-in của NV ${target.maNV}?`,
-                        confirmText: enabled ? "Cấp quyền" : "Thu hồi",
-                        danger: !enabled,
-                        onConfirm: () => runStaffAction("UPDATE_CHECKIN_ACCESS", target.maNV, { enabled }),
-                      });
-                    }}
+
+
+
                   />
                 </article>
               ))
@@ -5832,16 +5555,10 @@ function StaffAdminAccessBox({
   item,
   disabled,
   onSave,
-  checkinBusy,
-  checkinDisabled,
-  onCheckinToggle,
 }: {
   item: AdminStaff;
   disabled: boolean;
   onSave: (maNV: string, permission: string, modules: string) => Promise<void>;
-  checkinBusy: boolean;
-  checkinDisabled: boolean;
-  onCheckinToggle: (item: AdminStaff, enabled: boolean) => void;
 }) {
   const [permission, setPermission] = useState(item.permission || "");
   const [accessItems, setAccessItems] = useState<string[]>(parseAdminAccessItems(item.modulePermissions));
@@ -6026,33 +5743,7 @@ function StaffAdminAccessBox({
       {permission === "admin" && <em>Admin có toàn quyền, không cần chọn hạng mục.</em>}
       {permission === "" && <em>User thường không được truy cập trang quản trị.</em>}
 
-      <div className="adminx-permission-section-title">
-        <span>Quyền Check-in nội bộ</span>
-        <small>Cấp quyền cho nhân sự được phép mở công cụ Check-in Event.</small>
-      </div>
-      <div className="adminx-module-buttons adminx-action-buttons">
-        <button
-          type="button"
-          disabled={checkinDisabled || item.permission === "admin"}
-          className={item.permission === "admin" || hasDirectCheckinGrant(item) ? "active" : ""}
-          onClick={() => onCheckinToggle(item, !hasDirectCheckinGrant(item))}
-        >
-          <span>
-            {item.permission === "admin"
-              ? "Check-in mặc định cho Admin"
-              : hasDirectCheckinGrant(item)
-                ? "Đã cấp Check-in"
-                : "Cấp quyền Check-in"}
-          </span>
-          <small>
-            {item.permission === "admin"
-              ? "Tài khoản Admin luôn có quyền dùng Check-in."
-              : checkinBusy
-                ? "Đang cập nhật quyền Check-in..."
-                : "Bật/tắt quyền công cụ Check-in cho tài khoản này."}
-          </small>
-        </button>
-      </div>
+
     </div>
   );
 }
@@ -6116,13 +5807,7 @@ const ADMIN_MODULES: Array<{
     desc: "Quản lý hãng, hướng dẫn gỡ demo, ảnh, video và công cụ tải về.",
     badge: "Hãng / hướng dẫn",
   },
-  {
-    key: "tools",
-    no: "05",
-    title: "Quản trị: Công cụ hỗ trợ",
-    desc: "Quản trị PMH, Pincode và hồ sơ thẩm định nhân viên gửi lên.",
-    badge: "PMH / thẩm định",
-  },
+
   {
     key: "people",
     no: "06",
@@ -6130,7 +5815,7 @@ const ADMIN_MODULES: Array<{
     desc: "Duyệt tài khoản, reset bảo mật, phân quyền Admin / Mod / User.",
     badge: "Nhân sự / phân quyền",
   },
-  { key: "system", no: "07", title: "Tình trạng hệ thống", desc: "Kết nối dữ liệu, email, Telegram và lỗi gần đây.", badge: "Theo dõi vận hành" },
+
 ];
 
 const EMPTY_CMS: CmsItems = {
@@ -6625,17 +6310,7 @@ export default function AdminConsole({
               showToast={showToast}
             />
           ) : null
-        ) : module === "system" ? (
-          <AdminSystemStatus />
-        ) : (
-          <AdminToolsDashboard
-            initialSettings={initialSettings}
-            adminRole={adminRole}
-            adminModules={adminModules}
-            adminActions={adminActions}
-            adminHasExplicitActions={adminHasExplicitActions}
-          />
-        )}
+        ) : null}
       </section>
 
       {toast && <UiNotice tone={toast.type}>{toast.text}<button className="ui-notice-dismiss" type="button" aria-label="Đóng thông báo" onClick={() => setToast(null)}>×</button></UiNotice>}
