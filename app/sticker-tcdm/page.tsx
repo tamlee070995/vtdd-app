@@ -122,7 +122,7 @@ export default function StickerTcdmPage() {
         event.preventDefault();
         applyAmount(commonAmount);
     } }}/><button type="button" onClick={() => applyAmount(commonAmount)}>Áp dụng</button></div>
-            <div className={styles.quickAmounts} aria-label="Mức trợ giá gợi ý">{["500 NGHÌN", "1 TRIỆU", "2 TRIỆU", "3 TRIỆU"].map(amount => <button type="button" key={amount} onClick={() => applyAmount(amount)}>{amount}</button>)}</div>
+            <div className={styles.quickAmounts} aria-label="Mức trợ giá gợi ý">{["300 NGÀN", "500 NGÀN", "1 TRIỆU", "2 TRIỆU", "3 TRIỆU"].map(amount => <button type="button" key={amount} onClick={() => applyAmount(amount)}>{amount}</button>)}</div>
             <div className={styles.amountGrid}>{amounts.slice(0, quantity).map((amount, index) => <label className={styles.amountField} key={index}><span><i>{String(index + 1).padStart(2, "0")}</i> Sticker {index + 1}</span><input aria-label={"Giá sticker " + (index + 1)} maxLength={20} value={amount} placeholder="0 TRIỆU" onChange={event => updateAmount(index, event.target.value)}/></label>)}</div>
             <details className={styles.moreText}><summary>Chỉnh tiêu đề &amp; dòng phụ</summary><label className={styles.label}>Dòng tiêu đề<input maxLength={18} value={title} onChange={event => setTitle(event.target.value)} placeholder="TRỢ GIÁ"/></label><label className={styles.label}>Dòng phụ<input maxLength={24} value={footer} onChange={event => setFooter(event.target.value)} placeholder="LÊN ĐỜI !"/></label></details>
           </section>
