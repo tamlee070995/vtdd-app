@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { insertRows, isSupabaseConfigured, selectRows, updateRows } from "./supabase-rest";
-import { defaultTradeinAccess, normalizeTradeinAccess, type TradeinAccess, type TradeinStatus } from "./tradein-control";
+import { defaultTradeinAccess, effectiveTradeinAccess, normalizeTradeinAccess, normalizeTradeinSchedule, type TradeinAccess, type TradeinStatus } from "./tradein-control";
 import { TradeinDataError } from "./tradein-pricing";
 
 const CONTROL_KEY = "TRADEIN_PUBLIC_CONTROL_V1";
@@ -14,7 +14,7 @@ export async function getTradeinAccess(): Promise<TradeinAccess> {
   if (!rows.length) return defaultTradeinAccess();
   const value = JSON.parse(rows[0].value) as TradeinAccess;
   if (!value.revision || typeof value.locked !== "boolean" || typeof value.message !== "string") throw new TradeinDataError("Không đọc được trạng thái trang tra giá.", 503);
-  return value;
+  return effectiveTradeinAccess(value);
 }
 export async function getPublicTradeinStatus(): Promise<TradeinStatus> {
   requireStorage();
@@ -28,7 +28,11 @@ export async function getPublicTradeinStatus(): Promise<TradeinStatus> {
 export async function writeTradeinAccess(payload: Record<string, unknown>, actor: string) {
   const previous = await getTradeinAccess();
   if (payload.revision !== previous.revision) throw new TradeinDataError("Trạng thái vừa đổi ở phiên khác. Bấm “Làm mới thông tin” rồi thử lại.", 409);
-  const access = normalizeTradeinAccess(payload, randomUUID());
+  const access = normalizeTradeinAccess({ ...payload, locked: payload.action === "SET_SCHEDULE" ? previous.locked : payload.locked }, randomUUID());
+  if (payload.action === "SET_SCHEDULE") {
+    const schedule = normalizeTradeinSchedule(payload);
+    if (schedule.lockAt || schedule.reopenAt) access.schedule = schedule;
+  } else if (payload.keepSchedule === true && previous.schedule) access.schedule = previous.schedule;
   const row = { key: CONTROL_KEY, value: JSON.stringify(access), type: "TEXT", updated_at_text: new Date().toISOString(), updated_by: actor };
   if (previous.revision === "initial") {
     try { await insertRows("system_settings", [row]); }

@@ -45,11 +45,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, gradeGuide, message: "Đã lưu định nghĩa Loại 1–5. Người dùng sẽ thấy khi mở lại trang tra giá." });
     } catch (error) { return failure(error); }
   }
-  if (input.action === "SET_ACCESS") {
+  if (input.action === "SET_ACCESS" || input.action === "SET_SCHEDULE") {
     if (!adminHasAction(admin, "settings-write", "tcdm")) return NextResponse.json({ success: false, message: "Không có quyền đóng/mở trang tra giá." }, { status: 403 });
     try {
       const access = await writeTradeinAccess(input, admin!.name || admin!.maNV);
-      return NextResponse.json({ success: true, access, message: access.locked ? "Đã tạm khóa trang tra giá." : "Đã mở lại trang tra giá." });
+      return NextResponse.json({ success: true, access, message: input.action === "SET_SCHEDULE" ? access.schedule ? "Đã lưu lịch khóa / mở trang theo giờ Việt Nam." : "Đã hủy lịch hẹn. Trạng thái hiện tại được giữ nguyên." : input.keepSchedule === true ? "Đã lưu thông báo." : access.locked ? "Đã tạm khóa trang tra giá. Lịch hẹn cũ đã được hủy." : "Đã mở lại trang tra giá. Lịch hẹn cũ đã được hủy." });
     } catch (error) { return failure(error); }
   }
   if (!adminHasAction(admin, "reload-data", "tcdm")) return NextResponse.json({ success: false, message: "Không có quyền đồng bộ giá." }, { status: 403 });

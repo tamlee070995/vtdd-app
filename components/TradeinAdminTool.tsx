@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import type { TradeinAccess } from "@/lib/tradein-control";
+import { tradeinScheduleInput, tradeinScheduleIso, type TradeinAccess } from "@/lib/tradein-control";
 import styles from "./Tradein.module.css";
 import UiNotice from "./UiNotice";
 import { clientErrorMessage, requestJson } from "@/lib/client-request";
@@ -14,6 +14,13 @@ export default function TradeinAdminTool({ canSync, canManage }: { canSync: bool
   const [summary, setSummary] = useState<Summary | null>(null);
   const [access, setAccess] = useState<TradeinAccess | null>(null);
   const [lockMessage, setLockMessage] = useState("");
+  const [lockAt, setLockAt] = useState("");
+  const [reopenAt, setReopenAt] = useState("");
+  const receiveAccess = useCallback((next: TradeinAccess) => {
+    setAccess(next); setLockMessage(next.message);
+    setLockAt(tradeinScheduleInput(next.schedule?.lockAt));
+    setReopenAt(tradeinScheduleInput(next.schedule?.reopenAt));
+  }, []);
   const [busy, setBusy] = useState("LOAD");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -22,11 +29,11 @@ export default function TradeinAdminTool({ canSync, canManage }: { canSync: bool
     setBusy("LOAD"); setError(""); setMessage("");
     try {
       const result = await requestJson<{ success: boolean; summary: Summary | null; access: TradeinAccess; gradeGuide: TradeinGradeGuide }>("/api/admin/tradein");
-      setSummary(result.summary); setAccess(result.access); setLockMessage(result.access.message);
+      setSummary(result.summary); receiveAccess(result.access);
       setGradeGuide(result.gradeGuide || defaultGradeGuide());
     } catch (reason) { setError(clientErrorMessage(reason, "Chưa đọc được trạng thái bảng giá.")); }
     finally { setBusy(""); }
-  }, []);
+  }, [receiveAccess]);
   useEffect(() => { void load(); }, [load]);
   async function saveGradeGuide() {
     setBusy("SET_GRADE_GUIDE"); setError(""); setMessage("");
@@ -36,20 +43,20 @@ export default function TradeinAdminTool({ canSync, canManage }: { canSync: bool
     } catch (reason) { setError(clientErrorMessage(reason, "Chưa lưu được định nghĩa phân loại máy.")); }
     finally { setBusy(""); }
   }
-  async function mutate(action: "SYNC" | "SET_ACCESS", locked = false) {
+  async function mutate(action: "SYNC" | "SET_ACCESS" | "SET_SCHEDULE", locked = false, option: "keep" | "cancel" | "" = "") {
     setBusy(action); setError(""); setMessage("");
     try {
       const result = await requestJson<{ success: boolean; summary: Summary; access: TradeinAccess; message: string }>("/api/admin/tradein", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action === "SYNC"
-        ? { action, version: summary?.version || "" } : { action, revision: access?.revision, locked, message: lockMessage }) }, 120_000);
+        ? { action, version: summary?.version || "" } : { action, revision: access?.revision, locked, message: lockMessage, keepSchedule: option === "keep", ...(action === "SET_SCHEDULE" ? { lockAt: option === "cancel" ? null : tradeinScheduleIso(lockAt), reopenAt: option === "cancel" ? null : tradeinScheduleIso(reopenAt) } : {}) }) }, 120_000);
       if (action === "SYNC") {
         setSummary(result.summary);
         setMessage(access?.locked ? "Đã đồng bộ giá. Bấm “Mở lại trang tra giá” khi bạn sẵn sàng." : "Đã đồng bộ giá. Trang đang mở sẽ nhận thông báo và đếm ngược 7 giây để tải lại.");
-      } else { setAccess(result.access); setLockMessage(result.access.message); setMessage(result.message); }
+      } else { receiveAccess(result.access); setMessage(result.message); }
     } catch (reason) { setError(clientErrorMessage(reason, "Không lưu được thay đổi.")); }
     finally { setBusy(""); }
   }
   return <section className={styles.admin} aria-label="Đồng bộ giá thu cũ đổi mới" aria-busy={Boolean(busy)}>
-    {busy && <UiNotice tone="loading">{busy === "SYNC" ? "Đang đồng bộ giá từ Google Sheet. Vui lòng chờ kết quả…" : busy === "SET_ACCESS" ? "Đang lưu trạng thái trang tra giá…" : busy === "SET_GRADE_GUIDE" ? "Đang lưu định nghĩa Loại 1–5…" : "Đang tải thông tin bảng giá…"}</UiNotice>}
+    {busy && <UiNotice tone="loading">{busy === "SYNC" ? "Đang đồng bộ giá từ Google Sheet. Vui lòng chờ kết quả…" : busy === "SET_SCHEDULE" ? "Đang lưu lịch hẹn…" : busy === "SET_ACCESS" ? "Đang lưu trạng thái trang tra giá…" : busy === "SET_GRADE_GUIDE" ? "Đang lưu định nghĩa Loại 1–5…" : "Đang tải thông tin bảng giá…"}</UiNotice>}
     {error && <UiNotice onRetry={() => void load()} retryLabel={access ? "Kiểm tra trạng thái" : "Thử lại"} busy={Boolean(busy)}>{error}{access && <p>Chưa xác nhận được kết quả. Kiểm tra trạng thái trước khi thực hiện lại thao tác.</p>}</UiNotice>}
     {message && <UiNotice tone="success">{message}</UiNotice>}
     <div className={styles.adminTop}><div><h3>Bảng giá thu cũ đổi mới công khai</h3><p>Đọc giá từ Data_Moi và Data_Cu_PhoneMWG trong Google Sheet đã kết nối. Sau khi đồng bộ thành công, người dùng tra cứu ngay mà không cần đăng nhập.</p></div><Link href="/tra-gia-thu-cu" target="_blank">Mở trang tra giá ↗</Link></div>
@@ -64,8 +71,19 @@ export default function TradeinAdminTool({ canSync, canManage }: { canSync: bool
       <label htmlFor="tradein-lock-message">Thông báo cho người tra giá khi tạm khóa</label>
       <textarea id="tradein-lock-message" rows={3} maxLength={300} value={lockMessage} disabled={Boolean(busy) || !canManage} onChange={event => setLockMessage(event.target.value)} />
       <div className={styles.adminActions}><button type="button" disabled={Boolean(busy) || !access || !canManage || !lockMessage.trim()} onClick={() => void mutate("SET_ACCESS", !access?.locked)}>{busy === "SET_ACCESS" ? "Đang lưu…" : access?.locked ? "Mở lại trang tra giá" : "Tạm khóa trang tra giá"}</button>
-        {access?.locked && lockMessage !== access.message ? <button type="button" disabled={Boolean(busy) || !canManage || !lockMessage.trim()} onClick={() => void mutate("SET_ACCESS", true)}>Lưu thông báo</button> : null}</div>
+        {access?.locked && lockMessage !== access.message ? <button type="button" disabled={Boolean(busy) || !canManage || !lockMessage.trim()} onClick={() => void mutate("SET_ACCESS", true, "keep")}>Lưu thông báo</button> : null}</div>
       <p className={styles.adminNote}>Khi tạm khóa, phần tra cứu bị ẩn. Bạn có thể đồng bộ giá rồi mở lại trang. Trang đang mở kiểm tra thay đổi mỗi 30 giây; khi có giá mới hoặc được mở lại, người dùng nhận nút OK đếm ngược 7 giây.</p>
+      <div className={styles.schedulePanel}>
+        <h5>Hẹn giờ khóa / mở lại</h5>
+        <p className={styles.adminNote}>Giờ Việt Nam (UTC+7). Có thể chỉ hẹn khóa, chỉ hẹn mở lại hoặc hẹn cả hai. Lịch vẫn có hiệu lực khi đóng trang quản trị.</p>
+        <div className={styles.scheduleFields}>
+          <label htmlFor="tradein-lock-at">Giờ khóa<input id="tradein-lock-at" type="datetime-local" value={lockAt} disabled={Boolean(busy) || !canManage} onChange={event => setLockAt(event.target.value)} /></label>
+          <label htmlFor="tradein-reopen-at">Giờ mở lại<input id="tradein-reopen-at" type="datetime-local" value={reopenAt} disabled={Boolean(busy) || !canManage} onChange={event => setReopenAt(event.target.value)} /></label>
+        </div>
+        {access?.schedule && <div className={styles.scheduleSummary} role="status"><b>Lịch đã lưu</b>{access.schedule.lockAt && <span>Khóa: {new Date(access.schedule.lockAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false })}</span>}{access.schedule.reopenAt && <span>Mở lại: {new Date(access.schedule.reopenAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false })}</span>}</div>}
+        <div className={styles.adminActions}><button type="button" disabled={Boolean(busy) || !access || !canManage || !lockMessage.trim() || (!lockAt && !reopenAt)} onClick={() => void mutate("SET_SCHEDULE")}>Lưu lịch hẹn</button>{access?.schedule && <button type="button" disabled={Boolean(busy) || !canManage} onClick={() => void mutate("SET_SCHEDULE", false, "cancel")}>Hủy lịch hẹn</button>}</div>
+        <p className={styles.adminNote}>Đến giờ hẹn, mỗi lần vào trang đều theo đúng lịch. Trang đang mở nhận thay đổi trong vòng 30 giây. Nút khóa / mở ngay ở trên sẽ hủy lịch cũ; “Lưu thông báo” giữ nguyên lịch.</p>
+      </div>
       {!canManage ? <p className={styles.adminNote}>Cần quyền “Đóng/mở trang tra giá” để sử dụng chức năng này.</p> : null}
     </div>
     <div className={styles.accessPanel}>

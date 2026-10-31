@@ -85,6 +85,11 @@
 .accessPanel { margin-top:24px;padding-top:23px;border-top:1px solid #e8d889; }.accessHeading { display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px; }
 .accessHeading h4 { font-size:18px;margin:0; }.openBadge,.closedBadge { display:inline-block;padding:7px 11px;border-radius:99px;font-size:11px;font-weight:800; }.openBadge { background:#e4f4e9;color:#216c48; }.closedBadge { background:#ffe9cd;color:#995b00; }
 .accessPanel label { display:block;font-size:12px;font-weight:700;margin-bottom:8px; }.accessPanel textarea { display:block;width:100%;max-width:760px;padding:12px;border:1px solid #cbd5e1;border-radius:12px;color:#07111f;background:#fff;font-size:16px;line-height:1.6;resize:vertical; }
+.schedulePanel { margin-top:24px;padding:20px;border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc; }
+.schedulePanel h5 { margin:0;font-size:17px; }.schedulePanel .adminNote { margin-top:10px; }
+.scheduleFields { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px;max-width:760px;margin-top:18px; }
+.scheduleFields label { min-width:0; }.scheduleFields input { display:block;box-sizing:border-box;width:100%;min-width:0;min-height:46px;margin-top:8px;padding:10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#07111f;font:inherit;font-size:16px; }
+.scheduleSummary { display:grid;gap:6px;margin-top:14px;color:#526174;font-size:13px;line-height:1.6;overflow-wrap:anywhere; }
 @media(max-width:699px) {
   .admin { padding:14px; }.adminTop h3 { font-size:20px; }.adminStats { gap:10px 18px; }.adminActions button { flex:1 1 150px; }
   .suggestions { position:relative;top:auto;max-height:min(280px,calc(var(--ui-visual-height,100dvh) * .42)); }

@@ -57,3 +57,40 @@ test('a new price timestamp or reopening prompts reload, while a lock takes prio
   assert.equal(control.tradeinRefreshReason({...open,locked:true},open,''),'reopened');
   assert.equal(control.TRADEIN_RELOAD_SECONDS,7);
 });
+
+test('scheduled locking and reopening use server time without writes or an open administrator page',()=>{
+  const {control}=setup();
+  const access={revision:'x',locked:false,message:'Đang sửa giá.',schedule:{lockAt:'2030-01-01T02:00:00.000Z',reopenAt:'2030-01-01T03:00:00.000Z'}};
+  const at=time=>control.effectiveTradeinAccess(access,Date.parse(time)).locked;
+  assert.equal(at('2030-01-01T01:59:59Z'),false);
+  assert.equal(at('2030-01-01T02:00:00Z'),true);
+  assert.equal(at('2030-01-01T02:59:59Z'),true);
+  assert.equal(at('2030-01-01T03:00:00Z'),false);
+  assert.equal(access.locked,false);
+  assert.equal(control.effectiveTradeinAccess({...access,locked:true,schedule:{lockAt:null,reopenAt:access.schedule.reopenAt}},Date.parse('2030-01-01T03:00:00Z')).locked,false);
+  assert.equal(control.effectiveTradeinAccess({...access,schedule:{lockAt:access.schedule.lockAt,reopenAt:null}},Date.parse('2031-01-01T00:00:00Z')).locked,true);
+});
+
+test('schedule validation rejects past, malformed and inverted dates and uses Viet Nam time',()=>{
+  const {control}=setup();const now=Date.parse('2030-01-01T00:00:00Z');
+  for(const payload of [{lockAt:'bad',reopenAt:null},{lockAt:1,reopenAt:null},{lockAt:'2029-12-31T23:59:00Z',reopenAt:null},{lockAt:'2030-01-01T03:00:00Z',reopenAt:'2030-01-01T02:00:00Z'}])
+    assert.throws(()=>control.normalizeTradeinSchedule(payload,now),e=>e.status===400);
+  assert.deepEqual(control.normalizeTradeinSchedule({lockAt:null,reopenAt:null},now),{lockAt:null,reopenAt:null});
+  assert.equal(control.tradeinScheduleIso('2030-01-01T09:00'),'2030-01-01T02:00:00.000Z');
+  assert.equal(control.tradeinScheduleInput('2030-01-01T02:00:00.000Z'),'2030-01-01T09:00');
+});
+
+test('schedule changes preserve prices, enforce revision checks, and manual overrides cancel the schedule',async()=>{
+  const {rows,store}=setup();const snapshot=structuredClone(rows.get('TRADEIN_PUBLIC_SNAPSHOT_V1'));
+  const scheduled=await store.writeTradeinAccess({action:'SET_SCHEDULE',revision:'initial',message:'Đang sửa giá.',lockAt:'2099-01-01T02:00:00.000Z',reopenAt:'2099-01-01T03:00:00.000Z'},'Admin');
+  assert.equal((await store.getPublicTradeinStatus()).locked,false);
+  await assert.rejects(store.writeTradeinAccess({action:'SET_SCHEDULE',revision:'initial',message:'X',lockAt:null,reopenAt:null},'Admin'),e=>e.status===409);
+  const updated=await store.writeTradeinAccess({revision:scheduled.revision,locked:false,message:'Thông báo mới',keepSchedule:true},'Admin');
+  assert.deepEqual(updated.schedule,scheduled.schedule);
+  const manual=await store.writeTradeinAccess({revision:updated.revision,locked:true,message:'Thông báo mới'},'Admin');
+  assert.equal(manual.locked,true);assert.equal(manual.schedule,undefined);
+  const again=await store.writeTradeinAccess({action:'SET_SCHEDULE',revision:manual.revision,message:'X',lockAt:null,reopenAt:'2099-01-01T03:00:00.000Z'},'Admin');
+  const cancelled=await store.writeTradeinAccess({action:'SET_SCHEDULE',revision:again.revision,message:'X',lockAt:null,reopenAt:null},'Admin');
+  assert.equal(cancelled.locked,true);assert.equal(cancelled.schedule,undefined);
+  assert.deepEqual(rows.get('TRADEIN_PUBLIC_SNAPSHOT_V1'),snapshot);
+});
