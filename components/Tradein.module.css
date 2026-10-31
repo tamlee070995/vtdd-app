@@ -65,7 +65,7 @@
 .loading { padding:32px 18px;background:#fff;border:1px solid #dbe1ea;border-radius:22px;text-align:center;color:#64748b;font-size:14px;line-height:1.6; }
 .page button:focus-visible,.page a:focus-visible { outline:3px solid #a98600;outline-offset:3px; }
 .maintenance { padding:32px 22px;background:#fff;border:1px solid #ead573;border-radius:22px;text-align:center; }
-.maintenance > span { display:inline-block;font-size:38px;color:#8b6900;margin-bottom:8px; }
+.maintenanceArtwork { display:block;width:160px;max-width:100%;height:auto;object-fit:contain;margin:0 auto 20px; }
 .maintenance h2 { font-size:23px;line-height:1.4;margin:0 0 12px; }.maintenance p { font-size:15px;line-height:1.7;color:#526174;white-space:pre-line;overflow-wrap:anywhere; }
 .maintenance small { display:block;margin-top:20px;font-size:12px;line-height:1.7;color:#64748b; }
 .updateOverlay { position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(7,17,31,.72); }
@@ -90,6 +90,7 @@
   .suggestions { position:relative;top:auto;max-height:min(280px,calc(var(--ui-visual-height,100dvh) * .42)); }
 }
 @media(min-width:700px) {
+  .maintenanceArtwork { width:180px; }
   .page { padding:22px; }.topbar { padding:15px 22px;border-radius:24px;margin-bottom:18px; }
   .brand { gap:12px; }.brand img { width:42px;height:42px; }.brand b { font-size:17px; }.brand small { font-size:11px; }
   .homeLink { padding:10px 16px;font-size:12px; }.breadcrumb { font-size:12px;margin-bottom:16px;gap:9px; }

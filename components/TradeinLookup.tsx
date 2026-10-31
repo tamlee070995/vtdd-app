@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import maintenanceArtwork from "@/public/illustrations/tradein-maintenance.png";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { calculateTradeinQuote, formatTradeinRange, TRADEIN_GRADES,
   type NewTradeinProduct, type OldTradeinProduct, type PriceRange } from "@/lib/tradein-pricing";
@@ -90,7 +91,7 @@ export default function TradeinLookup() {
       </section>
       <div className={styles.dataBar} aria-live="polite"><span>{loading ? "Đang tải bảng giá…" : data ? <>Cập nhật: <b>{updatedAt}</b></> : "Bảng giá thu cũ đổi mới"}</span>
         <button type="button" disabled={loading} onClick={() => window.location.reload()}>{loading ? "Đang tải…" : "Tải lại trang ↻"}</button></div>
-      {status?.locked ? <section className={styles.maintenance} role="status"><span aria-hidden="true">⌁</span><h2>Trang tra giá đang tạm khóa</h2><p>{status.message}</p><small>Trang tự kiểm tra mỗi 30 giây. Khi mở lại, bạn sẽ nhận thông báo tải lại trang.</small></section> : <>
+      {status?.locked ? <section className={styles.maintenance} role="status"><Image className={styles.maintenanceArtwork} src={maintenanceArtwork} alt="" unoptimized loading="eager" /><h2>Trang tra giá đang tạm khóa</h2><p>{status.message}</p><small>Trang tự kiểm tra mỗi 30 giây. Khi mở lại, bạn sẽ nhận thông báo tải lại trang.</small></section> : <>
       {error ? <UiNotice onRetry={retry} busy={loading}>{error}</UiNotice> : null}
       {!data && loading ? <UiNotice tone="loading">Đang chuẩn bị danh sách máy và bảng giá…</UiNotice> : null}
       {data ? <div className={styles.steps} aria-busy={loading}>
