@@ -1,7 +1,7 @@
 "use client";
 import { buildStandbyImportPreview, type StandbyImportPreview } from "@/lib/staff-import";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Editor } from "@tinymce/tinymce-react";
 import { sanitizeHtml } from "@/lib/html-sanitize";
 import PasswordInput from "@/components/PasswordInput";
@@ -42,56 +42,13 @@ type StaffMeta = {
   summary: StaffSummary;
 };
 
-type DashboardLogRow = {
-  source: "staff" | "customer";
-  time: string;
-  action: string;
-  maNV: string;
-  maST: string;
-  staffName: string;
-  mode: string;
-  spMoi: string;
-  spCu: string;
-  memory: string;
-  loai: string;
-  tongTien: number;
-  ip: string;
-  deviceLabel: string;
-  networkType: string;
-};
-
-type DashboardSource = "staff" | "customer";
-type DashboardDeleteMode = "oldest-3" | "oldest-5" | "oldest-7" | "oldest-30" | "all";
-
-
-
-type AdminDashboard = {
-  topOldProducts: Array<{ product: string; count: number }>;
-  topStaff: Array<{ maNV: string; staffName: string; count: number; totalValue: number }>;
-  topStores: Array<{ maST: string; count: number; totalValue: number }>;
-  topDevices: Array<{ label: string; count: number; totalValue: number }>;
-  topIps: Array<{ ip: string; count: number; totalValue: number }>;
-  dailyLogs: Array<{ day: string; count: number }>;
-  actionCounts: Array<{ action: string; count: number }>;
-  recentLogs: DashboardLogRow[];
-  totalLogs: number;
-  totalValue: number;
-};
-
 type AdminRole = "admin" | "mod";
 type AdminActionKey =
   | "staff-manage"
   | "staff-delete"
   | "staff-security"
   | "settings-write"
-  | "reload-data"
-  | "dashboard-view"
-  | "tools-pmh"
-  | "tools-report"
-  | "tools-telegram"
-  | "tools-checkin";
-
-type TcdmConsoleScope = "tcdm" | "people";
+  | "reload-data";
 
 type AdminConsoleProps = {
   initialSettings: Record<string, string>;
@@ -102,88 +59,11 @@ type AdminConsoleProps = {
   adminHasExplicitActions?: boolean;
 };
 
-type OnlineStats = {
-  total: number;
-  home: number;
-  staff: number;
-  customer: number;
-  updatedAt: string;
-};
-
-type OnlineSession = {
-  page: string;
-  visitorId: string;
-  lastSeenAt: string;
-  ip: string;
-  path: string;
-  device: string;
-  userAgent: string;
-};
-
-type OpsHealth = {
-  generatedAt: string;
-  supabase?: { ok: boolean; message: string; latencyMs?: number };
-  mail?: { ok: boolean; message: string };
-  telegram?: { ok: boolean; message: string };
-  backup?: any;
-  sync?: any;
-  quality?: any;
-  recentErrors?: OpsErrorLog[];
-};
-
-type OpsErrorLog = {
-  id: string;
-  time: string;
-  actor: string;
-  page: string;
-  module: string;
-  message: string;
-  ip: string;
-  severity: string;
-};
-
-const EMPTY_ONLINE_STATS: OnlineStats = {
-  total: 0,
-  home: 0,
-  staff: 0,
-  customer: 0,
-  updatedAt: "",
-};
-
-const EMPTY_DASHBOARD: AdminDashboard = {
-  topOldProducts: [],
-  topStaff: [],
-  topStores: [],
-  topDevices: [],
-  topIps: [],
-  dailyLogs: [],
-  actionCounts: [],
-  recentLogs: [],
-  totalLogs: 0,
-  totalValue: 0,
-};
-
-const DASHBOARD_DELETE_OPTIONS: Array<{ value: DashboardDeleteMode; label: string }> = [
-  { value: "oldest-3", label: "Xóa 3 ngày xa nhất" },
-  { value: "oldest-5", label: "Xóa 5 ngày xa nhất" },
-  { value: "oldest-7", label: "Xóa 7 ngày xa nhất" },
-  { value: "oldest-30", label: "Xóa 30 ngày xa nhất" },
-  { value: "all", label: "Xóa tất cả" },
-];
-
-type TabKey = "overview" | "staff" | "permission" | "notify" | "system" | "dashboard";
+type TabKey = "staff" | "permission";
 
 type ToastState = {
   type: "success" | "error";
   text: string;
-} | null;
-
-type ConfirmDialogState = {
-  title: string;
-  message: string;
-  confirmText?: string;
-  danger?: boolean;
-  onConfirm: () => void | Promise<void>;
 } | null;
 
 type DeleteStaffDialogState = {
@@ -217,22 +97,13 @@ const TAB_ITEMS: Array<{
   desc: string;
   icon: string;
 }> = [
-  { key: "overview", label: "Tổng quan", desc: "Trạng thái", icon: "01" },
   { key: "staff", label: "Nhân viên", desc: "Duyệt & reset", icon: "02" },
   { key: "permission", label: "Phân quyền", desc: "Admin / Mod", icon: "03" },
-  { key: "notify", label: "Thông báo", desc: "Banner & push", icon: "04" },
-
-  { key: "dashboard", label: "Dashboard", desc: "Tra giá & log", icon: "06" },
 ];
-
-const TCDM_TAB_ITEMS = TAB_ITEMS.filter((item) =>
-  ["overview", "notify", "system", "dashboard"].includes(item.key)
-).map((item, index) => ({ ...item, icon: String(index + 1).padStart(2, "0") }));
 
 const PEOPLE_TAB_ITEMS = TAB_ITEMS.filter((item) =>
   ["staff", "permission"].includes(item.key)
 ).map((item, index) => ({ ...item, icon: String(index + 1).padStart(2, "0") }));
-
 
 const ADMIN_MODULE_OPTIONS = [
   { key: "tcdm", label: "1.1 Tra giá TCDM" },
@@ -262,63 +133,8 @@ const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: st
   ...TCDM_ACTION_OPTIONS,
 ];
 
-const TOOL_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
-
-
-
-
-];
-
-const ALL_ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
-  ...ADMIN_ACTION_OPTIONS,
-  ...TOOL_ACTION_OPTIONS,
-
-];
-
-const TOOL_ACTION_KEYS = new Set(TOOL_ACTION_OPTIONS.map((item) => item.key));
 const PERSONNEL_ACTION_KEYS = new Set(PERSONNEL_ACTION_OPTIONS.map((item) => item.key));
 const TCDM_ACTION_KEYS = new Set(TCDM_ACTION_OPTIONS.map((item) => item.key));
-
-const NOTICE_CONTENT_SETTING_KEYS = ["MARQUEE_MESSAGE", "FIXED_BANNER_MESSAGE"];
-const PUSH_NOTIFY_SETTING_KEYS = ["PUSH_NOTIFY_MESSAGE", "PUSH_NOTIFY_VERSION"];
-const HIDDEN_CLIENT_SETTING_KEYS = new Set(["PUSH_NOTIFY_VERSION"]);
-const STAFF_POPUP_TRADEIN_SETTING_KEYS = [
-  "STAFF_POPUP_TRADEIN_ENABLED",
-  "STAFF_POPUP_TRADEIN_MESSAGE",
-  "STAFF_POPUP_TRADEIN_SECONDS",
-  "STAFF_POPUP_TRADEIN_VERSION",
-];
-const STAFF_POPUP_BUYONLY_SETTING_KEYS = [
-  "STAFF_POPUP_BUYONLY_ENABLED",
-  "STAFF_POPUP_BUYONLY_MESSAGE",
-  "STAFF_POPUP_BUYONLY_SECONDS",
-  "STAFF_POPUP_BUYONLY_VERSION",
-];
-const STAFF_CHECKIN_PERMISSION_TOKEN = "tool:checkin";
-
-const PRICE_SETTING_KEYS = ["PRICE_EFFECTIVE_FROM", "PRICE_EFFECTIVE_TO"];
-const RELOAD_SETTING_KEYS = ["DATA_VERSION"];
-const EMERGENCY_LOCK_SETTING_KEYS = ["SYSTEM_LOCK_MESSAGE", "SYSTEM_LOCK_ENABLED"];
-const SCHEDULE_LOCK_SETTING_KEYS = [
-  "SYSTEM_LOCK_SCHEDULE_ENABLED",
-  "SYSTEM_LOCK_START_AT",
-  "SYSTEM_LOCK_END_AT",
-  "SYSTEM_LOCK_REASON",
-];
-const STAFF_LOCK_SETTING_KEYS = ["STAFF_PAGE_LOCKED", "STAFF_TRADEIN_LOCKED", "STAFF_BUYONLY_LOCKED"];
-const CUSTOMER_LOCK_SETTING_KEYS = ["CUSTOMER_PAGE_LOCKED", "CUSTOMER_TRADEIN_LOCKED", "CUSTOMER_BUYONLY_LOCKED"];
-const FIREWALL_SETTING_KEYS = [
-  "FIREWALL_BLACKLIST",
-  "FIREWALL_WHITELIST",
-  "FIREWALL_MESSAGE",
-  "FIREWALL_USER_BLACKLIST",
-  "FIREWALL_USER_WHITELIST",
-  "FIREWALL_USER_MESSAGE",
-];
-
-function stripHiddenClientSettings(values: Record<string, string>) {
-  return Object.fromEntries(Object.entries(values).filter(([key]) => !HIDDEN_CLIENT_SETTING_KEYS.has(key)));
-}
 
 const PERMISSION_TREE = [
 
@@ -337,7 +153,7 @@ const PERMISSION_TREE = [
   {
     title: "Nội dung trang chủ",
     desc: "Các trang CMS gắn ngoài trang chủ.",
-    children: ADMIN_MODULE_OPTIONS.filter((item) => !["tcdm", "tools", "people"].includes(item.key)).map((item) => ({
+    children: ADMIN_MODULE_OPTIONS.filter((item) => !["tcdm", "people"].includes(item.key)).map((item) => ({
       module: item.key,
       label: item.label,
       desc: "Cho phép mở và chỉnh nội dung module này.",
@@ -345,20 +161,6 @@ const PERMISSION_TREE = [
   },
 
 ] as const;
-
-function isOn(value: string) {
-  const v = String(value || "").trim().toLowerCase();
-  return v === "1" || v === "true" || v === "yes" || v === "on";
-}
-
-function toFlag(value: boolean) {
-  return value ? "1" : "0";
-}
-
-function money(value: number) {
-  if (!value || value <= 0) return "0 đ";
-  return Number(value).toLocaleString("vi-VN") + " đ";
-}
 
 function getErrorMessage(err: any) {
   return clientErrorMessage(err);
@@ -368,48 +170,10 @@ function formatNumber(value: number) {
   return Number(value || 0).toLocaleString("vi-VN");
 }
 
-function maskIpAddress(value: string, fullAccess: boolean) {
-  const ip = String(value || "").trim();
-  if (!ip || fullAccess) return ip || "—";
-
-  if (ip.includes(":")) {
-    const parts = ip.split(":").filter(Boolean);
-    return parts.length > 2 ? `${parts[0]}:${parts[1]}:****` : "****";
-  }
-
-  const parts = ip.split(".");
-  if (parts.length === 4) return `${parts[0]}.${parts[1]}.***.***`;
-  return "****";
-}
-
-function toDatetimeLocalInput(value: any) {
-  const raw = String(value || "").trim().replace(/^'/, "");
-  if (!raw) return "";
-
-  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}T${isoMatch[4]}:${isoMatch[5]}`;
-
-  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[,\s]+(\d{1,2}):(\d{2})/);
-  if (slashMatch) {
-    const a = Number(slashMatch[1]);
-    const b = Number(slashMatch[2]);
-    const month = a > 12 ? b : a;
-    const day = a > 12 ? a : b;
-
-    return [
-      slashMatch[3],
-      String(month).padStart(2, "0"),
-      String(day).padStart(2, "0"),
-    ].join("-") + `T${slashMatch[4].padStart(2, "0")}:${slashMatch[5]}`;
-  }
-
-  return raw;
-}
-
 function parseAdminAccessItems(value: any) {
   const moduleKeys = new Set(ADMIN_MODULE_OPTIONS.map((item) => item.key));
   const actionKeys = new Set(
-    ALL_ADMIN_ACTION_OPTIONS.map((item) => `${ADMIN_ACTION_PREFIX}${item.key}`)
+    ADMIN_ACTION_OPTIONS.map((item) => `${ADMIN_ACTION_PREFIX}${item.key}`)
   );
 
   return String(value || "")
@@ -422,7 +186,7 @@ function parseAdminAccessItems(value: any) {
 }
 
 function parseAdminActionItems(value: any) {
-  const actionKeys = new Set(ALL_ADMIN_ACTION_OPTIONS.map((item) => item.key));
+  const actionKeys = new Set(ADMIN_ACTION_OPTIONS.map((item) => item.key));
 
   return String(value || "")
     .split(",")
@@ -446,51 +210,25 @@ function summarizeAdminAccess(value: any) {
       if (moduleOption) return moduleOption.label;
 
       const actionKey = token.slice(ADMIN_ACTION_PREFIX.length);
-      const action = ALL_ADMIN_ACTION_OPTIONS.find((item) => item.key === actionKey);
+      const action = ADMIN_ACTION_OPTIONS.find((item) => item.key === actionKey);
       return action ? action.label : token;
     })
     .join(" · ");
 }
 
-function parseStaffPermissionTokens(value: any) {
-  return String(value || "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter((item, index, arr) => Boolean(item) && arr.indexOf(item) === index);
-}
-
-
-
-
-
-function TcdmAdminConsole({
-  initialSettings,
+function PersonnelAdminConsole({
   adminRole = "admin",
   adminModules = "",
   adminActions = "",
   adminHasExplicitActions = false,
-  scope = "tcdm",
-}: AdminConsoleProps & { scope?: TcdmConsoleScope }) {
-  const [tab, setTab] = useState<TabKey>(() => (scope === "people" ? "staff" : "overview"));
-  const [settings, setSettings] = useState<Record<string, string>>(initialSettings);
+}: Omit<AdminConsoleProps, "initialSettings">) {
+  const [tab, setTab] = useState<TabKey>("staff");
+
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState<ToastState>(null);
-  const [onlineStats, setOnlineStats] = useState<OnlineStats>(EMPTY_ONLINE_STATS);
-  const [onlineSessions, setOnlineSessions] = useState<OnlineSession[]>([]);
-  const [onlineLoading, setOnlineLoading] = useState(false);
-  const [opsHealth, setOpsHealth] = useState<OpsHealth | null>(null);
-  const [opsErrors, setOpsErrors] = useState<OpsErrorLog[]>([]);
-  const [opsErrorModule, setOpsErrorModule] = useState("");
-  const [opsErrorFrom, setOpsErrorFrom] = useState("");
-  const [opsErrorTo, setOpsErrorTo] = useState("");
-  const [opsLoading, setOpsLoading] = useState(false);
+
   const [commandInput, setCommandInput] = useState("");
-  const [dashboardSource, setDashboardSource] = useState<DashboardSource>("staff");
-  const [dashboardDeleteMode, setDashboardDeleteMode] = useState<DashboardDeleteMode>("oldest-3");
-  const [dashboardData, setDashboardData] = useState<AdminDashboard>(EMPTY_DASHBOARD);
-  const [dashboardLoading, setDashboardLoading] = useState(false);
-  const [dashboardLoaded, setDashboardLoaded] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+
   const [bulkStandbyOpen, setBulkStandbyOpen] = useState(false);
   const [bulkStandbyRoles, setBulkStandbyRoles] = useState({ user: true, mod: false });
   const [bulkStandbyPassword, setBulkStandbyPassword] = useState("");
@@ -522,116 +260,43 @@ function TcdmAdminConsole({
   const isFullAdmin = String(adminRole || "").toLowerCase() === "admin";
   const grantedModules = parseModuleList(adminModules);
   const grantedActions = parseAdminActionItems(adminActions);
-  const legacyTcdmAccess = !adminHasExplicitActions && grantedModules.includes("tcdm");
+
   const legacyPeopleAccess = !adminHasExplicitActions && grantedModules.includes("people");
   const hasExplicitPeopleActions = grantedActions.some((action) => PERSONNEL_ACTION_KEYS.has(action));
 
   function canUseAction(action: AdminActionKey) {
     if (isFullAdmin || grantedActions.includes(action)) return true;
-    if (TCDM_ACTION_KEYS.has(action)) return legacyTcdmAccess;
+
     if (PERSONNEL_ACTION_KEYS.has(action)) {
       return legacyPeopleAccess || (grantedModules.includes("people") && !hasExplicitPeopleActions);
     }
     return false;
   }
 
-  const tabItems = scope === "people" ? PEOPLE_TAB_ITEMS : TCDM_TAB_ITEMS;
+  const tabItems = PEOPLE_TAB_ITEMS;
   const visibleTabs = tabItems.filter((item) => {
     if (isFullAdmin) return true;
-    if (scope === "tcdm" && item.key === "overview") return true;
+
     if (item.key === "permission") return false;
     if (item.key === "staff") {
       return canUseAction("staff-manage") || canUseAction("staff-security") || canUseAction("staff-delete");
     }
-    if (item.key === "notify") return canUseAction("settings-write");
-    if (item.key === "system") return canUseAction("settings-write") || canUseAction("reload-data");
-    if (item.key === "dashboard") return canUseAction("dashboard-view");
     return false;
   });
   const activeTabAllowed = visibleTabs.some((item) => item.key === tab);
-  const firstVisibleTab = visibleTabs[0]?.key || (scope === "people" ? "staff" : "overview");
+  const firstVisibleTab = visibleTabs[0]?.key || "staff";
   const canManageStaff = canUseAction("staff-manage");
   const canDeleteStaff = canUseAction("staff-delete");
   const canResetStaffSecurity = canUseAction("staff-security");
   const canResetStaffOtp = canResetStaffSecurity || canManageStaff;
-  const canWriteSettings = canUseAction("settings-write");
-  const canReloadData = canUseAction("reload-data");
-  const dashboardIsCustomer = dashboardSource === "customer";
-  const dashboardDeviceRanking = useMemo(() => {
-    if (dashboardData.topDevices.length > 0) return dashboardData.topDevices;
-
-    const map = new Map<string, { label: string; count: number; totalValue: number }>();
-
-    dashboardData.recentLogs.forEach((item) => {
-      const label = item.deviceLabel || "Khong ro thiet bi";
-      const current = map.get(label) || { label, count: 0, totalValue: 0 };
-      current.count += 1;
-      current.totalValue += item.tongTien || 0;
-      map.set(label, current);
-    });
-
-    return Array.from(map.values())
-      .sort((a, b) => b.count - a.count || b.totalValue - a.totalValue)
-      .slice(0, 10);
-  }, [dashboardData.recentLogs, dashboardData.topDevices]);
-  const dashboardIpRanking = useMemo(() => {
-    if (dashboardData.topIps.length > 0) return dashboardData.topIps;
-
-    const map = new Map<string, { ip: string; count: number; totalValue: number }>();
-
-    dashboardData.recentLogs.forEach((item) => {
-      const ip = item.ip || "Khong ro IP";
-      const current = map.get(ip) || { ip, count: 0, totalValue: 0 };
-      current.count += 1;
-      current.totalValue += item.tongTien || 0;
-      map.set(ip, current);
-    });
-
-    return Array.from(map.values())
-      .sort((a, b) => b.count - a.count || b.totalValue - a.totalValue)
-      .slice(0, 10);
-  }, [dashboardData.recentLogs, dashboardData.topIps]);
 
   function isStaffAdminLocked(item: AdminStaff) {
     return !isFullAdmin && item.permission === "admin";
   }
 
-  const lockCount = useMemo(() => {
-    return [
-      "SYSTEM_LOCK_ENABLED",
-      "SYSTEM_LOCK_SCHEDULE_ENABLED",
-      "STAFF_PAGE_LOCKED",
-      "CUSTOMER_PAGE_LOCKED",
-      "STAFF_TRADEIN_LOCKED",
-      "STAFF_BUYONLY_LOCKED",
-      "CUSTOMER_TRADEIN_LOCKED",
-      "CUSTOMER_BUYONLY_LOCKED",
-    ].filter((key) => isOn(settings[key])).length;
-  }, [settings]);
-
-  const notifyCount = useMemo(() => {
-    return [
-      settings.MARQUEE_MESSAGE,
-      settings.FIXED_BANNER_MESSAGE,
-      settings.PUSH_NOTIFY_MESSAGE,
-      settings.STAFF_POPUP_TRADEIN_MESSAGE,
-      settings.STAFF_POPUP_BUYONLY_MESSAGE,
-    ].filter((item) => String(item || "").trim()).length;
-  }, [settings]);
-
   function showToast(type: "success" | "error", text: string) {
     setToast({ type, text });
     if (type === "success") window.setTimeout(() => setToast(current => current?.text === text ? null : current), 5000);
-  }
-
-  function openConfirmDialog(dialog: NonNullable<ConfirmDialogState>) {
-    setConfirmDialog(dialog);
-  }
-
-  async function runConfirmDialogAction() {
-    const action = confirmDialog?.onConfirm;
-    setConfirmDialog(null);
-    await action?.();
   }
 
   async function postJSON(url: string, body: any) {
@@ -645,140 +310,6 @@ function TcdmAdminConsole({
       body: JSON.stringify(body),
     });
 
-  }
-
-  function getDownloadFileName(res: Response, fallback: string) {
-    const header = res.headers.get("content-disposition") || "";
-    const match = header.match(/filename="?([^"]+)"?/i);
-
-    if (!match?.[1]) return fallback;
-
-    try {
-      return decodeURIComponent(match[1]);
-    } catch {
-      return match[1];
-    }
-  }
-
-  async function loadOnlineStats(options?: { silent?: boolean }) {
-    try {
-      if (!options?.silent) setOnlineLoading(true);
-
-      const res = await fetch("/api/admin/online", {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data?.success) {
-        throw new Error(data?.message || "Không tải được thống kê trực tuyến.");
-      }
-
-      setOnlineStats(data.online || EMPTY_ONLINE_STATS);
-      setOnlineSessions(Array.isArray(data.sessions) ? data.sessions : []);
-      setOnlineLoading(false);
-    } catch {
-      setOnlineLoading(false);
-    }
-  }
-
-  async function loadOpsHealth(options?: { silent?: boolean }) {
-    if (!canUseAction("dashboard-view")) return;
-
-    try {
-      if (!options?.silent) setOpsLoading(true);
-
-      const res = await fetch("/api/admin/ops", {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data?.success) {
-        throw new Error(data?.message || "Không tải được trạng thái hệ thống.");
-      }
-
-      setOpsHealth(data.health || null);
-      setOpsErrors(Array.isArray(data.health?.recentErrors) ? data.health.recentErrors : []);
-      setOpsLoading(false);
-    } catch (err: any) {
-      setOpsLoading(false);
-      if (!options?.silent) showToast("error", getErrorMessage(err));
-    }
-  }
-
-  async function downloadBackupFile(fileName?: string) {
-    const safeName = String(fileName || "vtdd-backup.json").trim() || "vtdd-backup.json";
-
-    try {
-      setBusy(`backup-download:${safeName}`);
-      const params = new URLSearchParams({
-        target: "backup-file",
-        file: safeName,
-      });
-      const res = await fetch(`/api/admin/tools/sync?${params.toString()}`, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-store" },
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.message || "Không tải được file backup.");
-      }
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = getDownloadFileName(res, safeName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      setBusy("");
-    } catch (err: any) {
-      setBusy("");
-      showToast("error", getErrorMessage(err));
-    }
-  }
-
-  async function loadOpsErrors() {
-    if (!canUseAction("dashboard-view")) return;
-
-    try {
-      setOpsLoading(true);
-      const params = new URLSearchParams({
-        mode: "errors",
-        limit: "120",
-      });
-      if (opsErrorModule.trim()) params.set("module", opsErrorModule.trim());
-      if (opsErrorFrom) params.set("from", opsErrorFrom);
-      if (opsErrorTo) params.set("to", opsErrorTo);
-
-      const res = await fetch(`/api/admin/ops?${params.toString()}`, {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      });
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data?.success) {
-        throw new Error(data?.message || "Không tải được nhật ký lỗi.");
-      }
-
-      setOpsErrors(Array.isArray(data.errors) ? data.errors : []);
-      setOpsLoading(false);
-    } catch (err: any) {
-      setOpsLoading(false);
-      showToast("error", getErrorMessage(err));
-    }
   }
 
   async function loadStaff(nextPage = staffPage, options?: { silent?: boolean }) {
@@ -824,89 +355,6 @@ function TcdmAdminConsole({
     }
   }
 
-  async function loadDashboard(options?: { silent?: boolean }) {
-    try {
-      if (!options?.silent) setDashboardLoading(true);
-
-      const res = await fetch(`/api/admin/dashboard?source=${dashboardSource}`, {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data?.success) {
-        throw new Error(data?.message || "Không tải được dashboard.");
-      }
-
-      setDashboardData(data.dashboard || EMPTY_DASHBOARD);
-      setDashboardLoaded(true);
-      setDashboardLoading(false);
-    } catch (err: any) {
-      setDashboardLoading(false);
-      showToast("error", getErrorMessage(err));
-    }
-  }
-
-  function changeDashboardSource(source: DashboardSource) {
-    if (dashboardSource === source) return;
-
-    setDashboardSource(source);
-    setDashboardData(EMPTY_DASHBOARD);
-    setDashboardLoaded(false);
-  }
-
-  function getDashboardDeleteLabel(mode: DashboardDeleteMode = dashboardDeleteMode) {
-    return DASHBOARD_DELETE_OPTIONS.find((item) => item.value === mode)?.label || "Xóa lượt tìm kiếm";
-  }
-
-  async function runDashboardLogDelete(source: DashboardSource, mode: DashboardDeleteMode) {
-    try {
-      setBusy("DELETE_DASHBOARD_LOGS");
-
-      const res = await fetch("/api/admin/dashboard", {
-        method: "DELETE",
-        cache: "no-store",
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-store",
-        },
-        body: JSON.stringify({ source, mode }),
-      });
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data?.success) {
-        throw new Error(data?.message || "Không xóa được lượt tìm kiếm.");
-      }
-
-      if (source === dashboardSource) {
-        setDashboardData(data.dashboard || EMPTY_DASHBOARD);
-        setDashboardLoaded(true);
-      }
-      setBusy("");
-      showToast("success", data.message || "Đã xóa lượt tìm kiếm.");
-    } catch (err: any) {
-      setBusy("");
-      showToast("error", getErrorMessage(err));
-    }
-  }
-
-  function openDashboardLogDeleteConfirm() {
-    const source = dashboardSource;
-    const mode = dashboardDeleteMode;
-    const sourceLabel = source === "customer" ? "khách hàng" : "nhân viên";
-
-    openConfirmDialog({
-      title: "Xóa lượt tìm kiếm",
-      message: `Bạn muốn ${getDashboardDeleteLabel(mode).toLowerCase()} trong dashboard ${sourceLabel}? Thao tác này không thể hoàn tác.`,
-      confirmText: "Xóa log",
-      danger: true,
-      onConfirm: () => runDashboardLogDelete(source, mode),
-    });
-  }
-
   function runCommandSearch() {
     const raw = commandInput.trim();
     const q = raw.toLowerCase();
@@ -915,9 +363,6 @@ function TcdmAdminConsole({
     const routeMap: Array<{ match: RegExp; tab: TabKey; action?: () => void }> = [
       { match: /(nhan|nhân|staff|nv|active|standby|otp|reset|delete|xoa|xóa|import)/i, tab: "staff" },
       { match: /(quyen|quyền|permission|mod|admin)/i, tab: "permission" },
-      { match: /(thong bao|thông báo|notify|push|popup|banner)/i, tab: "notify" },
-      { match: /(khoa|khóa|lock|reload|firewall|ip|tuong lua|tường lửa)/i, tab: "system" },
-      { match: /(dashboard|log|health|loi|lỗi|online|session|backup)/i, tab: "dashboard", action: () => loadDashboard({ silent: true }) },
     ];
 
     const found = routeMap.find((item) => item.match.test(q));
@@ -942,15 +387,8 @@ function TcdmAdminConsole({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, staffStatusFilter, staffQuery, staffPage]);
 
-  useEffect(() => {
-    if (tab !== "dashboard") return;
-    if (dashboardLoaded) return;
-    loadDashboard();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, dashboardLoaded, dashboardSource]);
-
   async function runStaffAction(
-    action: "ACTIVE" | "STANDBY" | "RESET_SECURITY" | "RESET_OTP_COUNT" | "DELETE" | "UPDATE_CHECKIN_ACCESS",
+    action: "ACTIVE" | "STANDBY" | "RESET_SECURITY" | "RESET_OTP_COUNT" | "DELETE",
     maNV: string,
     extra?: Record<string, unknown>
   ) {
@@ -1152,135 +590,10 @@ function TcdmAdminConsole({
     }
   }
 
-  async function saveSettings(extra?: Record<string, string>, options?: { onlyKeys?: string[]; busyKey?: string }) {
-    try {
-      const busyKey = options?.busyKey || "settings";
-      setBusy(busyKey);
-
-      const payload = {
-        ...settings,
-        ...(extra || {}),
-      };
-
-      const apiPayload = options?.onlyKeys?.length
-        ? options.onlyKeys.reduce<Record<string, string>>((acc, key) => {
-            acc[key] = payload[key] || "";
-            return acc;
-          }, {})
-        : { ...payload };
-
-      ["PRICE_EFFECTIVE_FROM", "PRICE_EFFECTIVE_TO", "SYSTEM_LOCK_START_AT", "SYSTEM_LOCK_END_AT"].forEach((key) => {
-        const value = String(apiPayload[key] || "").trim();
-        if (value && !value.startsWith("'")) {
-          apiPayload[key] = `'${value}`;
-        }
-      });
-
-      const data = await postJSON("/api/admin/settings", {
-        settings: apiPayload,
-      });
-
-      setSettings(stripHiddenClientSettings({ ...payload, ...(data.settings || {}) }));
-      showToast("success", data.message || "Đã lưu cấu hình.");
-      setBusy("");
-    } catch (err: any) {
-      setBusy("");
-      showToast("error", getErrorMessage(err));
-    }
-  }
-
-  async function reloadDataVersion() {
-    const nextVersion = String(Date.now());
-    await saveSettings({ DATA_VERSION: nextVersion }, { onlyKeys: RELOAD_SETTING_KEYS, busyKey: "reload-data" });
-  }
-
-  async function saveNoticeContent() {
-    await saveSettings({}, { onlyKeys: NOTICE_CONTENT_SETTING_KEYS, busyKey: "notice-content" });
-  }
-
-  async function sendPushNotifyNow() {
-    await saveSettings(
-      { PUSH_NOTIFY_VERSION: String(Date.now()) },
-      { onlyKeys: PUSH_NOTIFY_SETTING_KEYS, busyKey: "push-notify" }
-    );
-  }
-
-  async function saveStaffPopup(kind: "tradein" | "buyonly") {
-    const isTradein = kind === "tradein";
-    await saveSettings(
-      {
-        [isTradein ? "STAFF_POPUP_TRADEIN_VERSION" : "STAFF_POPUP_BUYONLY_VERSION"]: String(Date.now()),
-      },
-      {
-        onlyKeys: isTradein ? STAFF_POPUP_TRADEIN_SETTING_KEYS : STAFF_POPUP_BUYONLY_SETTING_KEYS,
-        busyKey: isTradein ? "popup-tradein" : "popup-buyonly",
-      }
-    );
-  }
-
-  async function saveSystemSection(keys: string[], busyKey: string, extra?: Record<string, string>) {
-    await saveSettings(extra, { onlyKeys: keys, busyKey });
-  }
-
-  function setSetting(key: string, value: string) {
-    setSettings((current) => ({ ...current, [key]: value }));
-  }
-
-  function setLockSetting(key: string, value: boolean) {
-    setSettings((current) => {
-      const next = { ...current, [key]: toFlag(value) };
-
-      if (key === "STAFF_PAGE_LOCKED" && value) {
-        next.STAFF_TRADEIN_LOCKED = "0";
-        next.STAFF_BUYONLY_LOCKED = "0";
-      }
-
-      if (key === "CUSTOMER_PAGE_LOCKED" && value) {
-        next.CUSTOMER_TRADEIN_LOCKED = "0";
-        next.CUSTOMER_BUYONLY_LOCKED = "0";
-      }
-
-      return next;
-    });
-  }
-
   function applyStaffSearch() {
     setStaffPage(1);
     setStaffQuery(staffSearchInput.trim());
   }
-
-  function ToggleRow({
-    settingKey,
-    title,
-    desc,
-    disabled = false,
-  }: {
-    settingKey: string;
-    title: string;
-    desc: string;
-    disabled?: boolean;
-  }) {
-    const checked = isOn(settings[settingKey]);
-
-    return (
-      <label className={`adminx-toggle-row ${disabled ? "disabled" : ""}`}>
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled={disabled}
-          onChange={(e) => setLockSetting(settingKey, e.target.checked)}
-        />
-        <span className="adminx-switch" aria-hidden="true"></span>
-        <div>
-          <b>{title}</b>
-          <p>{desc}</p>
-        </div>
-      </label>
-    );
-  }
-
-  const staffPageLockedInForm = isOn(settings.STAFF_PAGE_LOCKED);
-  const customerPageLockedInForm = isOn(settings.CUSTOMER_PAGE_LOCKED);
 
   return (
     <section className="adminx-console">
@@ -1288,7 +601,7 @@ function TcdmAdminConsole({
       {staffLoading && <UiNotice tone="loading">Đang tải danh sách tài khoản…</UiNotice>}
       {busy && <UiNotice tone="loading">Đang xử lý thay đổi. Vui lòng chờ kết quả…</UiNotice>}
       <style suppressHydrationWarning>{ADMINX_STYLE}</style>
-      <style suppressHydrationWarning>{ADMINX_ONLINE_STYLE}</style>
+      <style suppressHydrationWarning>{ADMINX_PERSONNEL_STYLE}</style>
 
       <nav className="adminx-tabs" aria-label="Admin navigation">
         {visibleTabs.map((item) => (
@@ -1318,209 +631,6 @@ function TcdmAdminConsole({
         />
         <button type="button" onClick={runCommandSearch}>Tìm chức năng</button>
       </div>
-
-      {tab === "overview" && (
-        <section className="adminx-panel">
-          <div className="adminx-panel-head">
-            <div>
-              <span className="adminx-eyebrow">Overview</span>
-              <h2>Tổng quan vận hành</h2>
-              <p>Theo dõi trạng thái tài khoản, thông báo, lock hệ thống và dữ liệu tra giá.</p>
-            </div>
-          </div>
-
-          <div className="adminx-metric-grid">
-            <div className="adminx-metric-card dark">
-              <span>Data version</span>
-              <b>{settings.DATA_VERSION || "1"}</b>
-              <p>Phiên bản dữ liệu hiện tại của hệ thống.</p>
-            </div>
-            <div className="adminx-metric-card">
-              <span>Thông báo</span>
-              <b>{formatNumber(notifyCount)}</b>
-              <p>Số cấu hình thông báo đang có nội dung.</p>
-            </div>
-            <div className="adminx-metric-card">
-              <span>Lock</span>
-              <b>{formatNumber(lockCount)}</b>
-              <p>Số khóa hệ thống / trang / tab đang bật.</p>
-            </div>
-            <div className="adminx-metric-card">
-              <span>Online</span>
-              <b>{formatNumber(onlineStats.total)}</b>
-              <p>Người dùng đang hoạt động gần đây.</p>
-            </div>
-          </div>
-
-          <div className="adminx-online-panel">
-            <div className="adminx-online-head">
-              <div>
-                <span>Trực tuyến toàn hệ thống</span>
-                <h3>{formatNumber(onlineStats.total)}</h3>
-                <p>Người dùng đang hoạt động trong khoảng 70 giây gần nhất.</p>
-              </div>
-              <button type="button" onClick={() => loadOnlineStats()} disabled={onlineLoading}>
-                {onlineLoading ? "Đang tải..." : "Cập nhật"}
-              </button>
-            </div>
-
-            <div className="adminx-online-grid">
-              <div>
-                <span>Trang chủ</span>
-                <b>{formatNumber(onlineStats.home)}</b>
-              </div>
-              <div>
-                <span>Nhân viên</span>
-                <b>{formatNumber(onlineStats.staff)}</b>
-              </div>
-              <div>
-                <span>Khách hàng</span>
-                <b>{formatNumber(onlineStats.customer)}</b>
-              </div>
-            </div>
-          </div>
-
-          {canUseAction("dashboard-view") && (
-            <div className="adminx-ops-panel">
-              <div className="adminx-ops-head">
-                <div>
-                  <span>System Health</span>
-                  <h3>Trạng thái vận hành</h3>
-                  <p>Supabase, mail, Telegram, backup, log lỗi và phiên đang hoạt động.</p>
-                </div>
-                <button type="button" onClick={() => loadOpsHealth()} disabled={opsLoading}>
-                  {opsLoading ? "Đang kiểm tra..." : "Kiểm tra hệ thống"}
-                </button>
-              </div>
-
-              <div className="adminx-health-grid">
-                {[
-                  { label: "Supabase", item: opsHealth?.supabase },
-                  { label: "Mail", item: opsHealth?.mail },
-                  { label: "Telegram", item: opsHealth?.telegram },
-                ].map((entry) => (
-                  <div key={entry.label} className={entry.item?.ok ? "ok" : "warn"}>
-                    <span>{entry.label}</span>
-                    <b>{entry.item?.ok ? "OK" : "Cần kiểm tra"}</b>
-                    <p>{entry.item?.message || "Chưa tải trạng thái."}</p>
-                  </div>
-                ))}
-                <div className={opsHealth?.backup?.lastError ? "warn" : opsHealth?.backup?.exists ? "ok" : "warn"}>
-                  <span>Backup</span>
-                  <b>{opsHealth?.backup?.exists ? "Đã có file" : "Chưa có file"}</b>
-                  <p>{opsHealth?.backup?.updatedAtVN || opsHealth?.backup?.nextRunAtVN || "Tự chạy từ 06:00 mỗi 3 giờ, chốt 23:00."}</p>
-                  {opsHealth?.backup?.exists ? (
-                    <button
-                      type="button"
-                      className="adminx-health-action"
-                      onClick={() => downloadBackupFile(opsHealth.backup.fileName || "vtdd-backup.json")}
-                      disabled={busy === `backup-download:${opsHealth.backup.fileName || "vtdd-backup.json"}`}
-                    >
-                      {busy === `backup-download:${opsHealth.backup.fileName || "vtdd-backup.json"}` ? "Đang tải..." : "Tải backup mới nhất"}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="adminx-ops-grid">
-                <article>
-                  <h4>Log lỗi gần nhất</h4>
-                  <div className="adminx-error-filter">
-                    <input
-                      value={opsErrorModule}
-                      onChange={(e) => setOpsErrorModule(e.target.value)}
-                      placeholder="Module: admin-pincode, frontend..."
-                    />
-                    <input type="date" value={opsErrorFrom} onChange={(e) => setOpsErrorFrom(e.target.value)} />
-                    <input type="date" value={opsErrorTo} onChange={(e) => setOpsErrorTo(e.target.value)} />
-                    <button type="button" onClick={loadOpsErrors} disabled={opsLoading}>Lọc</button>
-                  </div>
-                  <div className="adminx-ops-list">
-                    {opsErrors.length ? (
-                      opsErrors.slice(0, 8).map((item) => (
-                        <div key={item.id || `${item.time}-${item.message}`}>
-                          <b>{item.module || "system"}</b>
-                          <span>{item.time || "—"} • {item.actor || "system"} • {maskIpAddress(item.ip, isFullAdmin)}</span>
-                          <p>{item.message || "Không rõ lỗi"}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p>Chưa có lỗi mới.</p>
-                    )}
-                  </div>
-                </article>
-
-                <article>
-                  <h4>Lịch sử backup</h4>
-                  <div className="adminx-ops-list">
-                    {opsHealth?.backup?.history?.length ? (
-                      opsHealth.backup.history.slice(0, 7).map((item: any) => {
-                        const backupFileName = item.dailyFileName || item.fileName || "";
-
-                        return (
-                          <div key={backupFileName || item.createdAt}>
-                            <b>{backupFileName || "vtdd-backup.json"}</b>
-                            <span>{item.createdAtVN || item.createdAt || "—"} • {formatNumber(Number(item.bytes || 0))} bytes</span>
-                            <p>{item.trigger === "schedule" ? "Backup tự động" : "Backup thủ công"}</p>
-                            <button
-                              type="button"
-                              className="adminx-backup-download"
-                              onClick={() => downloadBackupFile(backupFileName)}
-                              disabled={!backupFileName || busy === `backup-download:${backupFileName}`}
-                            >
-                              {busy === `backup-download:${backupFileName}` ? "Đang tải..." : "Tải xuống"}
-                            </button>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p>Chưa có lịch sử backup. Hệ thống sẽ giữ 7 bản gần nhất.</p>
-                    )}
-                  </div>
-                </article>
-
-                <article>
-                  <h4>Phiên đang online</h4>
-                  <div className="adminx-ops-list">
-                    {onlineSessions.length ? (
-                      onlineSessions.slice(0, 8).map((item) => (
-                        <div key={item.visitorId}>
-                          <b>{item.page || "unknown"} • {item.device || "Thiết bị"}</b>
-                          <span>{maskIpAddress(item.ip, isFullAdmin)} • {item.lastSeenAt || "—"}</span>
-                          <p>{item.path || "/"}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p>Chưa có phiên online chi tiết.</p>
-                    )}
-                  </div>
-                </article>
-              </div>
-            </div>
-          )}
-
-          <div className="adminx-overview-grid">
-            <div className="adminx-soft-card">
-              <span>Thông báo</span>
-              <b>{notifyCount} mục đang cấu hình</b>
-              <p>Marquee, banner cố định, push nóng và popup SweetAlert.</p>
-            </div>
-            <div className="adminx-soft-card">
-              <span>Lock access</span>
-              <b>{lockCount} khóa đang bật</b>
-              <p>Khóa toàn hệ thống, trang hoặc từng tab con.</p>
-            </div>
-            <div className="adminx-soft-card">
-              <span>Data version</span>
-              <b>{settings.DATA_VERSION || "1"}</b>
-              <p>Dùng để reload dữ liệu bảng giá khi cập nhật khẩn cấp.</p>
-            </div>
-          </div>
-        </section>
-      )}
-
-
-
 
       {tab === "permission" && (
         <section className="adminx-panel adminx-permission-page">
@@ -1598,8 +708,6 @@ function TcdmAdminConsole({
                     disabled={!isFullAdmin || busy === `UPDATE_PERMISSION-${item.maNV}`}
                     onSave={runStaffAdminAccess}
 
-
-
                   />
                 </article>
               ))
@@ -1624,746 +732,6 @@ function TcdmAdminConsole({
             >
               Trang sau
             </button>
-          </div>
-        </section>
-      )}
-
-
-      {tab === "notify" && (
-        <section className="adminx-panel">
-          <div className="adminx-panel-head adminx-panel-head-row">
-            <div>
-              <span className="adminx-eyebrow">System Notify</span>
-              <h2>Thông báo hệ thống</h2>
-              <p>Chỉ áp dụng cho trang nhân viên. Trang khách hàng không nhận push hoặc popup nếu không có yêu cầu riêng.</p>
-            </div>
-            <button className="adminx-action-btn" type="button" onClick={saveNoticeContent} disabled={!canWriteSettings || busy === "notice-content"}>
-              {busy === "notice-content" ? "Đang lưu..." : "Lưu nội dung trang nhân viên"}
-            </button>
-          </div>
-
-          <div className="adminx-notify-stack">
-            <section className="adminx-notify-card">
-              <div className="adminx-notify-card-head">
-                <div>
-                  <h3>Thông báo trang nhân viên</h3>
-                  <p>Marquee và box thông báo quan trọng trong trang tra giá nhân viên.</p>
-                </div>
-                <button type="button" onClick={saveNoticeContent} disabled={!canWriteSettings || busy === "notice-content"}>
-                  {busy === "notice-content" ? "Đang lưu..." : "Lưu nội dung"}
-                </button>
-              </div>
-              <div className="adminx-form-grid">
-                <label>
-                  <span>Thông báo marquee</span>
-                  <textarea
-                    value={settings.MARQUEE_MESSAGE || ""}
-                    onChange={(e) => setSetting("MARQUEE_MESSAGE", e.target.value)}
-                    placeholder="Nhập nội dung chạy ngang trên banner..."
-                  />
-                </label>
-                <div className="adminx-form-field adminx-form-wide adminx-notice-rich-field">
-                  <span>Thông báo quan trọng trên trang nhân viên</span>
-                  <Editor
-                    tinymceScriptSrc="/tinymce/tinymce.min.js"
-                    licenseKey="gpl"
-                    value={settings.FIXED_BANNER_MESSAGE || ""}
-                    onEditorChange={(value) => setSetting("FIXED_BANNER_MESSAGE", value)}
-                    init={{
-                      height: 300,
-                      menubar: "edit view insert format tools table help",
-                      branding: true,
-                      promotion: false,
-                      automatic_uploads: true,
-                      paste_data_images: true,
-                      images_reuse_filename: false,
-                      image_title: true,
-                      image_caption: true,
-                      object_resizing: true,
-                      convert_urls: false,
-                      relative_urls: false,
-                      remove_script_host: false,
-                      file_picker_types: "image media file",
-                      images_upload_handler: async (blobInfo, progress) => {
-                        const formData = new FormData();
-                        formData.append("file", blobInfo.blob(), blobInfo.filename());
-                        formData.append("slug", "important-notice");
-
-                        const res = await fetch("/api/admin/cms-upload", {
-                          method: "POST",
-                          body: formData,
-                          cache: "no-store",
-                        });
-
-                        const data = await res.json().catch(() => null);
-
-                        if (!res.ok || !data?.success || !data?.location) {
-                          throw new Error(data?.message || "Upload ảnh thất bại.");
-                        }
-
-                        if (typeof progress === "function") progress(100);
-                        return data.location;
-                      },
-                      plugins:
-                        "advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount",
-                      toolbar:
-                        "undo redo | blocks | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table link image media | removeformat code fullscreen help",
-                      content_css: ["default", "/fonts/roboto/roboto.css"],
-                      content_style:
-                        "body{font-family:Roboto,Arial,sans-serif;font-size:14px;line-height:1.55;color:#0f172a;padding:12px;} img{display:block;max-width:100%!important;height:auto!important;margin:10px auto;border-radius:14px;} table{max-width:100%;border-collapse:collapse;} td,th{border:1px solid #e2e8f0;padding:6px;} p{margin:0 0 8px;} ul,ol{margin:6px 0 8px 20px;padding:0;}",
-                    }}
-                  />
-                  <small className="adminx-field-hint">
-                    Nội dung này chỉ hiển thị ở trang nhân viên. Khách hàng sẽ không thấy box thông báo quan trọng.
-                  </small>
-                </div>
-              </div>
-            </section>
-
-            <section className="adminx-notify-card adminx-hot-push-card">
-              <div className="adminx-notify-card-head">
-                <div>
-                  <h3>Phát thông báo nóng (PUSH)</h3>
-                  <p>Nội dung trượt từ trên xuống, giữ 30 giây rồi tự tắt.</p>
-                </div>
-              </div>
-              <div className="adminx-push-now-row">
-                <input
-                  value={settings.PUSH_NOTIFY_MESSAGE || ""}
-                  onChange={(e) => setSetting("PUSH_NOTIFY_MESSAGE", e.target.value)}
-                  placeholder="Nhập tin nhắn khẩn gửi tới màn hình toàn bộ nhân viên..."
-                />
-                <button type="button" onClick={sendPushNotifyNow} disabled={!canWriteSettings || busy === "push-notify"}>
-                  {busy === "push-notify" ? "Đang gửi..." : "Gửi thông báo ngay"}
-                </button>
-              </div>
-            </section>
-
-            <section className="adminx-notify-card adminx-popup-config-card">
-              <div className="adminx-popup-card-head">
-                <div>
-                  <h3>Popup &quot;Thu Cũ Đổi Mới&quot;</h3>
-                  <p>Hiển thị dạng SweetAlert giữa màn hình khi nhân viên vào luồng Thu cũ đổi mới.</p>
-                </div>
-                <label className="adminx-popup-toggle">
-                  <input
-                    type="checkbox"
-                    checked={isOn(settings.STAFF_POPUP_TRADEIN_ENABLED)}
-                    onChange={(e) => setSetting("STAFF_POPUP_TRADEIN_ENABLED", toFlag(e.target.checked))}
-                  />
-                  <span className="adminx-switch" aria-hidden="true"></span>
-                </label>
-              </div>
-              <label className="adminx-popup-field">
-                <span>Nội dung thông báo (nên ngắn gọn)</span>
-                <textarea
-                  value={settings.STAFF_POPUP_TRADEIN_MESSAGE || ""}
-                  onChange={(e) => setSetting("STAFF_POPUP_TRADEIN_MESSAGE", e.target.value)}
-                  placeholder="VD: Toàn bộ iPhone thu vào sẽ không có trợ giá..."
-                />
-              </label>
-              <label className="adminx-popup-time">
-                <span>Tự tắt sau</span>
-                <input
-                  inputMode="numeric"
-                  value={settings.STAFF_POPUP_TRADEIN_SECONDS || "10"}
-                  onChange={(e) => setSetting("STAFF_POPUP_TRADEIN_SECONDS", e.target.value.replace(/[^\d]/g, ""))}
-                  placeholder="10"
-                />
-                <small>Nhập 10 = 10 giây, nhập 10000 = 10 giây theo cấu hình cũ.</small>
-              </label>
-              <button
-                type="button"
-                className="adminx-popup-save"
-                onClick={() => saveStaffPopup("tradein")}
-                disabled={!canWriteSettings || busy === "popup-tradein"}
-              >
-                {busy === "popup-tradein" ? "Đang lưu..." : "Lưu cấu hình"}
-              </button>
-            </section>
-
-            <section className="adminx-notify-card adminx-popup-config-card">
-              <div className="adminx-popup-card-head">
-                <div>
-                  <h3>Popup &quot;Thu Cũ Không Đổi Mới&quot;</h3>
-                  <p>Hiển thị dạng SweetAlert giữa màn hình khi nhân viên vào luồng Chỉ thu cũ.</p>
-                </div>
-                <label className="adminx-popup-toggle">
-                  <input
-                    type="checkbox"
-                    checked={isOn(settings.STAFF_POPUP_BUYONLY_ENABLED)}
-                    onChange={(e) => setSetting("STAFF_POPUP_BUYONLY_ENABLED", toFlag(e.target.checked))}
-                  />
-                  <span className="adminx-switch" aria-hidden="true"></span>
-                </label>
-              </div>
-              <label className="adminx-popup-field">
-                <span>Nội dung thông báo (nên ngắn gọn)</span>
-                <textarea
-                  value={settings.STAFF_POPUP_BUYONLY_MESSAGE || ""}
-                  onChange={(e) => setSetting("STAFF_POPUP_BUYONLY_MESSAGE", e.target.value)}
-                  placeholder="VD: Chương trình OFF đến khi có thông báo mới..."
-                />
-              </label>
-              <label className="adminx-popup-time">
-                <span>Tự tắt sau</span>
-                <input
-                  inputMode="numeric"
-                  value={settings.STAFF_POPUP_BUYONLY_SECONDS || "10"}
-                  onChange={(e) => setSetting("STAFF_POPUP_BUYONLY_SECONDS", e.target.value.replace(/[^\d]/g, ""))}
-                  placeholder="10"
-                />
-                <small>Nhập 10 = 10 giây, nhập 10000 = 10 giây theo cấu hình cũ.</small>
-              </label>
-              <button
-                type="button"
-                className="adminx-popup-save"
-                onClick={() => saveStaffPopup("buyonly")}
-                disabled={!canWriteSettings || busy === "popup-buyonly"}
-              >
-                {busy === "popup-buyonly" ? "Đang lưu..." : "Lưu cấu hình"}
-              </button>
-            </section>
-          </div>
-        </section>
-      )}
-
-      {tab === "system" && (
-        <section className="adminx-panel">
-          <div className="adminx-panel-head adminx-panel-head-row">
-            <div>
-              <span className="adminx-eyebrow">System Control</span>
-              <h2>Điều khiển hệ thống</h2>
-              <p>Quản lý ngày áp dụng, khóa truy cập và reload dữ liệu bảng giá.</p>
-            </div>
-          </div>
-
-          <div className={`adminx-system-sections ${canWriteSettings ? "" : "reload-only"}`}>
-            <section className="adminx-system-card">
-              <div className="adminx-system-card-head">
-                <span>01</span>
-                <div>
-                  <h3>Thời gian áp dụng bảng giá</h3>
-                  <p>Hiển thị mốc áp dụng trên trang nhân viên và khách hàng.</p>
-                </div>
-              </div>
-              <div className="adminx-form-grid">
-                <label>
-                  <span>Ngày áp dụng từ</span>
-                  <input
-                    value={settings.PRICE_EFFECTIVE_FROM || ""}
-                    onChange={(e) => setSetting("PRICE_EFFECTIVE_FROM", e.target.value)}
-                    placeholder="Để trống = đầu tháng hiện tại"
-                  />
-                </label>
-                <label>
-                  <span>Ngày áp dụng đến</span>
-                  <input
-                    value={settings.PRICE_EFFECTIVE_TO || ""}
-                    onChange={(e) => setSetting("PRICE_EFFECTIVE_TO", e.target.value)}
-                    placeholder="Để trống = cuối tháng hiện tại"
-                  />
-                </label>
-              </div>
-              <div className="adminx-section-actions">
-                <button
-                  className="adminx-section-save"
-                  type="button"
-                  onClick={() => saveSystemSection(PRICE_SETTING_KEYS, "price-settings")}
-                  disabled={!canWriteSettings || busy === "price-settings"}
-                >
-                  {busy === "price-settings" ? "Đang lưu..." : "Lưu thời gian áp dụng"}
-                </button>
-              </div>
-            </section>
-
-            <section className="adminx-system-card adminx-reload-card">
-              <div className="adminx-system-card-head">
-                <span>02</span>
-                <div>
-                  <h3>Reload dữ liệu</h3>
-                  <p>Tăng phiên bản để người đang mở web thấy thông báo cập nhật và tự reload.</p>
-                </div>
-              </div>
-              <div className="adminx-form-grid">
-                <label>
-                  <span>Data version</span>
-                  <input value={settings.DATA_VERSION || "1"} readOnly />
-                </label>
-              </div>
-              <div className="adminx-section-actions">
-                <button
-                  className="adminx-section-save"
-                  type="button"
-                  onClick={reloadDataVersion}
-                  disabled={!canReloadData || busy === "reload-data"}
-                >
-                  {busy === "reload-data" ? "Đang reload..." : "Reload data"}
-                </button>
-              </div>
-            </section>
-
-            <section className="adminx-system-card">
-              <div className="adminx-system-card-head">
-                <span>03</span>
-                <div>
-                  <h3>Lock web khẩn cấp</h3>
-                  <p>Bật ngay màn hình khóa toàn hệ thống khi có sự cố hoặc cập nhật gấp.</p>
-                </div>
-              </div>
-              <div className="adminx-form-grid">
-                <label>
-                  <span>Thông báo lock toàn màn hình</span>
-                  <input
-                    value={settings.SYSTEM_LOCK_MESSAGE || ""}
-                    onChange={(e) => setSetting("SYSTEM_LOCK_MESSAGE", e.target.value)}
-                    placeholder="HỆ THỐNG ĐANG CẬP NHẬT KHẨN."
-                  />
-                </label>
-              </div>
-              <div className="adminx-lock-grid compact">
-                <ToggleRow settingKey="SYSTEM_LOCK_ENABLED" title="Lock web khẩn cấp" desc="Hiển thị toàn màn hình cập nhật khẩn." />
-              </div>
-              <div className="adminx-section-actions">
-                <button
-                  className="adminx-section-save"
-                  type="button"
-                  onClick={() => saveSystemSection(EMERGENCY_LOCK_SETTING_KEYS, "emergency-lock")}
-                  disabled={!canWriteSettings || busy === "emergency-lock"}
-                >
-                  {busy === "emergency-lock" ? "Đang lưu..." : "Lưu lock khẩn cấp"}
-                </button>
-              </div>
-            </section>
-
-            <section className="adminx-system-card">
-              <div className="adminx-system-card-head">
-                <span>04</span>
-                <div>
-                  <h3>Khóa theo lịch</h3>
-                  <p>Tự khóa khi đến giờ bắt đầu và mở lại sau giờ kết thúc.</p>
-                </div>
-              </div>
-              <div className="adminx-form-grid">
-                <label>
-                  <span>Giờ bắt đầu khóa</span>
-                  <input
-                    type="datetime-local"
-                    value={toDatetimeLocalInput(settings.SYSTEM_LOCK_START_AT)}
-                    onChange={(e) => setSetting("SYSTEM_LOCK_START_AT", e.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>Giờ kết thúc khóa</span>
-                  <input
-                    type="datetime-local"
-                    value={toDatetimeLocalInput(settings.SYSTEM_LOCK_END_AT)}
-                    onChange={(e) => setSetting("SYSTEM_LOCK_END_AT", e.target.value)}
-                  />
-                </label>
-                <label className="adminx-form-wide">
-                  <span>Lý do khóa theo lịch</span>
-                  <textarea
-                    value={settings.SYSTEM_LOCK_REASON || ""}
-                    onChange={(e) => setSetting("SYSTEM_LOCK_REASON", e.target.value)}
-                    placeholder="VD: Hệ thống tạm khóa để cập nhật bảng giá và bảo trì dữ liệu."
-                  />
-                </label>
-              </div>
-              <div className="adminx-lock-grid compact">
-                <ToggleRow settingKey="SYSTEM_LOCK_SCHEDULE_ENABLED" title="Khóa theo lịch" desc="Dùng khung giờ đã cài ở trên." />
-              </div>
-              <div className="adminx-section-actions">
-                <button
-                  className="adminx-section-save"
-                  type="button"
-                  onClick={() => saveSystemSection(SCHEDULE_LOCK_SETTING_KEYS, "schedule-lock")}
-                  disabled={!canWriteSettings || busy === "schedule-lock"}
-                >
-                  {busy === "schedule-lock" ? "Đang lưu..." : "Lưu khóa theo lịch"}
-                </button>
-              </div>
-            </section>
-
-            <section className="adminx-system-card">
-              <div className="adminx-system-card-head">
-                <span>05</span>
-                <div>
-                  <h3>Khóa trang nhân viên</h3>
-                  <p>Chặn toàn bộ trang nhân viên hoặc khóa từng tab nghiệp vụ.</p>
-                </div>
-              </div>
-              <div className="adminx-lock-grid">
-                <ToggleRow settingKey="STAFF_PAGE_LOCKED" title="Khóa trang nhân viên" desc="Chặn truy cập cổng tra giá nhân viên." />
-                <ToggleRow
-                  settingKey="STAFF_TRADEIN_LOCKED"
-                  title="Khóa nhân viên - Thu cũ đổi mới"
-                  desc="Khóa tab Thu cũ đổi mới trên trang nhân viên."
-                  disabled={staffPageLockedInForm}
-                />
-                <ToggleRow
-                  settingKey="STAFF_BUYONLY_LOCKED"
-                  title="Khóa nhân viên - Chỉ thu cũ"
-                  desc="Khóa tab Chỉ thu cũ trên trang nhân viên."
-                  disabled={staffPageLockedInForm}
-                />
-              </div>
-              <div className="adminx-lock-help">
-                Khóa trang nhân viên sẽ làm mờ luồng Nhân viên ở trang chủ/trang chọn bảng giá và chặn truy cập hẳn.
-                Khóa từng tab con chỉ khóa đúng tab nghiệp vụ bên trong tool, nhân viên vẫn vào được trang tra giá.
-              </div>
-              <div className="adminx-section-actions">
-                <button
-                  className="adminx-section-save"
-                  type="button"
-                  onClick={() => saveSystemSection(STAFF_LOCK_SETTING_KEYS, "staff-locks")}
-                  disabled={!canWriteSettings || busy === "staff-locks"}
-                >
-                  {busy === "staff-locks" ? "Đang lưu..." : "Lưu khóa nhân viên"}
-                </button>
-              </div>
-            </section>
-
-            <section className="adminx-system-card">
-              <div className="adminx-system-card-head">
-                <span>06</span>
-                <div>
-                  <h3>Khóa trang khách hàng</h3>
-                  <p>Chặn trang khách hàng hoặc khóa từng chế độ tra giá cho khách.</p>
-                </div>
-              </div>
-              <div className="adminx-lock-grid">
-                <ToggleRow settingKey="CUSTOMER_PAGE_LOCKED" title="Khóa trang khách hàng" desc="Chặn truy cập trang khách hàng cá nhân." />
-                <ToggleRow
-                  settingKey="CUSTOMER_TRADEIN_LOCKED"
-                  title="Khóa khách - Thu cũ đổi mới"
-                  desc="Khóa tab Thu cũ đổi mới trên trang khách hàng."
-                  disabled={customerPageLockedInForm}
-                />
-                <ToggleRow
-                  settingKey="CUSTOMER_BUYONLY_LOCKED"
-                  title="Khóa khách - Chỉ thu cũ"
-                  desc="Khóa tab Chỉ thu cũ trên trang khách hàng."
-                  disabled={customerPageLockedInForm}
-                />
-              </div>
-              <div className="adminx-lock-help">
-                Khóa trang khách hàng sẽ làm mờ luồng Khách hàng ở trang chủ/trang chọn bảng giá và chặn truy cập hẳn.
-                Khóa từng tab con chỉ khóa đúng chế độ tra giá bên trong trang khách hàng.
-              </div>
-              <div className="adminx-section-actions">
-                <button
-                  className="adminx-section-save"
-                  type="button"
-                  onClick={() => saveSystemSection(CUSTOMER_LOCK_SETTING_KEYS, "customer-locks")}
-                  disabled={!canWriteSettings || busy === "customer-locks"}
-                >
-                  {busy === "customer-locks" ? "Đang lưu..." : "Lưu khóa khách hàng"}
-                </button>
-              </div>
-            </section>
-
-            <section className="adminx-system-card adminx-firewall-card">
-              <div className="adminx-system-card-head">
-                <span>07</span>
-                <div>
-                  <h3>Hệ thống tường lửa IP</h3>
-                  <p>Chặn hoặc chỉ cho phép IP được cấu hình truy cập trang tra giá nhân viên và khách hàng.</p>
-                </div>
-              </div>
-
-              <div className="adminx-firewall-panel">
-                <label>
-                  <span>Blacklist (chặn IP | lý do)</span>
-                  <textarea
-                    value={settings.FIREWALL_BLACKLIST || ""}
-                    onChange={(e) => setSetting("FIREWALL_BLACKLIST", e.target.value)}
-                    placeholder={"42.113.79.11 | Truy cập bất thường\n183.80.38.199 | Spam tra giá"}
-                  />
-                </label>
-                <label>
-                  <span>Whitelist (chỉ cho IP này vào)</span>
-                  <textarea
-                    value={settings.FIREWALL_WHITELIST || ""}
-                    onChange={(e) => setSetting("FIREWALL_WHITELIST", e.target.value)}
-                    placeholder={"Nếu ô này có dữ liệu, toàn bộ IP khác bên ngoài danh sách sẽ bị chặn.\nVD: 113.190.25.10"}
-                  />
-                </label>
-                <label className="adminx-firewall-message">
-                  <span>Nội dung hiển thị khi bị chặn</span>
-                  <input
-                    value={settings.FIREWALL_MESSAGE || ""}
-                    onChange={(e) => setSetting("FIREWALL_MESSAGE", e.target.value)}
-                    placeholder="IP của bạn không được phép truy cập hệ thống tra giá."
-                  />
-                </label>
-              </div>
-
-              <div className="adminx-firewall-panel adminx-firewall-user-panel">
-                <label>
-                  <span>Blacklist User (chặn user | lý do)</span>
-                  <textarea
-                    value={settings.FIREWALL_USER_BLACKLIST || ""}
-                    onChange={(e) => setSetting("FIREWALL_USER_BLACKLIST", e.target.value)}
-                    placeholder={"NV36964 | Tạm khóa truy cập\n12345 | Spam tra giá"}
-                  />
-                </label>
-                <label>
-                  <span>Whitelist User (chỉ user này vào)</span>
-                  <textarea
-                    value={settings.FIREWALL_USER_WHITELIST || ""}
-                    onChange={(e) => setSetting("FIREWALL_USER_WHITELIST", e.target.value)}
-                    placeholder={"Nếu ô này có dữ liệu, toàn bộ user khác sẽ bị chặn.\nVD: NV36964"}
-                  />
-                </label>
-                <label className="adminx-firewall-message">
-                  <span>Nội dung hiển thị khi user bị chặn</span>
-                  <input
-                    value={settings.FIREWALL_USER_MESSAGE || ""}
-                    onChange={(e) => setSetting("FIREWALL_USER_MESSAGE", e.target.value)}
-                    placeholder="Tài khoản của bạn không được phép truy cập hệ thống tra giá."
-                  />
-                </label>
-              </div>
-
-              <div className="adminx-lock-help">
-                Blacklist chặn đúng IP/User, có thể ghi kèm lý do bằng dấu |. Whitelist nếu có dữ liệu sẽ chuyển sang chế độ chỉ cho các IP/User trong danh sách truy cập.
-              </div>
-
-              <div className="adminx-section-actions">
-                <button
-                  className="adminx-section-save"
-                  type="button"
-                  onClick={() => saveSystemSection(FIREWALL_SETTING_KEYS, "firewall-settings")}
-                  disabled={!canWriteSettings || busy === "firewall-settings"}
-                >
-                  {busy === "firewall-settings" ? "Đang lưu..." : "Lưu tường lửa IP/User"}
-                </button>
-              </div>
-            </section>
-          </div>
-        </section>
-      )}
-
-      {tab === "dashboard" && (
-        <section className="adminx-panel">
-          <div className="adminx-panel-head adminx-panel-head-row">
-            <div>
-              <span className="adminx-eyebrow">Analytics</span>
-              <h2>Dashboard tra giá</h2>
-              <p>Dữ liệu log chỉ được tải khi mở tab Dashboard để giữ trang Admin nhẹ và nhanh.</p>
-            </div>
-            <div className="adminx-dashboard-head-actions">
-              <div className="adminx-dashboard-source-switch" role="tablist" aria-label="Chọn nguồn dashboard">
-                <button
-                  type="button"
-                  className={dashboardSource === "staff" ? "active" : ""}
-                  onClick={() => changeDashboardSource("staff")}
-                  disabled={dashboardLoading}
-                >
-                  Nhân viên
-                </button>
-                <button
-                  type="button"
-                  className={dashboardSource === "customer" ? "active" : ""}
-                  onClick={() => changeDashboardSource("customer")}
-                  disabled={dashboardLoading}
-                >
-                  Khách hàng
-                </button>
-              </div>
-              {isFullAdmin && (
-                <div className="adminx-dashboard-delete-tools">
-                  <select
-                    value={dashboardDeleteMode}
-                    onChange={(event) => setDashboardDeleteMode(event.target.value as DashboardDeleteMode)}
-                    disabled={dashboardLoading || busy === "DELETE_DASHBOARD_LOGS"}
-                    aria-label="Chọn kiểu xóa lượt tìm kiếm"
-                  >
-                    {DASHBOARD_DELETE_OPTIONS.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={openDashboardLogDeleteConfirm}
-                    disabled={dashboardLoading || busy === "DELETE_DASHBOARD_LOGS" || dashboardData.totalLogs <= 0}
-                  >
-                    {busy === "DELETE_DASHBOARD_LOGS" ? "Đang xóa..." : "Xóa log"}
-                  </button>
-                </div>
-              )}
-              <button className="adminx-action-btn" type="button" onClick={() => loadDashboard()} disabled={dashboardLoading}>
-                {dashboardLoading ? "Đang tải..." : dashboardLoaded ? "Tải lại" : "Tải dashboard"}
-              </button>
-            </div>
-          </div>
-
-          <div className="adminx-metric-grid adminx-dashboard-metrics">
-            <div className="adminx-metric-card dark">
-              <span>Tổng lượt log</span>
-              <b>{formatNumber(dashboardData.totalLogs)}</b>
-              <p>Số lượt thao tác tra giá đã ghi nhận.</p>
-            </div>
-            <div className="adminx-metric-card">
-              <span>Tổng giá trị</span>
-              <b>{money(dashboardData.totalValue)}</b>
-              <p>Tổng tiền khách nhận trong các log gần nhất.</p>
-            </div>
-            <div className="adminx-metric-card">
-              <span>{dashboardIsCustomer ? "Thiết bị" : "Nhân viên"}</span>
-              <b>{formatNumber(dashboardIsCustomer ? dashboardDeviceRanking.length : dashboardData.topStaff.length)}</b>
-              <p>
-                {dashboardIsCustomer
-                  ? "Số nhóm thiết bị khách hàng phát sinh log gần đây."
-                  : "Số nhân viên có phát sinh log trong dữ liệu tải về."}
-              </p>
-            </div>
-            <div className="adminx-metric-card">
-              <span>{dashboardIsCustomer ? "IP gần đây" : "Siêu thị"}</span>
-              <b>{formatNumber(dashboardIsCustomer ? dashboardIpRanking.length : dashboardData.topStores.length)}</b>
-              <p>
-                {dashboardIsCustomer
-                  ? "Số IP khách hàng có phát sinh log gần đây."
-                  : "Số siêu thị có phát sinh log tra giá."}
-              </p>
-            </div>
-          </div>
-
-          <div className="adminx-dashboard-grid">
-            <div className="adminx-analytics-card">
-              <h3>Top 10 máy cũ tìm nhiều nhất</h3>
-              <div className="adminx-ranking-list">
-                {dashboardData.topOldProducts.length === 0 ? (
-                  <p>Chưa có dữ liệu.</p>
-                ) : (
-                  dashboardData.topOldProducts.map((item, index) => (
-                    <div key={`${item.product}-${index}`}>
-                      <span>{String(index + 1).padStart(2, "0")}</span>
-                      <b>{item.product}</b>
-                      <em>{item.count} lượt</em>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="adminx-analytics-card">
-              <h3>{dashboardIsCustomer ? "Thiết bị khách dùng" : "Top nhân viên tra giá"}</h3>
-              <div className="adminx-ranking-list">
-                {dashboardIsCustomer ? (
-                  dashboardDeviceRanking.length === 0 ? (
-                    <p>Chưa có dữ liệu.</p>
-                  ) : (
-                    dashboardDeviceRanking.map((item, index) => (
-                      <div key={`${item.label}-${index}`}>
-                        <span>{String(index + 1).padStart(2, "0")}</span>
-                        <b>{item.label}</b>
-                        <em>{item.count} lượt · {money(item.totalValue)}</em>
-                      </div>
-                    ))
-                  )
-                ) : dashboardData.topStaff.length === 0 ? (
-                  <p>Chưa có dữ liệu.</p>
-                ) : (
-                  dashboardData.topStaff.map((item, index) => (
-                    <div key={`${item.maNV}-${index}`}>
-                      <span>{String(index + 1).padStart(2, "0")}</span>
-                      <b>{item.staffName || `NV ${item.maNV}`}</b>
-                      <em>{item.count} lượt · {money(item.totalValue)}</em>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="adminx-analytics-card">
-              <h3>{dashboardIsCustomer ? "IP khách phát sinh log" : "Top siêu thị phát sinh log"}</h3>
-              <div className="adminx-ranking-list">
-                {dashboardIsCustomer ? (
-                  dashboardIpRanking.length === 0 ? (
-                    <p>Chưa có dữ liệu.</p>
-                  ) : (
-                    dashboardIpRanking.map((item, index) => (
-                      <div key={`${item.ip}-${index}`}>
-                        <span>{String(index + 1).padStart(2, "0")}</span>
-                        <b>{maskIpAddress(item.ip, isFullAdmin)}</b>
-                        <em>{item.count} lượt · {money(item.totalValue)}</em>
-                      </div>
-                    ))
-                  )
-                ) : dashboardData.topStores.length === 0 ? (
-                  <p>Chưa có dữ liệu.</p>
-                ) : (
-                  dashboardData.topStores.map((item, index) => (
-                    <div key={`${item.maST}-${index}`}>
-                      <span>{String(index + 1).padStart(2, "0")}</span>
-                      <b>ST {item.maST || "Không rõ"}</b>
-                      <em>{item.count} lượt · {money(item.totalValue)}</em>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="adminx-analytics-card">
-              <h3>Lượt tra giá theo ngày</h3>
-              <div className="adminx-ranking-list">
-                {dashboardData.dailyLogs.length === 0 ? (
-                  <p>Chưa có dữ liệu.</p>
-                ) : (
-                  dashboardData.dailyLogs.map((item, index) => (
-                    <div key={`${item.day}-${index}`}>
-                      <span>{String(index + 1).padStart(2, "0")}</span>
-                      <b>{item.day}</b>
-                      <em>{item.count} lượt</em>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="adminx-analytics-card">
-              <h3>Loại thao tác</h3>
-              <div className="adminx-ranking-list">
-                {dashboardData.actionCounts.length === 0 ? (
-                  <p>Chưa có dữ liệu.</p>
-                ) : (
-                  dashboardData.actionCounts.map((item, index) => (
-                    <div key={`${item.action}-${index}`}>
-                      <span>{String(index + 1).padStart(2, "0")}</span>
-                      <b>{item.action}</b>
-                      <em>{item.count} lượt</em>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="adminx-analytics-card">
-              <h3>20 lượt tra giá gần đây</h3>
-              <div className="adminx-log-list">
-                {dashboardData.recentLogs.length === 0 ? (
-                  <p>Chưa có dữ liệu.</p>
-                ) : (
-                  dashboardData.recentLogs.map((item, index) => (
-                    <div key={`${item.time}-${index}`}>
-                      <b>{item.spCu || "Không rõ máy cũ"}</b>
-                      <span>
-                        {item.time} • {dashboardIsCustomer ? "Khách hàng" : `NV ${item.maNV}`} • {item.action} • {money(item.tongTien)}
-                      </span>
-                      <small className="adminx-log-meta">
-                        <em>{item.deviceLabel || "Không rõ"}</em>
-                        <em>{maskIpAddress(item.ip, isFullAdmin)}</em>
-                        <em>{item.networkType || "Không rõ mạng"}</em>
-                      </small>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
           </div>
         </section>
       )}
@@ -2562,159 +930,12 @@ function TcdmAdminConsole({
         </div>
       )}
 
-      {confirmDialog && (
-        <div className="adminx-confirm-layer" role="alertdialog" aria-modal="true" aria-labelledby="adminConfirmTitle">
-          <div className="adminx-confirm-card">
-            <span>{confirmDialog.danger ? "Cần xác nhận" : "Xác nhận thao tác"}</span>
-            <h3 id="adminConfirmTitle">{confirmDialog.title}</h3>
-            <p>{confirmDialog.message}</p>
-            <div>
-              <button type="button" className="ghost" onClick={() => setConfirmDialog(null)}>
-                Hủy
-              </button>
-              <button
-                type="button"
-                className={confirmDialog.danger ? "danger" : "primary"}
-                onClick={runConfirmDialogAction}
-              >
-                {confirmDialog.confirmText || "Xác nhận"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {toast && <UiNotice tone={toast.type} onRetry={toast.type === "error" ? () => void loadStaff() : undefined} retryLabel="Tải lại danh sách" busy={staffLoading}>{toast.text}</UiNotice>}
     </section>
   );
 }
 
-
 const ADMINX_STYLE = `
-.admin-saas-page {
-  min-height: 100vh;
-  padding: max(16px, env(safe-area-inset-top)) 12px max(26px, env(safe-area-inset-bottom));
-  background:
-    radial-gradient(circle at 18% 0%, rgba(255, 212, 0, .22), transparent 34%),
-    radial-gradient(circle at 92% 12%, rgba(37, 99, 235, .12), transparent 32%),
-    linear-gradient(180deg, #ffffff 0%, #f8fafc 44%, #eef2f7 100%);
-  color: #0f172a;
-}
-
-.admin-saas-shell {
-  width: min(100%, 1120px);
-  margin: 0 auto;
-  display: grid;
-  gap: 14px;
-}
-
-.admin-saas-hero {
-  position: relative;
-  overflow: hidden;
-  min-height: 238px;
-  padding: 22px;
-  border-radius: 34px;
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  color: #ffffff;
-  background:
-    radial-gradient(circle at 92% 8%, rgba(255, 212, 0, .58), transparent 30%),
-    linear-gradient(135deg, #0f172a, #111827 58%, #020617);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, .20);
-}
-
-.admin-saas-hero::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 88px;
-  background:
-    linear-gradient(90deg, rgba(255, 212, 0, .15), rgba(37, 99, 235, .10)),
-    repeating-linear-gradient(90deg, rgba(255,255,255,.10) 0 1px, transparent 1px 13px);
-  mask-image: linear-gradient(180deg, transparent, #000 45%);
-}
-
-.admin-saas-hero-left,
-.admin-saas-hero-actions {
-  position: relative;
-  z-index: 2;
-}
-
-.admin-saas-kicker {
-  width: fit-content;
-  padding: 8px 11px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.10);
-  border: 1px solid rgba(255,255,255,.14);
-  color: rgba(255,255,255,.80);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-}
-
-.admin-saas-hero h1 {
-  margin-top: 30px;
-  color: #ffffff;
-  font-size: clamp(40px, 8vw, 76px);
-  line-height: .88;
-  font-weight: 900;
-  letter-spacing: -.075em;
-  text-transform: uppercase;
-}
-
-.admin-saas-hero h1 span {
-  display: block;
-  color: #ffd400;
-}
-
-.admin-saas-hero p {
-  max-width: 540px;
-  margin-top: 13px;
-  color: rgba(255,255,255,.72);
-  font-size: 13px;
-  line-height: 1.5;
-  font-weight: 750;
-}
-
-.admin-saas-hero-meta {
-  margin-top: 14px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.admin-saas-hero-meta span,
-.admin-saas-ghost-link,
-.admin-saas-logout {
-  min-height: 38px;
-  padding: 0 13px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(255,255,255,.10);
-  color: rgba(255,255,255,.82);
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  text-decoration: none;
-}
-
-.admin-saas-hero-actions {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.admin-saas-logout {
-  background: #ffd400;
-  border-color: #ffd400;
-  color: #111827;
-}
-
 .adminx-console {
   display: grid;
   gap: 12px;
@@ -2856,11 +1077,9 @@ const ADMINX_STYLE = `
 }
 
 .adminx-action-btn,
-.adminx-inline-actions button,
 .adminx-filter-bar button,
 .adminx-pagination button,
-.adminx-staff-actions button,
-.adminx-section-save {
+.adminx-staff-actions button {
   min-height: 42px;
   padding: 0 14px;
   border: 0;
@@ -2907,119 +1126,16 @@ const ADMINX_STYLE = `
 .adminx-action-btn:disabled,
 .adminx-filter-bar button:disabled,
 .adminx-pagination button:disabled,
-.adminx-staff-actions button:disabled,
-.adminx-section-save:disabled {
+.adminx-staff-actions button:disabled {
   opacity: .45;
   cursor: not-allowed;
 }
 
-.adminx-button-stack {
-  display: flex;
-  gap: 8px;
-}
-
-.adminx-button-stack.no-system-save .adminx-action-btn:not(.secondary),
-.adminx-button-stack.no-reload .adminx-action-btn.secondary {
-  display: none;
-}
-
-.adminx-dashboard-head-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.adminx-dashboard-source-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px;
-  border-radius: 999px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.adminx-dashboard-source-switch button {
-  min-height: 36px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: #64748b;
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 950;
-  cursor: pointer;
-}
-
-.adminx-dashboard-source-switch button.active {
-  background: #07111f;
-  color: #ffd400;
-  box-shadow: 0 10px 22px rgba(15, 23, 42, .12);
-}
-
-.adminx-dashboard-source-switch button:disabled {
-  opacity: .55;
-  cursor: wait;
-}
-
-.adminx-dashboard-delete-tools {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px;
-  border-radius: 999px;
-  border: 1px solid #fed7aa;
-  background: #fff7ed;
-}
-
-.adminx-dashboard-delete-tools select {
-  min-height: 36px;
-  max-width: 180px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: #9a3412;
-  font-size: 11px;
-  font-weight: 950;
-  cursor: pointer;
-}
-
-.adminx-dashboard-delete-tools button {
-  min-height: 36px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 999px;
-  background: #fee2e2;
-  color: #991b1b;
-  font-size: 11px;
-  font-weight: 1000;
-  cursor: pointer;
-}
-
-.adminx-dashboard-delete-tools select:disabled,
-.adminx-dashboard-delete-tools button:disabled {
-  opacity: .5;
-  cursor: not-allowed;
-}
-
-.adminx-metric-grid,
-.adminx-overview-grid,
-.adminx-staff-summary,
-.adminx-form-grid,
-.adminx-lock-grid,
-.adminx-dashboard-grid {
+.adminx-staff-summary {
   display: grid;
   gap: 10px;
 }
 
-.adminx-metric-grid {
-  grid-template-columns: repeat(4, 1fr);
-}
-
-.adminx-overview-grid,
 .adminx-staff-summary {
   grid-template-columns: repeat(3, 1fr);
   margin-top: 10px;
@@ -3030,8 +1146,6 @@ const ADMINX_STYLE = `
   margin-bottom: 12px;
 }
 
-.adminx-metric-card,
-.adminx-soft-card,
 .adminx-staff-summary div {
   min-height: 118px;
   padding: 15px;
@@ -3040,13 +1154,6 @@ const ADMINX_STYLE = `
   border: 1px solid #e2e8f0;
 }
 
-.adminx-metric-card.dark {
-  background: #0f172a;
-  border-color: #0f172a;
-}
-
-.adminx-metric-card span,
-.adminx-soft-card span,
 .adminx-staff-summary span {
   display: block;
   color: #64748b;
@@ -3057,13 +1164,6 @@ const ADMINX_STYLE = `
   text-transform: uppercase;
 }
 
-.adminx-metric-card.dark span,
-.adminx-metric-card.dark p {
-  color: rgba(255,255,255,.64);
-}
-
-.adminx-metric-card b,
-.adminx-soft-card b,
 .adminx-staff-summary b {
   display: block;
   margin-top: 11px;
@@ -3072,25 +1172,6 @@ const ADMINX_STYLE = `
   line-height: 1;
   font-weight: 900;
   letter-spacing: -.06em;
-}
-
-.adminx-soft-card b {
-  font-size: 18px;
-  letter-spacing: -.035em;
-  line-height: 1.2;
-}
-
-.adminx-metric-card.dark b {
-  color: #ffd400;
-}
-
-.adminx-metric-card p,
-.adminx-soft-card p {
-  margin-top: 9px;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.35;
-  font-weight: 750;
 }
 
 .adminx-filter-bar {
@@ -3104,9 +1185,7 @@ const ADMINX_STYLE = `
 }
 
 .adminx-filter-bar input,
-.adminx-filter-bar select,
-.adminx-form-grid input,
-.adminx-form-grid textarea {
+.adminx-filter-bar select {
   width: 100%;
   min-height: 48px;
   padding: 12px 13px;
@@ -3120,9 +1199,7 @@ const ADMINX_STYLE = `
 }
 
 .adminx-filter-bar input:focus,
-.adminx-filter-bar select:focus,
-.adminx-form-grid input:focus,
-.adminx-form-grid textarea:focus {
+.adminx-filter-bar select:focus {
   border-color: #facc15;
   box-shadow: 0 0 0 4px rgba(250, 204, 21, .16);
 }
@@ -3314,515 +1391,6 @@ const ADMINX_STYLE = `
 .adminx-pagination span {
   color: #64748b;
   font-size: 12px;
-  font-weight: 900;
-}
-
-.adminx-form-grid {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.adminx-form-wide {
-  grid-column: 1 / -1;
-}
-
-.adminx-form-grid label {
-  display: grid;
-  gap: 7px;
-}
-
-.adminx-form-grid label > span {
-  color: #64748b;
-  font-size: 10px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.adminx-form-grid textarea {
-  min-height: 96px;
-  resize: vertical;
-  line-height: 1.45;
-}
-
-.adminx-inline-actions {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.adminx-notify-stack {
-  display: grid;
-  gap: 14px;
-}
-
-.adminx-notify-card {
-  padding: 18px;
-  border-radius: 24px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 16px 42px rgba(15, 23, 42, .06);
-}
-
-.adminx-notify-card-head,
-.adminx-popup-card-head {
-  margin-bottom: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.adminx-notify-card-head h3,
-.adminx-popup-card-head h3 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 16px;
-  line-height: 1.15;
-  font-weight: 1000;
-  letter-spacing: -.02em;
-}
-
-.adminx-notify-card-head p,
-.adminx-popup-card-head p {
-  margin: 4px 0 0;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.42;
-  font-weight: 800;
-}
-
-.adminx-hot-push-card {
-  background: linear-gradient(135deg, #ffffff, #f8fbff);
-}
-
-.adminx-push-now-row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-.adminx-push-now-row input {
-  width: 100%;
-  min-height: 46px;
-  border-radius: 18px;
-  border: 1px solid #dbe3ef;
-  background: #f8fafc;
-  padding: 0 14px;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 850;
-}
-
-.adminx-push-now-row button,
-.adminx-popup-save,
-.adminx-notify-card-head button {
-  min-height: 44px;
-  border: 0;
-  border-radius: 16px;
-  background: #dbeafe;
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 1000;
-  cursor: pointer;
-}
-
-.adminx-push-now-row button,
-.adminx-popup-save {
-  width: 100%;
-}
-
-.adminx-popup-config-card {
-  display: grid;
-  gap: 14px;
-}
-
-.adminx-popup-toggle {
-  display: inline-grid;
-  cursor: pointer;
-}
-
-.adminx-popup-toggle input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.adminx-popup-toggle input:checked + .adminx-switch {
-  background: #22c55e;
-}
-
-.adminx-popup-toggle input:checked + .adminx-switch::after {
-  transform: translateX(20px);
-}
-
-.adminx-popup-field,
-.adminx-popup-time {
-  display: grid;
-  gap: 8px;
-}
-
-.adminx-popup-field > span,
-.adminx-popup-time > span {
-  color: #64748b;
-  font-size: 10px;
-  line-height: 1;
-  font-weight: 1000;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.adminx-popup-field textarea {
-  min-height: 90px;
-  border-radius: 18px;
-  border: 1px solid #dbe3ef;
-  background: #f8fafc;
-  padding: 14px;
-  color: #0f172a;
-  font-size: 13px;
-  line-height: 1.45;
-  font-weight: 850;
-  resize: vertical;
-}
-
-.adminx-popup-time {
-  grid-template-columns: auto 120px 1fr;
-  align-items: center;
-}
-
-.adminx-popup-time input {
-  min-height: 44px;
-  border-radius: 16px;
-  border: 1px solid #dbe3ef;
-  background: #f8fafc;
-  padding: 0 14px;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 850;
-}
-
-.adminx-popup-time small {
-  color: #64748b;
-  font-size: 11px;
-  line-height: 1.3;
-  font-weight: 800;
-}
-
-.adminx-section-actions {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.adminx-section-save {
-  width: min(100%, 320px);
-}
-
-.adminx-system-sections {
-  display: grid;
-  gap: 12px;
-}
-
-.adminx-system-sections.reload-only .adminx-system-card:not(.adminx-reload-card) {
-  display: none;
-}
-
-.adminx-system-card {
-  padding: 14px;
-  border-radius: 22px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, .045);
-}
-
-.adminx-system-card-head {
-  margin-bottom: 12px;
-  display: grid;
-  grid-template-columns: 38px 1fr;
-  gap: 10px;
-  align-items: start;
-}
-
-.adminx-system-card-head > span {
-  width: 34px;
-  height: 34px;
-  border-radius: 13px;
-  display: grid;
-  place-items: center;
-  background: #0f172a;
-  color: #ffd400;
-  font-size: 11px;
-  font-weight: 1000;
-}
-
-.adminx-system-card h3 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 17px;
-  line-height: 1.15;
-  font-weight: 1000;
-  letter-spacing: -.02em;
-}
-
-.adminx-system-card p {
-  margin: 4px 0 0;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.4;
-  font-weight: 800;
-}
-
-.adminx-lock-grid {
-  margin-top: 14px;
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.adminx-lock-grid.compact {
-  grid-template-columns: 1fr;
-}
-
-.adminx-lock-help {
-  margin-top: 10px;
-  padding: 11px 12px;
-  border-radius: 16px;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  color: #9a3412;
-  font-size: 12px;
-  line-height: 1.45;
-  font-weight: 850;
-}
-
-.adminx-firewall-card {
-  background:
-    radial-gradient(circle at 100% 0%, rgba(14, 165, 233, .16), transparent 34%),
-    #ffffff;
-}
-
-.adminx-firewall-panel {
-  padding: 16px;
-  border-radius: 22px;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-  background: #020617;
-  border: 1px solid #0f172a;
-}
-
-.adminx-firewall-user-panel {
-  margin-top: 12px;
-  background: #111827;
-}
-
-.adminx-firewall-panel label {
-  display: grid;
-  gap: 8px;
-}
-
-.adminx-firewall-panel label > span {
-  color: #94a3b8;
-  font-size: 10px;
-  line-height: 1.1;
-  font-weight: 1000;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.adminx-firewall-panel textarea,
-.adminx-firewall-panel input {
-  width: 100%;
-  border: 1px solid rgba(148, 163, 184, .28);
-  border-radius: 18px;
-  background: rgba(248, 250, 252, .92);
-  color: #0f172a;
-  font-size: 13px;
-  line-height: 1.45;
-  font-weight: 850;
-}
-
-.adminx-firewall-panel textarea {
-  min-height: 118px;
-  padding: 14px;
-  resize: vertical;
-}
-
-.adminx-firewall-panel input {
-  min-height: 48px;
-  padding: 0 14px;
-}
-
-.adminx-firewall-message {
-  grid-column: 1 / -1;
-}
-
-.adminx-toggle-row {
-  padding: 13px;
-  border-radius: 20px;
-  display: grid;
-  grid-template-columns: 50px 1fr;
-  gap: 11px;
-  align-items: center;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-}
-
-.adminx-toggle-row.disabled {
-  opacity: .54;
-  cursor: not-allowed;
-}
-
-.adminx-toggle-row input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.adminx-switch {
-  position: relative;
-  width: 48px;
-  height: 28px;
-  border-radius: 999px;
-  background: #cbd5e1;
-  box-shadow: inset 0 2px 5px rgba(15, 23, 42, .16);
-}
-
-.adminx-switch::after {
-  content: "";
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, .18);
-  transition: .18s ease;
-}
-
-.adminx-toggle-row input:checked + .adminx-switch {
-  background: #ffd400;
-}
-
-.adminx-toggle-row input:checked + .adminx-switch::after {
-  transform: translateX(20px);
-  background: #0f172a;
-}
-
-.adminx-toggle-row b {
-  color: #0f172a;
-  font-size: 13px;
-  line-height: 1.1;
-  font-weight: 900;
-}
-
-.adminx-toggle-row p {
-  margin-top: 5px;
-  color: #64748b;
-  font-size: 11.5px;
-  line-height: 1.35;
-  font-weight: 750;
-}
-
-.adminx-dashboard-grid {
-  grid-template-columns: 1fr 1fr;
-}
-
-.adminx-dashboard-metrics {
-  margin-bottom: 10px;
-}
-
-.adminx-dashboard-metrics .adminx-metric-card b {
-  font-size: 24px;
-  line-height: 1.1;
-  letter-spacing: 0;
-  word-break: break-word;
-}
-
-.adminx-analytics-card {
-  padding: 14px;
-  border-radius: 24px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.adminx-analytics-card h3 {
-  color: #0f172a;
-  font-size: 16px;
-  font-weight: 900;
-  letter-spacing: -.035em;
-}
-
-.adminx-ranking-list,
-.adminx-log-list {
-  margin-top: 12px;
-  display: grid;
-  gap: 8px;
-  max-height: 520px;
-  overflow: auto;
-}
-
-.adminx-ranking-list div,
-.adminx-log-list div {
-  padding: 10px;
-  border-radius: 16px;
-  display: grid;
-  gap: 5px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-}
-
-.adminx-ranking-list div {
-  grid-template-columns: 36px 1fr auto;
-  align-items: center;
-}
-
-.adminx-ranking-list span {
-  width: 30px;
-  height: 30px;
-  border-radius: 11px;
-  display: grid;
-  place-items: center;
-  background: #0f172a;
-  color: #ffd400;
-  font-size: 11px;
-  font-weight: 900;
-}
-
-.adminx-ranking-list b,
-.adminx-log-list b {
-  color: #0f172a;
-  font-size: 12.5px;
-  line-height: 1.25;
-  font-weight: 900;
-}
-
-.adminx-ranking-list em,
-.adminx-log-list span {
-  color: #64748b;
-  font-size: 11px;
-  line-height: 1.3;
-  font-style: normal;
-  font-weight: 800;
-}
-
-.adminx-log-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 3px;
-}
-
-.adminx-log-meta em {
-  width: fit-content;
-  padding: 5px 8px;
-  border-radius: 999px;
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
-  color: #334155;
-  font-size: 10px;
-  line-height: 1;
-  font-style: normal;
   font-weight: 900;
 }
 
@@ -4252,13 +1820,7 @@ const ADMINX_STYLE = `
     scroll-snap-align: start;
   }
 
-  .adminx-metric-grid,
-  .adminx-overview-grid,
-  .adminx-staff-summary,
-  .adminx-form-grid,
-  .adminx-lock-grid,
-  .adminx-firewall-panel,
-  .adminx-dashboard-grid {
+  .adminx-staff-summary {
     grid-template-columns: 1fr;
   }
 
@@ -4269,35 +1831,9 @@ const ADMINX_STYLE = `
   .adminx-filter-bar {
     grid-template-columns: 1fr;
   }
-
-  .admin-saas-hero {
-    display: grid;
-  }
-
-  .admin-saas-hero-actions {
-    align-items: stretch;
-  }
 }
 
 @media screen and (max-width: 430px) {
-  .admin-saas-page {
-    padding: 12px 10px 22px;
-  }
-
-  .admin-saas-hero {
-    min-height: 220px;
-    padding: 18px;
-    border-radius: 30px;
-  }
-
-  .admin-saas-hero h1 {
-    font-size: 42px;
-  }
-
-  .admin-saas-hero-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
 
   .adminx-tabs {
     padding: 7px;
@@ -4334,15 +1870,6 @@ const ADMINX_STYLE = `
 
   .adminx-panel-head-row {
     display: grid;
-  }
-
-  .adminx-notify-card-head,
-  .adminx-popup-card-head {
-    align-items: start;
-  }
-
-  .adminx-popup-time {
-    grid-template-columns: 1fr;
   }
 
   .adminx-panel h2 {
@@ -4415,39 +1942,7 @@ const ADMINX_STYLE = `
 }
 @media (max-width: 980px) { .adminx-permission-card-v3 { grid-template-columns: 1fr; } }
 
-
 /* ===== VTDD ADMIN - TinyMCE cho thông báo quan trọng ===== */
-.adminx-form-field {
-  display: grid;
-  gap: 7px;
-}
-
-.adminx-form-field > span {
-  color: #64748b;
-  font-size: 10px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.adminx-form-wide {
-  grid-column: 1 / -1;
-}
-
-.adminx-notice-rich-field .tox-tinymce {
-  border-radius: 18px !important;
-  border-color: #cbd5e1 !important;
-  overflow: hidden !important;
-}
-
-.adminx-notice-rich-field .tox .tox-statusbar {
-  background: #f8fafc !important;
-}
-
-.adminx-notice-rich-field .tox .tox-promotion {
-  display: none !important;
-}
 
 .adminx-field-hint {
   display: block;
@@ -4459,111 +1954,7 @@ const ADMINX_STYLE = `
 
 `;
 
-const ADMINX_ONLINE_STYLE = `
-.adminx-online-panel {
-  margin-top: 14px;
-  padding: 16px;
-  border-radius: 26px;
-  background:
-    radial-gradient(circle at 100% 0%, rgba(255, 212, 0, .18), transparent 38%),
-    linear-gradient(135deg, #ffffff, #f8fafc);
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, .06);
-}
-
-.adminx-online-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.adminx-online-head span {
-  width: fit-content;
-  display: inline-flex;
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: #0f172a;
-  color: #ffd400;
-  font-size: 9.5px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.adminx-online-head h3 {
-  margin-top: 10px;
-  color: #0f172a;
-  font-size: 44px;
-  line-height: .9;
-  font-weight: 900;
-  letter-spacing: -.07em;
-}
-
-.adminx-online-head p {
-  margin-top: 7px;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.4;
-  font-weight: 750;
-}
-
-.adminx-online-head button {
-  flex: 0 0 auto;
-  min-height: 40px;
-  padding: 0 13px;
-  border: 0;
-  border-radius: 999px;
-  background: #ffd400;
-  color: #111827;
-  font-size: 10.5px;
-  font-weight: 900;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-}
-
-.adminx-online-head button:disabled {
-  opacity: .65;
-  cursor: wait;
-}
-
-.adminx-online-grid {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.adminx-online-grid div {
-  min-height: 84px;
-  padding: 13px;
-  border-radius: 20px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
-}
-
-.adminx-online-grid span {
-  display: block;
-  color: #64748b;
-  font-size: 10px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.adminx-online-grid b {
-  display: block;
-  margin-top: 10px;
-  color: #0f172a;
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: -.06em;
-}
-
+const ADMINX_PERSONNEL_STYLE = `
 .adminx-command-search {
   margin: 12px 0 0;
   padding: 8px;
@@ -4589,8 +1980,7 @@ const ADMINX_ONLINE_STYLE = `
   outline: none;
 }
 
-.adminx-command-search button,
-.adminx-ops-head button {
+.adminx-command-search button {
   border: 0;
   border-radius: 16px;
   background: #ffd400;
@@ -4600,252 +1990,14 @@ const ADMINX_ONLINE_STYLE = `
   cursor: pointer;
 }
 
-.adminx-command-search button:disabled,
-.adminx-ops-head button:disabled {
+.adminx-command-search button:disabled {
   opacity: .62;
   cursor: wait;
-}
-
-.adminx-ops-panel {
-  margin-top: 14px;
-  padding: 16px;
-  border-radius: 26px;
-  background: #07111f;
-  border: 1px solid rgba(255, 212, 0, .28);
-  box-shadow: 0 18px 46px rgba(15, 23, 42, .14);
-}
-
-.adminx-ops-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.adminx-ops-head span {
-  display: inline-flex;
-  width: fit-content;
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: #ffd400;
-  color: #07111f;
-  font-size: 9.5px;
-  line-height: 1;
-  font-weight: 1000;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.adminx-ops-head h3 {
-  margin-top: 10px;
-  color: #ffffff;
-  font-size: 28px;
-  line-height: 1;
-  font-weight: 1000;
-  letter-spacing: -.04em;
-}
-
-.adminx-ops-head p {
-  margin-top: 6px;
-  color: rgba(255, 255, 255, .68);
-  font-size: 12px;
-  line-height: 1.35;
-  font-weight: 800;
-}
-
-.adminx-ops-head button {
-  min-height: 40px;
-  padding: 0 13px;
-}
-
-.adminx-health-grid,
-.adminx-ops-grid {
-  margin-top: 14px;
-  display: grid;
-  gap: 10px;
-}
-
-.adminx-health-grid {
-  grid-template-columns: repeat(4, 1fr);
-}
-
-.adminx-health-grid div,
-.adminx-ops-grid article {
-  border-radius: 18px;
-  background: rgba(255, 255, 255, .08);
-  border: 1px solid rgba(255, 255, 255, .12);
-  padding: 12px;
-}
-
-.adminx-health-grid div.ok {
-  border-color: rgba(34, 197, 94, .42);
-}
-
-.adminx-health-grid div.warn {
-  border-color: rgba(248, 113, 113, .48);
-}
-
-.adminx-health-grid span,
-.adminx-ops-grid h4 {
-  display: block;
-  color: #ffd400;
-  font-size: 10px;
-  line-height: 1;
-  font-weight: 1000;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.adminx-health-grid b {
-  display: block;
-  margin-top: 10px;
-  color: #ffffff;
-  font-size: 19px;
-  line-height: 1;
-  font-weight: 1000;
-}
-
-.adminx-health-grid p,
-.adminx-ops-list p {
-  margin-top: 8px;
-  color: rgba(255, 255, 255, .68);
-  font-size: 11.5px;
-  line-height: 1.35;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-
-.adminx-health-action {
-  width: 100%;
-  min-height: 32px;
-  margin-top: 10px;
-  border: 0;
-  border-radius: 12px;
-  background: rgba(255, 212, 0, .95);
-  color: #07111f;
-  font-size: 10.5px;
-  font-weight: 1000;
-  cursor: pointer;
-}
-
-.adminx-health-action:disabled {
-  opacity: .62;
-  cursor: not-allowed;
-}
-
-.adminx-ops-grid {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.adminx-ops-list {
-  margin-top: 10px;
-  display: grid;
-  gap: 8px;
-  max-height: 260px;
-  overflow: auto;
-  padding-right: 2px;
-}
-
-.adminx-error-filter {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: 1fr 112px 112px 56px;
-  gap: 6px;
-}
-
-.adminx-error-filter input,
-.adminx-error-filter button {
-  min-height: 34px;
-  border-radius: 11px;
-  border: 1px solid rgba(255, 255, 255, .14);
-  background: rgba(255, 255, 255, .09);
-  color: #ffffff;
-  padding: 0 9px;
-  font-size: 10.5px;
-  font-weight: 850;
-  outline: none;
-}
-
-.adminx-error-filter input::placeholder {
-  color: rgba(255, 255, 255, .48);
-}
-
-.adminx-error-filter button {
-  background: #ffd400;
-  color: #07111f;
-  border-color: #ffd400;
-  font-weight: 1000;
-  cursor: pointer;
-}
-
-.adminx-ops-list div {
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .08);
-  border: 1px solid rgba(255, 255, 255, .1);
-}
-
-.adminx-ops-list b {
-  display: block;
-  color: #ffffff;
-  font-size: 12px;
-  line-height: 1.25;
-  font-weight: 1000;
-  overflow-wrap: anywhere;
-}
-
-.adminx-ops-list span {
-  display: block;
-  margin-top: 5px;
-  color: rgba(255, 255, 255, .58);
-  font-size: 10.5px;
-  line-height: 1.3;
-  font-weight: 850;
-}
-
-.adminx-backup-download {
-  width: 100%;
-  min-height: 32px;
-  margin-top: 9px;
-  border: 0;
-  border-radius: 12px;
-  background: #ffd400;
-  color: #07111f;
-  font-size: 10.5px;
-  font-weight: 1000;
-  cursor: pointer;
-}
-
-.adminx-backup-download:disabled {
-  opacity: .62;
-  cursor: not-allowed;
 }
 
 @media screen and (max-width: 560px) {
   .adminx-command-search {
     grid-template-columns: 1fr;
-  }
-
-  .adminx-online-head {
-    display: grid;
-  }
-
-  .adminx-online-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .adminx-ops-head,
-  .adminx-ops-grid {
-    display: grid;
-  }
-
-  .adminx-health-grid,
-  .adminx-ops-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .adminx-error-filter {
-    grid-template-columns: 1fr 1fr;
   }
 }
 /* ===== VTDD ADMIN V3 - Permission tab & TinyMCE ===== */
@@ -5003,57 +2155,6 @@ const ADMINX_ONLINE_STYLE = `
 @media (max-width: 980px) { .adminx-permission-card-v3 { grid-template-columns: 1fr; } }
 
 /* ===== VTDD ADMIN FINAL POLISH - cleaner, denser, calmer ===== */
-.admin-saas-page {
-  background:
-    linear-gradient(90deg, rgba(15,23,42,.035) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(15,23,42,.035) 1px, transparent 1px),
-    linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
-  background-size: 36px 36px, 36px 36px, auto;
-}
-
-.admin-saas-shell {
-  width: min(100%, 1220px);
-  gap: 12px;
-}
-
-.admin-saas-hero {
-  min-height: 176px;
-  padding: 22px 24px;
-  border-radius: 28px;
-  align-items: flex-start;
-  box-shadow: 0 20px 54px rgba(15, 23, 42, .16);
-}
-
-.admin-saas-hero h1 {
-  margin-top: 22px;
-  font-size: clamp(40px, 5vw, 62px);
-  line-height: .9;
-}
-
-.admin-saas-hero p {
-  max-width: 600px;
-  margin-top: 10px;
-}
-
-.admin-saas-hero-meta {
-  margin-top: 11px;
-}
-
-.admin-saas-hero-meta span,
-.admin-saas-ghost-link,
-.admin-saas-logout {
-  min-height: 36px;
-  padding: 0 12px;
-  font-size: 10px;
-}
-
-.admin-saas-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: flex-start;
-  max-width: 360px;
-}
 
 .adminx-console {
   gap: 10px;
@@ -5123,45 +2224,7 @@ const ADMINX_ONLINE_STYLE = `
   max-width: 760px;
 }
 
-.adminx-metric-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 9px;
-}
-
-.adminx-metric-card {
-  min-height: 96px;
-  padding: 13px;
-  border-radius: 18px;
-}
-
-.adminx-metric-card b {
-  margin-top: 8px;
-  font-size: clamp(24px, 2.3vw, 34px);
-}
-
-.adminx-metric-card p {
-  margin-top: 7px;
-  font-size: 11px;
-}
-
-.adminx-online-panel {
-  margin-top: 10px;
-  padding: 13px;
-  border-radius: 20px;
-}
-
-.adminx-overview-grid {
-  gap: 9px;
-}
-
-.adminx-soft-card {
-  min-height: 104px;
-  padding: 14px;
-  border-radius: 18px;
-}
-
-.adminx-staff-summary,
-.adminx-dashboard-metrics {
+.adminx-staff-summary {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 9px;
 }
@@ -5173,14 +2236,7 @@ const ADMINX_ONLINE_STYLE = `
 }
 
 .adminx-filter-bar input,
-.adminx-filter-bar select,
-.adminx-form-grid input,
-.adminx-form-grid textarea,
-.adminx-firewall-panel input,
-.adminx-firewall-panel textarea,
-.adminx-popup-card textarea,
-.adminx-popup-card input,
-.adminx-notify-card input {
+.adminx-filter-bar select {
   border-radius: 15px;
   background: #f8fafc;
   border-color: #dbe4ef;
@@ -5189,7 +2245,6 @@ const ADMINX_ONLINE_STYLE = `
 
 .adminx-filter-bar button,
 .adminx-action-btn,
-.adminx-section-save,
 .adminx-staff-actions button,
 .cms-actions button {
   border-radius: 14px;
@@ -5249,85 +2304,6 @@ const ADMINX_ONLINE_STYLE = `
 
 .adminx-pagination {
   margin-top: 10px;
-}
-
-.adminx-system-sections {
-  gap: 10px;
-}
-
-.adminx-system-card {
-  padding: 13px;
-  border-radius: 20px;
-  box-shadow: none;
-}
-
-.adminx-system-card-head {
-  margin-bottom: 10px;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 9px;
-}
-
-.adminx-system-card-head > span {
-  width: 31px;
-  height: 31px;
-  border-radius: 11px;
-  font-size: 10px;
-}
-
-.adminx-system-card h3 {
-  font-size: 16px;
-}
-
-.adminx-system-card p {
-  font-size: 11.5px;
-}
-
-.adminx-form-grid,
-.adminx-firewall-panel {
-  gap: 9px;
-}
-
-.adminx-lock-grid {
-  margin-top: 10px;
-  gap: 8px;
-}
-
-.adminx-toggle-row {
-  min-height: 60px;
-  padding: 10px;
-  border-radius: 16px;
-}
-
-.adminx-toggle-row p {
-  margin-top: 3px;
-  font-size: 11px;
-}
-
-.adminx-lock-help {
-  margin-top: 8px;
-  padding: 10px 11px;
-  border-radius: 14px;
-  font-size: 11.5px;
-}
-
-.adminx-section-actions {
-  margin-top: 10px;
-}
-
-.adminx-section-save {
-  min-height: 46px;
-}
-
-.adminx-dashboard-grid {
-  gap: 10px;
-}
-
-.adminx-dashboard-card {
-  border-radius: 20px;
-}
-
-.adminx-dashboard-list {
-  max-height: 430px;
 }
 
 .adminx-permission-page,
@@ -5402,41 +2378,7 @@ const ADMINX_ONLINE_STYLE = `
   border-radius: 16px !important;
 }
 
-@media (min-width: 1180px) {
-  .adminx-system-sections {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
-
-  .adminx-system-card.adminx-firewall-card {
-    grid-column: 1 / -1;
-  }
-
-  .adminx-firewall-panel {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .adminx-firewall-message {
-    grid-column: 1 / -1;
-  }
-}
-
 @media (max-width: 920px) {
-  .admin-saas-hero {
-    min-height: 168px;
-    padding: 18px;
-    border-radius: 24px;
-  }
-
-  .admin-saas-hero h1 {
-    margin-top: 18px;
-    font-size: clamp(36px, 9vw, 48px);
-  }
-
-  .admin-saas-hero-actions {
-    max-width: none;
-    justify-content: flex-start;
-  }
 
   .adminx-tabs {
     top: 0;
@@ -5448,9 +2390,7 @@ const ADMINX_ONLINE_STYLE = `
     min-width: 132px;
   }
 
-  .adminx-metric-grid,
-  .adminx-staff-summary,
-  .adminx-dashboard-metrics {
+  .adminx-staff-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -5463,44 +2403,9 @@ const ADMINX_ONLINE_STYLE = `
   .adminx-staff-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .adminx-dashboard-head-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
 }
 
 @media (max-width: 520px) {
-  .admin-saas-page {
-    padding: 10px 8px 20px;
-  }
-
-  .adminx-dashboard-head-actions,
-  .adminx-dashboard-source-switch,
-  .adminx-dashboard-delete-tools {
-    width: 100%;
-  }
-
-  .adminx-dashboard-source-switch button {
-    flex: 1;
-  }
-
-  .adminx-dashboard-delete-tools select {
-    flex: 1;
-    max-width: none;
-  }
-
-  .admin-saas-shell {
-    gap: 10px;
-  }
-
-  .admin-saas-hero {
-    border-radius: 22px;
-  }
-
-  .admin-saas-hero-meta {
-    display: none;
-  }
 
   .adminx-panel {
     padding: 12px;
@@ -5511,19 +2416,8 @@ const ADMINX_ONLINE_STYLE = `
     font-size: 23px;
   }
 
-  .adminx-metric-grid,
-  .adminx-staff-summary,
-  .adminx-dashboard-metrics,
-  .adminx-overview-grid,
-  .adminx-lock-grid,
-  .adminx-form-grid,
-  .adminx-firewall-panel {
+  .adminx-staff-summary {
     grid-template-columns: 1fr;
-  }
-
-  .adminx-metric-card,
-  .adminx-soft-card {
-    min-height: auto;
   }
 
   .adminx-staff-actions {
@@ -5548,8 +2442,6 @@ const ADMINX_ONLINE_STYLE = `
 }
 
 `;
-
-
 
 function StaffAdminAccessBox({
   item,
@@ -5576,8 +2468,8 @@ function StaffAdminAccessBox({
   function toggleModule(key: string) {
     setAccessItems((current) => {
       if (!current.includes(key)) return [...current, key];
-      if (key === "tcdm" || key === "tools" || key === "people") {
-        const actionKeys = key === "tools" ? TOOL_ACTION_KEYS : key === "people" ? PERSONNEL_ACTION_KEYS : TCDM_ACTION_KEYS;
+      if (key === "tcdm" || key === "people") {
+        const actionKeys = key === "people" ? PERSONNEL_ACTION_KEYS : TCDM_ACTION_KEYS;
         return current.filter((item) => {
           if (item === key) return false;
           if (!item.startsWith(ADMIN_ACTION_PREFIX)) return true;
@@ -5595,7 +2487,7 @@ function StaffAdminAccessBox({
     setAccessItems((current) => {
       if (current.includes(token)) return current.filter((item) => item !== token);
 
-      const parentModule = TOOL_ACTION_KEYS.has(key) ? "tools" : PERSONNEL_ACTION_KEYS.has(key) ? "people" : "tcdm";
+      const parentModule = PERSONNEL_ACTION_KEYS.has(key) ? "people" : "tcdm";
       const next = current.includes(parentModule)
         ? [...current, token]
         : [parentModule, ...current, token];
@@ -5742,7 +2634,6 @@ function StaffAdminAccessBox({
       )}
       {permission === "admin" && <em>Admin có toàn quyền, không cần chọn hạng mục.</em>}
       {permission === "" && <em>User thường không được truy cập trang quản trị.</em>}
-
 
     </div>
   );
@@ -5917,7 +2808,6 @@ function CmsEditor({
     const nextBody = legacyTextToHtml(item.draftBody || item.body || "");
     setBody(nextBody);
   }, [item.slug, item.draftTitle, item.draftSummary, item.draftBody, item.title, item.summary, item.body]);
-
 
   async function post(action: "SAVE_DRAFT" | "PUBLISH" | "UNPUBLISH") {
     try {
@@ -6153,7 +3043,6 @@ function NoAccessPanel({ moduleTitle }: { moduleTitle: string }) {
 }
 
 export default function AdminConsole({
-  initialSettings,
   adminRole = "admin",
   adminName = "Admin",
   adminModules = "",
@@ -6281,10 +3170,8 @@ export default function AdminConsole({
                 <h3>Quản trị: Quyền & Nhân sự</h3>
               </div>
             </div>
-            <TcdmAdminConsole
+            <PersonnelAdminConsole
               key="people"
-              scope="people"
-              initialSettings={initialSettings}
               adminRole={adminRole}
               adminName={adminName}
               adminModules={adminModules}

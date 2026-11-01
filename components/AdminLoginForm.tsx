@@ -93,26 +93,8 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
               Quản trị vận hành
               <b>TCDM</b>
             </h1>
-            <p>
-              Dành riêng cho Admin và Mod được phân quyền. Mọi thao tác đều được
-              ghi nhận để bảo vệ dữ liệu nhân viên.
-            </p>
           </div>
 
-          <div className="admin-auth-metrics" aria-hidden="true">
-            <div>
-              <b>RBAC</b>
-              <span>Phân quyền module</span>
-            </div>
-            <div>
-              <b>LOG</b>
-              <span>Theo dõi thao tác</span>
-            </div>
-            <div>
-              <b>OTP</b>
-              <span>Bảo mật tài khoản</span>
-            </div>
-          </div>
         </aside>
 
         <section className="admin-auth-panel">
@@ -120,7 +102,6 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
             <span>ADMIN</span>
             <div>
               <h2>Đăng nhập quản trị</h2>
-              <p>Kiểm tra quyền truy cập trước khi mở dashboard.</p>
             </div>
           </div>
 
