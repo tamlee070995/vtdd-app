@@ -15,9 +15,13 @@ import {
 } from "@/lib/staff-store";
 import { decryptText, hashPassword, normalizeCode, verifyPassword } from "@/lib/staff-security";
 import { getPublicMailError, sendStaffActivatedMail, sendStaffDeletedMail } from "@/lib/mail";
+import { isSameOriginRequest } from "@/lib/request-origin";
+import { createManagedStaff, previewStaffDeletion, deletePreviewedStaff, StaffManagementError } from "@/lib/staff-management-store";
+import { appendAdminAudit } from "@/lib/system-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function normalizePermission(value: any): "admin" | "mod" | "" {
   const v = String(value || "").trim().toLowerCase();
@@ -127,12 +131,14 @@ export async function GET(req: NextRequest) {
     const status = url.searchParams.get("status") || "ALL";
     const q = url.searchParams.get("q") || "";
 
-    const data = await getAdminStaffPage({ page, pageSize, status, q });
+    const role = url.searchParams.get("role") || "ALL";
+    const data = await getAdminStaffPage({ page, pageSize, status, q, role });
     const query = String(q || "").trim().toLowerCase();
     const adminCode = normalizeCode(admin?.maNV || "");
     const statusAllowsCurrentAdmin = status === "ALL" || status === "Active";
     const currentAdminMatchesQuery =
       Boolean(adminCode) &&
+      (role === "ALL" || role === normalizePermission(admin?.permission) || (role === "user" && !normalizePermission(admin?.permission))) &&
       statusAllowsCurrentAdmin &&
       Boolean(query) &&
       [adminCode, admin?.name, admin?.permission]
@@ -181,12 +187,35 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const { admin, response } = await requireAdminApi(req);
   if (response) return response;
+  if (!isSameOriginRequest(req)) return NextResponse.json({ success: false, message: "Yêu cầu chưa hợp lệ." }, { status: 403 });
+  if (Number(req.headers.get("content-length") || 0) > 262144) return NextResponse.json({ success: false, message: "Danh sách quá lớn." }, { status: 413 });
 
   try {
     await ensureStaffAdminHeaders();
 
-    const body = await req.json();
+    const raw = await req.text();
+    if (raw.length > 262144) return NextResponse.json({ success: false, message: "Danh sách quá lớn." }, { status: 413 });
+    let body;
+    try { body = JSON.parse(raw); } catch { return NextResponse.json({ success: false, message: "Dữ liệu chưa hợp lệ." }, { status: 400 }); }
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ success: false, message: "Dữ liệu chưa hợp lệ." }, { status: 400 });
     const action = String(body.action || "").trim().toUpperCase();
+
+    if (["CREATE_STAFF", "PREVIEW_DELETE_STAFF", "DELETE_STAFF_GROUP"].includes(action)) {
+      if (!(await isFullAdmin(admin))) return NextResponse.json({ success: false, message: "Chỉ Admin mới được thêm nhân viên hoặc xóa theo nhóm quyền." }, { status: 403 });
+      const actor = normalizeCode(admin?.maNV || "");
+      if (action === "PREVIEW_DELETE_STAFF") return NextResponse.json({ success: true, preview: await previewStaffDeletion(body.roles, actor) });
+      if (action === "CREATE_STAFF") {
+        const result = await createManagedStaff(body.staff, body.temporaryPassword, body.status);
+        await appendAdminAudit({ admin: actor, action: "CREATE_STAFF", target: result.created.join(","), note: `Thêm ${result.created.length}; bỏ qua ${result.skipped.length} mã đã có.` }).catch(() => undefined);
+        return NextResponse.json({ success: true, result, message: `Đã thêm ${result.created.length} nhân viên; bỏ qua ${result.skipped.length} mã đã có. Tài khoản mới cần cập nhật bảo mật khi đăng nhập.` });
+      }
+      const current = await findStaffByMaNV(actor);
+      if (!current || normalizePermission(current.permission) !== "admin" || current.status.toLowerCase() !== "active") return NextResponse.json({ success: false, message: "Tài khoản Admin đã đổi. Xin đăng nhập lại." }, { status: 403 });
+      if (typeof body.adminPassword !== "string" || !verifyPassword(body.adminPassword, current.password)) return NextResponse.json({ success: false, message: "Mật khẩu Admin chưa đúng." }, { status: 401 });
+      const result = await deletePreviewedStaff(body.token, actor);
+      await appendAdminAudit({ admin: actor, action: "DELETE_STAFF_GROUP", target: result.deleted.join(","), note: JSON.stringify({ deleted: result.deleted.length, skipped: result.skipped, failed: result.failed, unprocessed: result.unprocessed }) }).catch(() => undefined);
+      return NextResponse.json({ success: true, result, message: `Đã xóa ${result.deleted.length} tài khoản; bỏ qua ${result.skipped.length}; còn ${result.failed.length + result.unprocessed.length} tài khoản chưa xử lý. Tài khoản đang dùng được giữ lại.` });
+    }
 
     if (action === "STANDBY_BULK") {
       if (!(await isFullAdmin(admin))) {
@@ -481,6 +510,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: false, message: "Action không hợp lệ." }, { status: 400 });
   } catch (err: any) {
+    if (err instanceof StaffManagementError) return NextResponse.json({ success: false, message: err.message }, { status: err.status });
     console.error("ADMIN_STAFF_ACTION_ERROR:", err?.message || err);
     return NextResponse.json(
       { success: false, message: "Không xử lý được yêu cầu nhân viên." },

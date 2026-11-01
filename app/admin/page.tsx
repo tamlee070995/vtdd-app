@@ -51,6 +51,7 @@ export default async function AdminPage() {
           initialSettings={clientSettings}
           adminRole={admin.permission}
           adminName={admin.name}
+          adminCode={admin.maNV}
           adminModules={admin.modules.join(",")}
           adminActions={admin.actions.join(",")}
           adminHasExplicitActions={admin.hasExplicitActions}

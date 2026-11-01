@@ -91,7 +91,6 @@ export default function AdminLoginForm({ initialError = "" }: AdminLoginFormProp
             <span>MODULE CONTROL</span>
             <h1>
               Quản trị vận hành
-              <b>TCDM</b>
             </h1>
           </div>
 

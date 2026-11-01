@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { readSheetRange } from "@/lib/sheets";
-import { deleteRows, eq, insertRows, isNull, isSupabaseConfigured, selectAllRows, selectRows, updateRows } from "@/lib/supabase-rest";
+import { countRows, deleteRows, eq, insertRows, isNull, isSupabaseConfigured, selectAllRows, selectRows, updateRows } from "@/lib/supabase-rest";
+import { staffRoleFilters, STAFF_DIRECTORY_COLUMNS } from "./staff-query";
 
 const SHEET_NAME = "Data_Staff";
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -272,6 +273,7 @@ export async function getAdminStaffPage(params: {
   pageSize?: number;
   q?: string;
   status?: "ALL" | "Active" | "Standby" | string;
+  role?: string;
 }) {
   const page = Math.max(1, Number(params.page || 1));
   const pageSize = Math.min(100, Math.max(10, Number(params.pageSize || 50)));
@@ -279,7 +281,27 @@ export async function getAdminStaffPage(params: {
   const qCode = normalizeStaffCodeSearch(params.q);
   const status = clean(params.status || "ALL");
 
-  const rows = await getStaffRows();
+  if (isSupabaseConfigured() && (!q || /^(nv\s*)?\d+(\.0)?$/i.test(clean(params.q)))) {
+    const filters = staffRoleFilters(params.role || "ALL");
+    if (status !== "ALL") filters.status = `ilike.${status}`;
+    if (qCode) filters.ma_nv = `like.*${qCode}*`;
+    const [total, active, standby, needSetup, matched] = await Promise.all([
+      countRows("staff"), countRows("staff", {status:"ilike.Active"}),
+      countRows("staff", {status:"ilike.Standby"}), countRows("staff", {need_setup:"eq.1"}),
+      countRows("staff", filters),
+    ]);
+    const pages = Math.max(1, Math.ceil(matched / pageSize));
+    const safePage = Math.min(page, pages);
+    const selected = await selectRows<any>("staff", {select:STAFF_DIRECTORY_COLUMNS, filters, order:"status.desc,ma_nv.asc", limit:pageSize, offset:(safePage-1)*pageSize});
+    return {
+      staff: selected.map(mapDbStaffRow).map(({password,securityQuestion,securityAnswer,resetOtpHash,resetOtpExpires,resetOtpDay,...item}) => ({...item,gmail:item.gmail?"Đã cấu hình":""})),
+      meta: {page:safePage,pageSize,total:matched,pages,summary:{total,active,standby,needSetup}},
+    };
+  }
+  // Accent-insensitive name searches retain the existing matching rules, with no password/OTP columns loaded.
+  const rows = isSupabaseConfigured()
+    ? (await selectAllRows<any>("staff", {select:STAFF_DIRECTORY_COLUMNS,order:"ma_nv.asc"})).map(mapDbStaffRow)
+    : await getStaffRows();
 
   let total = 0;
   let active = 0;
@@ -299,6 +321,7 @@ export async function getAdminStaffPage(params: {
     if (item.needSetup === "1") needSetup += 1;
 
     if (status !== "ALL" && normalizedStatus !== status) return;
+    if (params.role && params.role !== "ALL" && (item.permission || "user") !== params.role) return;
 
     if (q) {
       if (qCode && normalizeStaffCodeSearch(item.maNV).includes(qCode)) {

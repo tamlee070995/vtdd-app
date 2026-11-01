@@ -9,6 +9,8 @@ import DemoAdminTool from "@/components/DemoAdminTool";
 import TradeinAdminTool from "@/components/TradeinAdminTool";
 import AdminSectionIcon from "@/components/AdminSectionIcon";
 import UiNotice from "@/components/UiNotice";
+import UiFeedbackDialog from "@/components/UiFeedbackDialog";
+import StaffDirectoryPanel from "@/components/StaffDirectoryPanel";
 import { clientErrorMessage, requestJson } from "@/lib/client-request";
 import { ADMIN_SECTIONS, visibleAdminScreens, type AdminScreen } from "@/lib/admin-navigation";
 
@@ -54,6 +56,7 @@ type AdminConsoleProps = {
   initialSettings: Record<string, string>;
   adminRole?: AdminRole;
   adminName?: string;
+  adminCode?: string;
   adminModules?: string;
   adminActions?: string;
   adminHasExplicitActions?: boolean;
@@ -221,6 +224,7 @@ function PersonnelAdminConsole({
   adminModules = "",
   adminActions = "",
   adminHasExplicitActions = false,
+  adminCode = "",
 }: Omit<AdminConsoleProps, "initialSettings">) {
   const [tab, setTab] = useState<TabKey>("staff");
 
@@ -254,7 +258,9 @@ function PersonnelAdminConsole({
   const [staffSearchInput, setStaffSearchInput] = useState("");
   const [staffQuery, setStaffQuery] = useState("");
   const [staffStatusFilter, setStaffStatusFilter] = useState<"ALL" | "Active" | "Standby">("ALL");
+  const [staffRoleFilter, setStaffRoleFilter] = useState("ALL");
   const [staffPage, setStaffPage] = useState(1);
+  const staffRequest = useRef(0);
 
   const summary = staffMeta.summary || EMPTY_SUMMARY;
   const isFullAdmin = String(adminRole || "").toLowerCase() === "admin";
@@ -296,7 +302,6 @@ function PersonnelAdminConsole({
 
   function showToast(type: "success" | "error", text: string) {
     setToast({ type, text });
-    if (type === "success") window.setTimeout(() => setToast(current => current?.text === text ? null : current), 5000);
   }
 
   async function postJSON(url: string, body: any) {
@@ -313,6 +318,7 @@ function PersonnelAdminConsole({
   }
 
   async function loadStaff(nextPage = staffPage, options?: { silent?: boolean }) {
+    const request = ++staffRequest.current;
     try {
       setStaffLoadError("");
       if (!options?.silent) setStaffLoading(true);
@@ -322,6 +328,7 @@ function PersonnelAdminConsole({
         pageSize: "50",
         status: staffStatusFilter,
         q: staffQuery,
+        role: tab === "staff" ? staffRoleFilter : "ALL",
       });
 
       const res = await fetch(`/api/admin/staff?${params.toString()}`, {
@@ -332,6 +339,7 @@ function PersonnelAdminConsole({
       });
 
       const data = await res.json().catch(() => null);
+      if (request !== staffRequest.current) return;
 
       if (!res.ok || !data?.success) {
         throw new Error(data?.message || "Không tải được danh sách nhân viên.");
@@ -350,6 +358,7 @@ function PersonnelAdminConsole({
       setStaffPage(data.meta?.page || nextPage);
       setStaffLoading(false);
     } catch (err: any) {
+      if (request !== staffRequest.current) return;
       setStaffLoading(false);
       setStaffLoadError(getErrorMessage(err));
     }
@@ -385,7 +394,7 @@ function PersonnelAdminConsole({
     if (tab !== "staff" && tab !== "permission") return;
     loadStaff(staffPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, staffStatusFilter, staffQuery, staffPage]);
+  }, [tab, staffStatusFilter, staffQuery, staffPage, staffRoleFilter]);
 
   async function runStaffAction(
     action: "ACTIVE" | "STANDBY" | "RESET_SECURITY" | "RESET_OTP_COUNT" | "DELETE",
@@ -631,6 +640,12 @@ function PersonnelAdminConsole({
         />
         <button type="button" onClick={runCommandSearch}>Tìm chức năng</button>
       </div>
+
+      {tab === "staff" && <StaffDirectoryPanel staff={staff} meta={staffMeta} loading={staffLoading} busy={Boolean(busy)} isAdmin={isFullAdmin} actorCode={adminCode}
+        canManage={canManageStaff} canDelete={canDeleteStaff} canReset={canResetStaffSecurity} canResetOtp={canResetStaffOtp}
+        search={staffSearchInput} onSearchChange={setStaffSearchInput} onSearch={applyStaffSearch} status={staffStatusFilter} onStatusChange={value=>{setStaffPage(1);setStaffStatusFilter(value as "ALL" | "Active" | "Standby");}}
+        role={staffRoleFilter} onRoleChange={value=>{setStaffPage(1);setStaffRoleFilter(value);}} onPage={setStaffPage} onReload={()=>loadStaff(staffPage,{silent:true})}
+        onAction={(action,code)=>void runStaffAction(action,code)} onDelete={openDeleteStaffDialog} onImportStandby={openStandbyImportDialog} onBulkStandby={()=>setBulkStandbyOpen(true)} />}
 
       {tab === "permission" && (
         <section className="adminx-panel adminx-permission-page">
@@ -930,7 +945,7 @@ function PersonnelAdminConsole({
         </div>
       )}
 
-      {toast && <UiNotice tone={toast.type} onRetry={toast.type === "error" ? () => void loadStaff() : undefined} retryLabel="Tải lại danh sách" busy={staffLoading}>{toast.text}</UiNotice>}
+      {toast && <UiFeedbackDialog tone={toast.type} onDismiss={()=>setToast(null)} onRetry={toast.type === "error" ? ()=>{setToast(null);void loadStaff();} : undefined} retryLabel="Kiểm tra danh sách">{toast.text}</UiFeedbackDialog>}
     </section>
   );
 }
@@ -3045,6 +3060,7 @@ function NoAccessPanel({ moduleTitle }: { moduleTitle: string }) {
 export default function AdminConsole({
   adminRole = "admin",
   adminName = "Admin",
+  adminCode = "",
   adminModules = "",
   adminActions = "",
   adminHasExplicitActions = false,
@@ -3174,6 +3190,7 @@ export default function AdminConsole({
               key="people"
               adminRole={adminRole}
               adminName={adminName}
+              adminCode={adminCode}
               adminModules={adminModules}
               adminActions={adminActions}
               adminHasExplicitActions={adminHasExplicitActions}
