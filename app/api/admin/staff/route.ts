@@ -203,7 +203,8 @@ export async function POST(req: NextRequest) {
     if (["CREATE_STAFF", "PREVIEW_DELETE_STAFF", "DELETE_STAFF_GROUP"].includes(action)) {
       if (!(await isFullAdmin(admin))) return NextResponse.json({ success: false, message: "Chỉ Admin mới được thêm nhân viên hoặc xóa theo nhóm quyền." }, { status: 403 });
       const actor = normalizeCode(admin?.maNV || "");
-      if (action === "PREVIEW_DELETE_STAFF") return NextResponse.json({ success: true, preview: await previewStaffDeletion(body.roles, actor) });
+      if (action !== "CREATE_STAFF" && body.protocol !== 2) return NextResponse.json({success:false,message:"Chức năng đã được cập nhật. Xin tải lại trang rồi thử lại."},{status:409});
+      if (action === "PREVIEW_DELETE_STAFF") return NextResponse.json({ success: true, preview: await previewStaffDeletion(body.roles, actor, body.planToken, body.page) });
       if (action === "CREATE_STAFF") {
         const result = await createManagedStaff(body.staff, body.temporaryPassword, body.status);
         await appendAdminAudit({ admin: actor, action: "CREATE_STAFF", target: result.created.join(","), note: `Thêm ${result.created.length}; bỏ qua ${result.skipped.length} mã đã có.` }).catch(() => undefined);

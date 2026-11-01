@@ -34,3 +34,13 @@ test('failed API responses and invalid JSON never report success', async () => {
     await assert.rejects(requestJson('/bad-json'), /chưa trả về kết quả/);
   } finally { global.fetch = original; }
 });
+
+test('platform timeout and oversized response errors have actionable messages without exposing HTML', async () => {
+  const original=global.fetch;
+  try {
+    global.fetch=async()=>new Response('FUNCTION_INVOCATION_TIMEOUT',{status:504});
+    await assert.rejects(requestJson('/slow'),/Máy chủ xử lý quá lâu/);
+    global.fetch=async()=>new Response('FUNCTION_RESPONSE_PAYLOAD_TOO_LARGE',{status:413});
+    await assert.rejects(requestJson('/large'),/Dữ liệu trả về quá lớn/);
+  }finally{global.fetch=original;}
+});

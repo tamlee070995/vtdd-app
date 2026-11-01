@@ -21,7 +21,7 @@ function setup() {
     isSupabaseConfigured: () => true,
     eq: value => 'eq.' + encodeURIComponent(value),
     selectAllRows: async (_,options) => {reads.push({all:true,...options});const result = query(data,options); if (afterRead) { afterRead(); afterRead = null; } return result; },
-    selectRows: async (_,options) => {reads.push(options);return query(data,options);},
+    selectRows: async (_,options) => {reads.push(options);const result=query(data,options);if(afterRead){afterRead();afterRead=null;}return result;},
     countRows: async (_,filters) => data.filter(row=>matches(row,filters)).length,
     insertRows: async (_, records) => {
       if (conflict || records.some(row => data.some(old => old.ma_nv === row.ma_nv))) throw new Error('23505 duplicate key');
@@ -59,7 +59,7 @@ function setup() {
   }
   const management = load('lib/staff-management-store.ts');
   const route = load('app/api/admin/staff/route.ts');
-  const request = (body,origin='http://localhost') => new NextRequest('http://localhost/api/admin/staff',{method:'POST',headers:{'content-type':'application/json',origin},body:JSON.stringify(body)});
+  const request = (body,origin='http://localhost') => new NextRequest('http://localhost/api/admin/staff',{method:'POST',headers:{'content-type':'application/json',origin},body:JSON.stringify({protocol:2,...body})});
   return {data,management,route,request,load,audit,reads,deletedCalls,setActor:value=>actor=value,setAuthorized:value=>authorized=value,setConflict:()=>conflict=true,setAfterRead:fn=>afterRead=fn,setFailCode:code=>failCode=code};
 }
 
@@ -89,7 +89,7 @@ test('create one or many skips existing accounts, salts passwords and never acce
 
 test('deletion preview normalizes role aliases, excludes current admin, exposes no credentials and deletes only previewed roles', async () => {
   const ctx=setup(), preview=await ctx.management.previewStaffDeletion(['admin','mod'],'001');
-  assert.deepEqual(preview.staff.map(row=>row.maNV),['002','003']);assert.equal(preview.skippedSelf,true);
+  assert.deepEqual(preview.staff.map(row=>row.maNV),['002','003']);assert.ok(preview.staff.every(row=>row.maNV!=='001'));
   assert.equal(JSON.stringify(preview).includes('password_hash'),false);
   const result=await ctx.management.deletePreviewedStaff(preview.token,'001');
   assert.deepEqual(result.deleted.sort(),['002','003']);assert.deepEqual(ctx.data.map(row=>row.ma_nv),['001','004']);
@@ -150,6 +150,51 @@ test('default list and code searches load only a database page, with correct sum
 test('large role groups use conditional batches while preserving other roles and the acting admin', async () => {
   const ctx=setup();for(let i=0;i<2100;i++)ctx.data.push({ma_nv:String(900000+i),staff_name:'Test',permission:'',status:'Standby',source_row:String(10+i)});
   const preview=await ctx.management.previewStaffDeletion(['user'],'001');assert.equal(preview.count,2101);
-  const removed=await ctx.management.deletePreviewedStaff(preview.token,'001');assert.equal(removed.deleted.length,2101);assert.deepEqual(removed.failed,[]);
+  const batches=[preview];for(let page=1;page<preview.pages;page++)batches.push(await ctx.management.previewStaffDeletion(null,'001',preview.planToken,page));
+  let deleted=0;for(const batch of batches){const removed=await ctx.management.deletePreviewedStaff(batch.token,'001');deleted+=removed.deleted.length;assert.deepEqual(removed.failed,[]);}
+  assert.equal(deleted,2101);
   assert.equal(ctx.deletedCalls.length,85);assert.deepEqual(ctx.data.map(row=>row.ma_nv),['001','002','003']);
+  assert.ok(ctx.reads.every(read=>!read.all && read.limit<=200));
+});
+
+test('21 thousand employee previews remain bounded and the client prepares every batch before confirmation', async () => {
+  const ctx=setup();for(let i=0;i<21454;i++)ctx.data.push({ma_nv:String(900000+i),staff_name:'Nhân viên thử — '+('Tên dài '.repeat(12)),permission:'',status:'Standby',source_row:String(10+i)});
+  const original=global.fetch;const progress=[];let largestResponse=0,active=0,maxActive=0;
+  global.fetch=async(_,init)=>{active++;maxActive=Math.max(maxActive,active);try{await new Promise(resolve=>setTimeout(resolve,1));const response=await ctx.route.POST(ctx.request(JSON.parse(init.body)));const size=(await response.clone().text()).length;largestResponse=Math.max(largestResponse,size);return response;}finally{active--;}};
+  try {
+    const preview=await ctx.load('lib/staff-deletion-client.ts').prepareStaffDeletion(['user'],(done,total)=>progress.push([done,total]));
+    assert.equal(preview.count,21455);assert.equal(preview.staff.length,21455);assert.equal(preview.tokens.length,108);
+    assert.equal(largestResponse<150000,true);assert.equal(maxActive<=4,true);
+    assert.deepEqual(progress.at(-1),[21455,21455]);assert.equal(ctx.deletedCalls.length,0);
+    assert.ok(ctx.reads.every(read=>!read.all && read.limit<=200));
+  } finally{global.fetch=original;}
+});
+
+test('client completes a whole group through small delete requests and reports progress', async () => {
+  const ctx=setup();for(let i=0;i<450;i++)ctx.data.push({ma_nv:String(900000+i),staff_name:'Test',permission:'',status:'Standby',source_row:String(10+i)});
+  const original=global.fetch;global.fetch=async(_,init)=>ctx.route.POST(ctx.request(JSON.parse(init.body)));
+  try {
+    const client=ctx.load('lib/staff-deletion-client.ts'),preview=await client.prepareStaffDeletion(['user'],()=>{}),progress=[];
+    assert.equal(await client.executeStaffDeletion(preview,'secret',(done,total)=>progress.push([done,total])),451);
+    assert.deepEqual(progress,[[200,451],[400,451],[451,451]]);assert.equal(ctx.data.length,3);
+  }finally{global.fetch=original;}
+});
+
+test('delete client stops after an ambiguous timeout, never repeats a write, and includes confirmed progress', async () => {
+  const ctx=setup(),original=global.fetch;let deletes=0;
+  global.fetch=async(_,init)=>{const body=JSON.parse(init.body);if(body.action==='DELETE_STAFF_GROUP'){deletes++;throw new DOMException('Timeout','AbortError');}return ctx.route.POST(ctx.request(body));};
+  try {
+    const client=ctx.load('lib/staff-deletion-client.ts'),preview=await client.prepareStaffDeletion(['user'],()=>{});
+    await assert.rejects(client.executeStaffDeletion(preview,'secret',()=>{}),/0\/1.*quá lâu.*kiểm tra danh sách/);
+    assert.equal(deletes,1);assert.equal(ctx.deletedCalls.length,0);
+  }finally{global.fetch=original;}
+});
+
+test('a changed later preview page fails before any deletion; old clients must reload', async () => {
+  const ctx=setup();for(let i=0;i<210;i++)ctx.data.push({ma_nv:String(900000+i),staff_name:'Test',permission:'',status:'Standby',source_row:String(10+i)});
+  const first=await ctx.management.previewStaffDeletion(['user'],'001');ctx.data.pop();
+  await assert.rejects(ctx.management.previewStaffDeletion(null,'001',first.planToken,1),error=>error.status===409);
+  assert.equal(ctx.deletedCalls.length,0);
+  const response=await ctx.route.POST(ctx.request({action:'PREVIEW_DELETE_STAFF',roles:['user'],protocol:undefined}));
+  assert.equal(response.status,409);assert.match((await response.json()).message,/tải lại trang/);
 });

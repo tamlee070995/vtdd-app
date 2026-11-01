@@ -1,16 +1,17 @@
 import "server-only";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { deleteRows, insertRows, isSupabaseConfigured, selectAllRows, selectRows } from "./supabase-rest";
+import { countRows, deleteRows, insertRows, isSupabaseConfigured, selectRows } from "./supabase-rest";
 import { hashPassword, normalizeText } from "./staff-security";
 import { validateNewStaffRows } from "./staff-import";
-import { quoteStaffFilter } from "./staff-query";
+import { quoteStaffFilter, staffRoleFilters } from "./staff-query";
 
 export class StaffManagementError extends Error { constructor(message: string, public status = 400) { super(message); } }
 export type StaffRole = "admin" | "mod" | "user";
 type ManagedRow = { ma_nv: string; staff_name: string; permission: string | null; status: string | null; source_row: string | number | null };
 export function staffRole(value: unknown): StaffRole { const role = String(value || "").trim().toLowerCase(); return role === "admin" ? "admin" : role === "mod" || role === "moderator" ? "mod" : "user"; }
 function storage() { if (!isSupabaseConfigured()) throw new StaffManagementError("Chức năng này cần kết nối cơ sở dữ liệu Supabase.", 503); }
-async function rows() { storage(); return selectAllRows<ManagedRow>("staff", { select: "ma_nv,staff_name,permission,status,source_row", order: "ma_nv.asc" }); }
+const DELETE_BATCH_SIZE = 200;
+const MANAGED_COLUMNS = "ma_nv,staff_name,permission,status,source_row";
 export async function createManagedStaff(input: unknown, password: unknown, status: unknown) {
   storage();
   let entries;
@@ -32,29 +33,62 @@ function normalizeRoles(input: unknown): StaffRole[] {
 }
 function candidates(all: ManagedRow[], roles: StaffRole[], actor: string) { return all.filter(row => roles.includes(staffRole(row.permission)) && row.ma_nv !== actor).sort((a,b) => a.ma_nv.localeCompare(b.ma_nv)); }
 function digest(list: ManagedRow[]) { return createHash("sha256").update(JSON.stringify(list)).digest("hex"); }
+function roleFilters(roles: StaffRole[], actor: string) {
+  const clauses = roles.map(role => {
+    const filters = staffRoleFilters(role);
+    return filters.or ? "or" + filters.or : "permission.imatch." + quoteStaffFilter(filters.permission.slice("imatch.".length));
+  });
+  return { ma_nv: `neq.${actor}`, or: `(${clauses.join(",")})` };
+}
 function sign(body: string) {
   const secret = process.env.AUTH_SESSION_SECRET || process.env.AUTH_SECRET || process.env.SESSION_SECRET || process.env.FIELD_ENCRYPTION_KEY || "";
   if (secret.length < 16) throw new StaffManagementError("Chưa có khóa xác nhận thao tác quản trị.", 503);
   return createHmac("sha256", secret).update("staff-delete-preview:v1:" + body).digest("base64url");
 }
-export async function previewStaffDeletion(input: unknown, actor: string) {
-  const roles = normalizeRoles(input), all = await rows();
-  const selected = candidates(all, roles, actor);
-  if (selected.length > 30_000) throw new StaffManagementError("Mỗi lần xem trước tối đa 30 ngàn tài khoản. Xin chọn từng nhóm quyền.");
-  const expiresAt = Date.now() + 10 * 60_000;
-  const body = Buffer.from(JSON.stringify({ purpose: "delete-staff", actor, roles, digest: digest(selected), expiresAt })).toString("base64url");
-  return { token: body + "." + sign(body), expiresAt, count: selected.length, skippedSelf: all.some(row => row.ma_nv === actor && roles.includes(staffRole(row.permission))), staff: selected.map(row => ({ maNV: row.ma_nv, staffName: row.staff_name, role: staffRole(row.permission), status: row.status })) };
+type DeletePlan = { purpose: "staff-delete-plan"; actor: string; roles: StaffRole[]; total: number; expiresAt: number };
+type DeleteBatch = { purpose: "staff-delete-batch"; actor: string; roles: StaffRole[]; page: number; expectedRemaining: number; codes: string[]; digest: string; expiresAt: number };
+function signedToken(payload: DeletePlan | DeleteBatch) {
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return body + "." + sign(body);
 }
-export async function deletePreviewedStaff(token: unknown, actor: string) {
-  if (typeof token !== "string" || token.length > 4096) throw new StaffManagementError("Xin xem trước danh sách cần xóa.");
+function readToken(token: unknown, actor: string, purpose: string) {
+  if (typeof token !== "string" || token.length > 16384) throw new StaffManagementError("Xin xem trước danh sách cần xóa.");
   const [body, signature, extra] = token.split(".");
   const expected = sign(body || ""), supplied = signature || "";
   if (extra || expected.length !== supplied.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(supplied))) throw new StaffManagementError("Phiếu xác nhận chưa hợp lệ. Xin xem trước lại.");
   let payload;
   try { payload = JSON.parse(Buffer.from(body,"base64url").toString("utf8")); } catch { throw new StaffManagementError("Phiếu xác nhận chưa hợp lệ."); }
-  if (payload.purpose !== "delete-staff" || payload.actor !== actor || !Number.isFinite(payload.expiresAt) || Date.now() > payload.expiresAt) throw new StaffManagementError("Phiếu xác nhận đã hết hạn hoặc không thuộc tài khoản này. Xin xem trước lại.", 409);
-  const roles = normalizeRoles(payload.roles), selected = candidates(await rows(), roles, actor);
-  if (selected.length > 30_000 || digest(selected) !== payload.digest) throw new StaffManagementError("Danh sách đã đổi. Xin xem trước lại trước khi xóa.", 409);
+  if (!payload || payload.purpose !== purpose || payload.actor !== actor || !Number.isFinite(payload.expiresAt) || Date.now() > payload.expiresAt) throw new StaffManagementError("Phiếu xác nhận đã hết hạn hoặc không thuộc tài khoản này. Xin xem trước lại.", 409);
+  normalizeRoles(payload.roles);
+  return payload;
+}
+export async function previewStaffDeletion(input: unknown, actor: string, planToken?: unknown, pageInput: unknown = 0) {
+  storage();
+  const page = Number(pageInput);
+  if (!Number.isInteger(page) || page < 0) throw new StaffManagementError("Đợt xem trước chưa hợp lệ.");
+  const saved = planToken ? readToken(planToken, actor, "staff-delete-plan") as DeletePlan : null;
+  if (!saved && page !== 0) throw new StaffManagementError("Xin xem trước danh sách từ đầu.");
+  const roles = saved ? saved.roles : normalizeRoles(input);
+  const filters = roleFilters(roles, actor);
+  const total = await countRows("staff", filters);
+  if (total > 30_000) throw new StaffManagementError("Mỗi lần xem trước tối đa 30 ngàn tài khoản. Xin chọn từng nhóm quyền.");
+  if (saved && saved.total !== total) throw new StaffManagementError("Danh sách đã đổi. Xin xem trước lại.", 409);
+  const pages = Math.max(1, Math.ceil(total / DELETE_BATCH_SIZE));
+  if (page >= pages) throw new StaffManagementError("Đợt xem trước chưa hợp lệ.");
+  const plan: DeletePlan = saved || { purpose: "staff-delete-plan", actor, roles, total, expiresAt: Date.now() + 10 * 60_000 };
+  const selected = candidates(await selectRows<ManagedRow>("staff", {select:MANAGED_COLUMNS,filters,order:"ma_nv.asc",limit:DELETE_BATCH_SIZE,offset:page*DELETE_BATCH_SIZE}), roles, actor);
+  if (selected.length !== Math.min(DELETE_BATCH_SIZE, total-page*DELETE_BATCH_SIZE)) throw new StaffManagementError("Danh sách đã đổi. Xin xem trước lại.", 409);
+  const batch: DeleteBatch = {purpose:"staff-delete-batch",actor,roles,page,expectedRemaining:total-page*DELETE_BATCH_SIZE,codes:selected.map(row=>row.ma_nv),digest:digest(selected),expiresAt:plan.expiresAt};
+  return { protocol:2, planToken:signedToken(plan), token:signedToken(batch), page, pages, expiresAt:plan.expiresAt, count:total, staff:selected.map(row=>({maNV:row.ma_nv,staffName:row.staff_name,role:staffRole(row.permission),status:row.status || ""})) };
+}
+export async function deletePreviewedStaff(token: unknown, actor: string) {
+  storage();
+  const payload = readToken(token, actor, "staff-delete-batch") as DeleteBatch;
+  if (!Array.isArray(payload.codes) || payload.codes.length > DELETE_BATCH_SIZE || payload.codes.some(code=>typeof code!=="string" || !code || code.length>20)) throw new StaffManagementError("Phiếu xác nhận chưa hợp lệ.");
+  const total = await countRows("staff", roleFilters(payload.roles,actor));
+  if (total !== payload.expectedRemaining) throw new StaffManagementError("Danh sách đã đổi. Xin xem trước lại trước khi xóa.", 409);
+  const selected = payload.codes.length ? candidates(await selectRows<ManagedRow>("staff", {select:MANAGED_COLUMNS,filters:{ma_nv:`in.(${payload.codes.map(quoteStaffFilter).join(",")})`},order:"ma_nv.asc",limit:DELETE_BATCH_SIZE}),payload.roles,actor) : [];
+  if (selected.length !== payload.codes.length || digest(selected) !== payload.digest) throw new StaffManagementError("Danh sách đã đổi. Xin xem trước lại trước khi xóa.", 409);
   const deleted: string[] = [], skipped: string[] = [], failed: string[] = [];
   const startedAt = Date.now();
   for (let offset = 0; offset < selected.length; offset += 200) {

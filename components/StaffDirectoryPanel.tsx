@@ -4,11 +4,11 @@ import PasswordInput from "./PasswordInput";
 import UiFeedbackDialog from "./UiFeedbackDialog";
 import { clientErrorMessage, requestJson } from "@/lib/client-request";
 import { parseNewStaffImport, validateNewStaffRows, type NewStaffInput } from "@/lib/staff-import";
+import { prepareStaffDeletion, executeStaffDeletion, type StaffDeletionPreview } from "@/lib/staff-deletion-client";
 import styles from "./StaffDirectoryPanel.module.css";
 
 type Staff = { maNV: string; staffName: string; maST: string; storeName: string; status: string; permission: "" | "admin" | "mod"; needSetup: string; resetOtpCount: string; modulePermissions: string; rowNumber: number; gmail: string; department: string };
 type Meta = { page: number; pages: number; total: number; summary: { total: number; active: number; standby: number; needSetup: number } };
-type Preview = { token: string; count: number; skippedSelf: boolean; expiresAt: number; staff: { maNV: string; staffName: string; role: string; status: string }[] };
 const roleName = (role: string) => role === "admin" ? "Admin" : role === "mod" ? "Mod" : "Nhân viên";
 function StaffDialog({ title, busy, onClose, children }: { title: string; busy: boolean; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -28,7 +28,7 @@ export default function StaffDirectoryPanel({ staff, meta, loading, busy: parent
   const [password, setPassword] = useState("");
   const [newStatus, setNewStatus] = useState("Standby");
   const [roles, setRoles] = useState<string[]>(["user"]);
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [preview, setPreview] = useState<StaffDeletionPreview | null>(null);
   const [adminPassword, setAdminPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [working, setWorking] = useState(false);
@@ -73,8 +73,9 @@ export default function StaffDirectoryPanel({ staff, meta, loading, busy: parent
     finally{setWorking(false);}
   }
   async function loadPreview() {
+    setPreview(null);setConfirmation("");setAdminPassword("");
     setWorking(true);setFeedback({tone:"loading",text:"Đang đọc danh sách cần xóa…"});
-    try { const result=await requestJson<{success:boolean;preview:Preview}>("/api/admin/staff",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"PREVIEW_DELETE_STAFF",roles})},120_000);setPreview(result.preview);setConfirmation("");setAdminPassword("");setFeedback(null); }
+    try { const result=await prepareStaffDeletion(roles,(done,total)=>setFeedback({tone:"loading",text:`Đang đọc danh sách: ${done}/${total} tài khoản…`}));setPreview(result);setConfirmation("");setAdminPassword("");setFeedback(null); }
     catch(error){setFeedback({tone:"error",text:clientErrorMessage(error,"Chưa đọc được danh sách cần xóa.")});}
     finally{setWorking(false);}
   }
@@ -82,10 +83,10 @@ export default function StaffDirectoryPanel({ staff, meta, loading, busy: parent
     if(!preview || confirmation !== `XÓA ${preview.count}`)return;
     setWorking(true);setFeedback({tone:"loading",text:"Đang xóa các tài khoản đã xác nhận…"});
     try {
-      const result=await requestJson<{message:string;result:{failed:string[];unprocessed:string[]}}>("/api/admin/staff",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"DELETE_STAFF_GROUP",token:preview.token,adminPassword})},120_000);
-      const pending=[...result.result.failed,...result.result.unprocessed];close();setFeedback({tone:pending.length?"error":"success",text:result.message+(pending.length?`\nChưa xử lý: ${pending.slice(0,30).join(", ")}. Xin xem trước lại trước khi tiếp tục.`:"")});await onReload();
-    }catch(error){setPreview(null);setAdminPassword("");setFeedback({tone:"error",text:clientErrorMessage(error,"Chưa xác nhận được kết quả. Xin xem lại danh sách trước khi thử lại.")});}
-    finally{setWorking(false);}
+      const deleted=await executeStaffDeletion(preview,adminPassword,(done,total)=>setFeedback({tone:"loading",text:`Đang xóa: ${done}/${total} tài khoản. Xin giữ trang này mở…`}));
+      close();setFeedback({tone:"success",text:`Đã xóa ${deleted} tài khoản. Tài khoản Admin đang dùng được giữ lại.`});
+    }catch(error){setPreview(null);setAdminPassword("");setConfirmation("");setFeedback({tone:"error",text:clientErrorMessage(error,"Chưa xác nhận được kết quả. Xin xem lại danh sách trước khi thử lại.")});}
+    finally{await onReload();setWorking(false);}
   }
   return <>
     <section className={styles.panel} aria-label="Danh sách nhân viên">
@@ -116,6 +117,6 @@ export default function StaffDirectoryPanel({ staff, meta, loading, busy: parent
         {preview && <><div className={styles.preview} aria-label="Tài khoản sắp xóa"><b>{preview.count} tài khoản sắp xóa</b>{preview.staff.slice(0,200).map(item=><p key={item.maNV}>{item.maNV} · {item.staffName||"Chưa có tên"} · {roleName(item.role)}</p>)}{preview.count>200 && <p>Đang hiện 200 tài khoản đầu. Tải danh sách đầy đủ để xem trước.</p>}</div><button type="button" disabled={working} onClick={downloadDeletionPreview}>Tải danh sách đầy đủ</button><p>Tài khoản Admin đang dùng luôn được giữ lại. Danh sách thay đổi thì phải xem trước lại. Xóa sẽ gỡ tài khoản và quyền đăng nhập, không xóa nhật ký nghiệp vụ.</p><label>Mật khẩu Admin<PasswordInput value={adminPassword} maxLength={128} disabled={working} autoComplete="current-password" onChange={e=>setAdminPassword(e.target.value)}/></label><label>Nhập XÓA {preview.count} để xác nhận<input value={confirmation} disabled={working} autoComplete="off" onChange={e=>setConfirmation(e.target.value)}/></label><div className={styles.footer}><button type="button" disabled={working} onClick={close}>Hủy</button><button type="button" className={styles.danger} disabled={working||!preview.count||!adminPassword||confirmation!==`XÓA ${preview.count}`} onClick={()=>void removeGroup()}>Xóa {preview.count} tài khoản</button></div></>}
       </>}
     </StaffDialog>}
-    {feedback && <UiFeedbackDialog tone={feedback.tone} onDismiss={()=>setFeedback(null)}>{feedback.text}</UiFeedbackDialog>}
+    {feedback && <UiFeedbackDialog tone={feedback.tone} onDismiss={()=>setFeedback(null)} onRetry={feedback.tone==="error" && kind==="delete" && !preview && !working ? ()=>void loadPreview() : undefined} retryLabel="Xem trước lại">{feedback.text}</UiFeedbackDialog>}
   </>;
 }

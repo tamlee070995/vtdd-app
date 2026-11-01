@@ -21,6 +21,8 @@ export async function requestJson<T extends { success?: boolean; message?: strin
       window.location.assign("/admin/setup");
       throw new Error(data.message || "Vui lòng cập nhật thông tin bảo mật.");
     }
+    if (!data && response.status === 504) throw new Error("Máy chủ xử lý quá lâu. Xin kiểm tra trạng thái rồi thử lại.");
+    if (!data && response.status === 413) throw new Error("Dữ liệu trả về quá lớn. Xin tải lại trang để dùng bản mới.");
     if (!response.ok || !data?.success) throw new Error(data?.message || (response.status === 401 ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." : "Máy chủ chưa trả về kết quả. Vui lòng thử lại."));
     return data as T;
   } finally {
