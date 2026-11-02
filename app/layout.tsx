@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     default: "Ngành Hàng Viễn Thông Di Động",
     template: "%s | Viễn Thông Di Động",
   },
-  description: "Trung Tâm Chính Sách & Nghiệp Vụ Sản Phẩm.",
+  description: "Cổng Nghiệp Vụ & Chính Sách Sản Phẩm",
   applicationName: "VTDD App",
   manifest: "/manifest.webmanifest?v=2",
   openGraph: {
@@ -26,13 +26,13 @@ export const metadata: Metadata = {
     locale: "vi_VN",
     siteName: "Viễn Thông Di Động",
     title: "Ngành Hàng Viễn Thông Di Động",
-    description: "Trung Tâm Chính Sách & Nghiệp Vụ Sản Phẩm.",
+    description: "Cổng Nghiệp Vụ & Chính Sách Sản Phẩm",
     images: [{ url: "/brand/share-logo-v2.png", width: 1200, height: 1200, alt: "Viễn Thông Di Động" }],
   },
   twitter: {
     card: "summary",
     title: "Ngành Hàng Viễn Thông Di Động",
-    description: "Trung Tâm Chính Sách & Nghiệp Vụ Sản Phẩm.",
+    description: "Cổng Nghiệp Vụ & Chính Sách Sản Phẩm",
     images: ["/brand/share-logo-v2.png"],
   },
   appleWebApp: {
