@@ -6,7 +6,7 @@ import { usePortalGroup } from "./PortalShell";
 import styles from "@/app/page.module.css";
 
 type IconName = "tradein" | "phone" | "used" | "demo" | "tools" | "search" | "printer" | "document";
-export type HomeTool = { title: string; desc: string; mobileDesc?: string; featured?: boolean; href?: string; status?: string; icon: IconName };
+export type HomeTool = { title: string; desc: string; mobileDesc?: string; featured?: boolean; href?: string; status?: string; icon: IconName; external?: boolean; highlighted?: boolean; isNew?: boolean };
 export type HomeGroup = { id: string; title: string; navTitle: string; shortTitle: string; desc: string; mobileDesc?: string; icon: IconName; items: HomeTool[] };
 
 const quickGuides: Record<string, { title: string; steps: { title: string; desc: string }[] }> = {
@@ -97,21 +97,23 @@ export default function HomePortal({ groups }: { groups: HomeGroup[] }) {
               {query && <button type="button" aria-label="Xóa tìm kiếm" onClick={() => { setQuery(""); search.current?.focus(); }}>×</button>}
             </form>
           </header>
-          <section className={styles.toolGrid} data-single={entries.length === 1 || undefined} aria-label={searching ? "Kết quả tìm kiếm công cụ" : `Công cụ ${active.title}`}>
+          <section className={styles.toolGrid} data-single={entries.length === 1 || undefined} data-balanced={entries.length === 4 || undefined} aria-label={searching ? "Kết quả tìm kiếm công cụ" : `Công cụ ${active.title}`}>
             {entries.map(item => {
               const body = <>
-                <span className={styles.toolVisual}><span className={styles.toolIcon}><Icon name={item.icon} /></span>{item.featured && <span className={styles.featuredBadge}>Dùng nhiều</span>}</span>
+                <span className={styles.toolVisual}><span className={styles.toolIcon}><Icon name={item.icon} /></span>{item.featured && <span className={styles.featuredBadge}>Dùng nhiều</span>}{item.isNew && <span className={styles.newBadge}>MỚI</span>}</span>
                 <span className={styles.toolText}>
                   {searching && <span className={styles.category}>{item.group.title}</span>}
-                  <b>{item.title}</b>
-                  {item.href && <span className={styles.openingLabel}><i aria-hidden="true" />Đang mở…</span>}
+                  <b>{item.title}{item.isNew && <span className={`${styles.newBadge} ${styles.newBadgeMobile}`}>MỚI</span>}</b>
+                  {item.href && !item.external && <span className={styles.openingLabel}><i aria-hidden="true" />Đang mở…</span>}
                   <small className={styles.desktopDescription}>{item.desc}</small>
                   <small className={styles.mobileDescription} title={item.desc}>{item.mobileDesc || item.desc}</small>
                   {!item.href && <em>{item.status || "Đang cập nhật"}</em>}
                 </span>
-                {item.href && <span className={styles.openAction} aria-hidden="true"><span className={styles.actionLabel}>Xem ngay</span><i className={styles.arrow}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg></i></span>}
+                {item.href && (item.external ? <span className={`${styles.openAction} ${styles.externalAction}`} aria-hidden="true"><span className={styles.externalCta}><span className={styles.actionLabel}>Mở công cụ</span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M7 7h10v10" /></svg></span><span className={styles.externalHint}>Mở trong tab mới</span></span> : <span className={styles.openAction} aria-hidden="true"><span className={styles.actionLabel}>Xem ngay</span><i className={styles.arrow}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.7" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg></i></span>)}
               </>;
-              return item.href ? <Link className={styles.toolItem} data-featured={item.featured || undefined} href={item.href} key={`${item.group.id}-${item.title}`}>{body}</Link> : <div className={styles.toolItemDisabled} key={`${item.group.id}-${item.title}`}>{body}</div>;
+              const key = `${item.group.id}-${item.title}`;
+              if (!item.href) return <div className={styles.toolItemDisabled} key={key}>{body}</div>;
+              return item.external ? <a className={styles.toolItem} data-highlighted={item.highlighted || undefined} href={item.href} target="_blank" rel="noopener noreferrer" aria-label={`${item.title} — mở trong tab mới`} key={key}>{body}</a> : <Link className={styles.toolItem} data-featured={item.featured || undefined} href={item.href} key={key}>{body}</Link>;
             })}
           </section>
           {!entries.length && <div className={styles.empty}><span className={styles.emptyIcon}><Icon name="search" /></span><h2>Chưa tìm thấy công cụ</h2><p>Thử tên ngắn hơn như “giá”, “sticker” hoặc “demo”.</p><button type="button" onClick={() => { setQuery(""); search.current?.focus(); }}>Xóa tìm kiếm</button></div>}

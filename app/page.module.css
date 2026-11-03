@@ -46,14 +46,18 @@
 .page .search input:focus-visible { outline:none; box-shadow:none; }
 .search button { flex: 0 0 44px; height: 44px; border: 0; background: transparent; color: #596577; border-radius: 10px; font-size: 24px; cursor: pointer; }
 .toolGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.toolGrid[data-balanced="true"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .toolItem, .toolItemDisabled { position: relative; min-width: 0; min-height: 252px; display: flex; flex-direction: column; align-items: stretch; padding: 24px; border: 1px solid #dce2eb; border-radius: 18px; background: #fff; }
 .toolItem { color: #111827; text-decoration: none; transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease; -webkit-tap-highlight-color: #ffd40030; }
 .toolItem[data-featured="true"] { border-color: #e6bf55; background: linear-gradient(135deg, #fff8df, #fff); }
+.toolItem[data-highlighted="true"] { border-color: #e6bf55; background: #fffbea; }
 .toolVisual { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 19px; }
 .toolIcon { width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #fff0c7; color: #8f5907; }
 .toolIcon svg { width: 23px; height: 23px; }
 .toolItem[data-featured="true"] .toolIcon { background: #ffd400; color: #07111f; }
 .featuredBadge { display: inline-flex; padding: 5px 9px; border: 1px solid #e9ca6d; border-radius: 99px; background: #fff0b3; color: #80520c; font-size: 12px; line-height: 1.4; font-weight: 600; white-space: nowrap; }
+.newBadge { display: inline-flex; padding: 4px 8px; border-radius: 7px; background: #ffd400; color: #07111f; font-size: 11px; line-height: 1.4; font-weight: 700; white-space: nowrap; vertical-align: middle; }
+.newBadgeMobile { display: none; }
 .toolText { display: grid; align-content: start; gap: 9px; min-width: 0; }
 .toolText b { font-size: 18px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
 .toolText small { color: #526176; font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
@@ -61,6 +65,10 @@
 .toolItemDisabled .toolIcon { color: #68758a; background: #f0f2f5; }
 .toolItemDisabled b { color: #596577; }
 .openAction { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; align-self: flex-end; margin-top: auto; padding-top: 22px; color: #145db5; font-size: 14px; font-weight: 600; line-height: 1.5; }
+.externalAction { flex-direction: column; gap: 7px; }
+.externalCta { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 44px; padding: 10px 17px; border-radius: 10px; background: #07111f; color: #ffd400; }
+.externalCta svg { flex: 0 0 auto; }
+.externalHint { color: #596577; font-size: 12px; font-weight: 400; }
 .arrow { position: relative; width: 25px; height: 25px; flex: 0 0 auto; display: grid; place-items: center; font-style: normal; }
 .arrow svg { display: block; width: 22px; height: 22px; }
 .category { color: #80520c; font-size: 13px; font-weight: 500; line-height: 1.4; }
@@ -129,7 +137,7 @@
   .count { min-height: 27px; padding: 4px 9px; font-size: 13px; }
   .groupDescription { margin-top: 7px; font-size: 13px; line-height: 1.5; }
   .search { flex: none; min-width: 0; width: 100%; height: 48px; border-radius: 10px; }
-  .toolGrid { grid-template-columns: 1fr; gap: 10px; }
+  .toolGrid, .toolGrid[data-balanced="true"] { grid-template-columns: 1fr; gap: 10px; }
   .toolItem, .toolItemDisabled, .toolGrid[data-single="true"] > .toolItem, .toolGrid[data-single="true"] > .toolItemDisabled { display: flex; flex-direction: row; align-items: center; gap: 12px; min-height: 84px; padding: 12px 14px; border-radius: 14px; }
   .toolVisual, .toolGrid[data-single="true"] .toolVisual { display: flex; justify-content: center; width: 38px; margin: 0; flex: 0 0 auto; }
   .toolIcon, .toolGrid[data-single="true"] .toolIcon { width: 38px; height: 38px; border-radius: 11px; }
@@ -138,6 +146,10 @@
   .toolText b { font-size: 15px; line-height: 1.4; }
   .toolText small { font-size: 12px; line-height: 1.5; }
   .toolText .mobileDescription { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toolItem[data-highlighted="true"] .mobileDescription { white-space: normal; overflow: visible; }
+  .toolVisual .newBadge, .externalHint { display: none; }
+  .newBadgeMobile { display: inline-flex; margin-left: 6px; padding: 2px 5px; font-size: 10px; }
+  .externalCta { min-height: 26px; width: 26px; padding: 0; border-radius: 0; background: transparent; color: #07111f; }
   .toolText em { font-size: 11px; }
   .category { font-size: 11px; }
   .openAction, .toolGrid[data-single="true"] .openAction { align-self: center; flex: 0 0 26px; margin: 0; padding: 0; color: #475569; }

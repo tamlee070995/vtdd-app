@@ -18,10 +18,11 @@ export default async function HomePage() {
   const groups: HomeGroup[] = [
     {
       id: "he-thu-cu-doi-moi", title: "Thu cũ đổi mới", navTitle: "Thu cũ đổi mới", shortTitle: "Thu cũ", icon: "tradein",
-      desc: "Công cụ tra giá, in tem và quy trình thu cũ đổi mới.",
-      mobileDesc: "Tra giá, in tem và quy trình thu cũ.",
+      desc: "Tra giá, hỗ trợ, in tem và quy trình thu cũ đổi mới.",
+      mobileDesc: "Tra giá, hỗ trợ, in tem và quy trình thu cũ.",
       items: [
         { title: "Tra cứu giá thu cũ đổi mới", desc: "Tìm đúng tên máy và dung lượng, xem giá thu Loại 1–5 cùng mức trợ giá lên đời máy mới.", mobileDesc: "Giá Loại 1–5 và trợ giá lên đời", featured: true, href: "/tra-gia-thu-cu", icon: "search" },
+        { title: "Hỗ trợ thu cũ đổi mới", desc: "Chiến giá · Máy ngoài danh sách · Xem lại PMH", mobileDesc: "Chiến giá · Máy ngoài danh sách · Xem lại PMH", href: "https://script.google.com/macros/s/AKfycbw6gaW9B9sdbyZTBUa8aGufFwAJk0zFXvh_GgDdKy7H1dDF0GtFyk8so84gvJBfqYdf/exec", icon: "tools", external: true, highlighted: true, isNew: Date.now() < Date.parse("2026-11-17T00:00:00+07:00") },
         { title: "In sticker trợ giá", desc: "Chọn mẫu, chỉnh nội dung và in tối đa 6 sticker trên một trang A4.", mobileDesc: "In tối đa 6 tem trên trang A4", href: "/sticker-tcdm", icon: "printer" },
         cmsTool(cms["quy-trinh-thu-cu"]),
       ],
