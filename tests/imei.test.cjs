@@ -208,7 +208,7 @@ test('own cancellation stops at exactly two minutes; only manage-all bypasses th
     if (elapsed >= 120000) {
       const error = await result.json();
       assert.equal(error.code, 'IMEI_CANCEL_EXPIRED');
-      assert.equal(error.message, 'Liên Hệ Quản Lý: 37804 - Lê Thanh Sang');
+      assert.equal(error.message, 'Cần Hủy Mã Liên Hệ Quản Lý: 37804 - Lê Thanh Sang');
       assert.equal((await ctx.store.listImei(item.actor, false, 1, '')).items[0].status, 'active');
       ctx.setActor({ maNV: '456', name: 'Quản lý', permission: 'mod', actions: ['imei-manage-all'] });
       assert.equal((await ctx.route.POST(ctx.request(command))).status, 200);
@@ -304,7 +304,7 @@ test('Apple serials enforce the same two-minute cancellation deadline and manage
   const item = await ctx.store.generateImei('apple-other', crypto.randomUUID(), ctx.actor);
   const command = { requestId: item.requestId, actor: item.actor, reason: 'Hủy SN thử' };
   ctx.setTime(start + 120000);
-  await assert.rejects(ctx.store.cancelImei(command, ctx.actor, own), error => error.code === 'IMEI_CANCEL_EXPIRED' && error.message === 'Liên Hệ Quản Lý: 37804 - Lê Thanh Sang');
+  await assert.rejects(ctx.store.cancelImei(command, ctx.actor, own), error => error.code === 'IMEI_CANCEL_EXPIRED' && error.message === 'Cần Hủy Mã Liên Hệ Quản Lý: 37804 - Lê Thanh Sang');
   assert.equal((await ctx.store.cancelImei(command, { maNV: '456', name: 'Quản lý' }, { canCancelOwn: false, canManageAll: true })).status, 'cancelled');
 });
 

@@ -20,7 +20,7 @@ export const IMEI_BRANDS: Record<ImeiBrand, string> = {
   samsung: "Samsung", xiaomi: "Xiaomi", "apple-13-plus": "Apple iPhone 13 trở lên", "apple-other": "Apple iPhone còn lại", other: "Hãng còn lại",
 };
 export const IMEI_CANCEL_WINDOW_MS = 2 * 60 * 1000;
-export const IMEI_CANCEL_CONTACT = "Liên Hệ Quản Lý: 37804 - Lê Thanh Sang";
+export const IMEI_CANCEL_CONTACT = "Cần Hủy Mã Liên Hệ Quản Lý: 37804 - Lê Thanh Sang";
 export const APPLE_SN_ALPHABET = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 export function isAppleSerial(brand: unknown) {
