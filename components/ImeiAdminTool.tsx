@@ -50,6 +50,7 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
   const busy = useRef(false), sequence = useRef({ value: 0 }), confirmation = useRef<HTMLDialogElement>(null), copyField = useRef<HTMLInputElement>(null);
   const storageKey = `vtdd-imei-pending-${actor}`;
   const access = directory?.access;
+  const visibleItems = directory?.items.filter(item => directory.access.canManageAll || item.status !== "cancelled") || [];
   const syncClock = useCallback((serverTime: number) => {
     if (!Number.isFinite(serverTime)) return;
     clock.current = { server: serverTime, received: performance.now() }; setNow(serverTime);
@@ -148,13 +149,13 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
         {!access.canCreate && <p className={styles.hint}>Bạn được xem sổ mã. Xin liên lạc Admin nếu cần quyền tạo mã.</p>}
       </section>
       {pending && <UiNotice>Một lượt tạo chưa nhận được kết quả. Bấm “Tiếp tục lượt chưa xong” để kiểm tra và nhận lại đúng mã.</UiNotice>}
-      {result?.imei && <section className={styles.result} aria-label="Kết quả cấp mã"><div><span>{labels[result.status]} · {isAppleSerial(result.brand) ? "SN" : "IMEI"} · {IMEI_BRANDS[result.brand]}</span><input ref={copyField} aria-label={isAppleSerial(result.brand) ? "SN vừa cấp" : "Mã IMEI vừa cấp"} readOnly value={result.imei} onFocus={event => event.currentTarget.select()} /></div><button type="button" className={styles.primary} disabled={result.status !== "active"} onClick={() => void copy(result.imei!)}>Sao chép</button></section>}
+      {result?.imei && (access?.canManageAll || result.status !== "cancelled") && <section className={styles.result} aria-label="Kết quả cấp mã"><div><span>{labels[result.status]} · {isAppleSerial(result.brand) ? "SN" : "IMEI"} · {IMEI_BRANDS[result.brand]}</span><input ref={copyField} aria-label={isAppleSerial(result.brand) ? "SN vừa cấp" : "Mã IMEI vừa cấp"} readOnly value={result.imei} onFocus={event => event.currentTarget.select()} /></div><button type="button" className={styles.primary} disabled={result.status !== "active"} onClick={() => void copy(result.imei!)}>Sao chép</button></section>}
       <section className={styles.history} aria-label="Lịch sử cấp mã">
-        <div className={styles.historyTop}><div><h3>Lịch sử cấp mã <span>{directory.total}</span></h3><p>{access.canManageAll ? "Toàn bộ sổ mã" : "Các lượt cấp của bạn"}</p></div><button className={styles.secondary} type="button" disabled={loading} onClick={() => void load()}>Tải lại lịch sử</button></div>
+        <div className={styles.historyTop}><div><h3>Lịch sử cấp mã {access.canManageAll && <span>{directory.total}</span>}</h3><p>{access.canManageAll ? "Toàn bộ sổ mã" : "Các lượt cấp của bạn"}</p></div><button className={styles.secondary} type="button" disabled={loading} onClick={() => void load()}>Tải lại lịch sử</button></div>
         <form className={styles.search} onSubmit={event => { event.preventDefault(); setPage(1); if (search === query) void load(); else setQuery(search); }}><input aria-label="Tìm IMEI hoặc SN" placeholder="Nhập đầy đủ IMEI hoặc SN" autoCapitalize="characters" spellCheck={false} value={search} maxLength={15} onChange={event => setSearch(event.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase())} /><button className={styles.secondary}>Tìm mã</button>{query && <button type="button" className={styles.secondary} onClick={() => { setSearch(""); setQuery(""); setPage(1); }}>Xem hết</button>}</form>
         <div className={styles.items} aria-busy={loading}>
-          {!directory.items.length && <p className={styles.empty}>{query ? "Không tìm thấy mã trong phạm vi bạn được xem." : "Chưa có lượt cấp mã."}</p>}
-          {directory.items.map(item => <article className={styles.item} key={`${item.actor}-${item.requestId}`}>
+          {!visibleItems.length && <p className={styles.empty}>{query ? "Không tìm thấy mã trong phạm vi bạn được xem." : "Trang này không có lượt cấp mã đang hiển thị."}</p>}
+          {visibleItems.map(item => <article className={styles.item} key={`${item.actor}-${item.requestId}`}>
             <div className={styles.itemMain}><div className={styles.itemTop}><strong className={styles.number}>{item.imei || "Chưa cấp mã"}</strong><span className={styles.status} data-status={item.status}>{labels[item.status]}</span></div>
               <p>{isAppleSerial(item.brand) ? "SN" : "IMEI"} · {IMEI_BRANDS[item.brand]} · {date(item.createdAt)}</p>{access.canManageAll && <p>{item.actorName} · NV {item.actor}</p>}
               {item.cancelledAt && <p className={styles.cancellation}>Hủy: {date(item.cancelledAt)} · NV {item.cancelledBy}<br />{item.reason}</p>}
