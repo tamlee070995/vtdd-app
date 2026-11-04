@@ -65,7 +65,7 @@ test('Luhn matches an independent known vector; all brands preserve exact prefix
   const ctx = setup();
   assert.equal(ctx.rules.completeImei('49015420323751'), '490154203237518');
   assert.equal(ctx.rules.validImei('490154203237519'), false);
-  for (const [brand, prefix] of [['samsung', '35399'], ['xiaomi', '867'], ['other', '00123']]) {
+  for (const [brand, prefix] of [['samsung', '35399'], ['xiaomi', '86799'], ['other', '00123']]) {
     for (let index = 0; index < 8; index++) {
       const result = await ctx.store.generateImei(brand, crypto.randomUUID(), ctx.actor);
       assert.equal(result.status, 'active'); assert.ok(result.imei.startsWith(prefix)); assert.match(result.imei, /^\d{15}$/);
@@ -195,18 +195,20 @@ test('general page settings exclude the private register and pricing snapshot at
   assert.ok(query(ctx.rows, options).every(row => !row.key.startsWith('IMEI_V1_')));
 });
 
-test('own cancellation stops at exactly ten minutes; only manage-all bypasses the deadline on the API', async () => {
+test('own cancellation stops at exactly two minutes; only manage-all bypasses the deadline on the API', async () => {
   const start = Date.parse('2026-11-04T00:00:00Z');
-  for (const elapsed of [599999, 600000, 600001]) {
+  for (const elapsed of [119999, 120000, 120001]) {
     const ctx = setup(); ctx.setTime(start);
     ctx.setActor({ ...ctx.actor, permission: 'mod', actions: ['imei-cancel-own'] });
     const item = await ctx.store.generateImei('samsung', crypto.randomUUID(), ctx.actor);
     ctx.setTime(start + elapsed);
     const command = { action: 'CANCEL', requestId: item.requestId, actor: item.actor, reason: 'Thử hạn giờ', createdAt: new Date(start + elapsed).toISOString(), serverTime: start };
     const result = await ctx.route.POST(ctx.request(command));
-    assert.equal(result.status, elapsed < 600000 ? 200 : 403);
-    if (elapsed >= 600000) {
-      assert.equal((await result.json()).code, 'IMEI_CANCEL_EXPIRED');
+    assert.equal(result.status, elapsed < 120000 ? 200 : 403);
+    if (elapsed >= 120000) {
+      const error = await result.json();
+      assert.equal(error.code, 'IMEI_CANCEL_EXPIRED');
+      assert.equal(error.message, 'Liên Hệ Quản Lý: 37804 - Lê Thanh Sang');
       assert.equal((await ctx.store.listImei(item.actor, false, 1, '')).items[0].status, 'active');
       ctx.setActor({ maNV: '456', name: 'Quản lý', permission: 'mod', actions: ['imei-manage-all'] });
       assert.equal((await ctx.route.POST(ctx.request(command))).status, 200);
@@ -214,7 +216,7 @@ test('own cancellation stops at exactly ten minutes; only manage-all bypasses th
   }
 });
 
-test('time starts at allocation, not an interrupted plan; every reissue receives its own ten-minute window', async () => {
+test('time starts at allocation, not an interrupted plan; every reissue receives its own two-minute window', async () => {
   const ctx = setup(), start = Date.parse('2026-11-04T01:00:00Z'), id = crypto.randomUUID();
   ctx.setTime(start); ctx.stopBeforeClaim();
   await assert.rejects(ctx.store.generateImei('xiaomi', id, ctx.actor), /Interrupted before claim/);
@@ -227,22 +229,22 @@ test('time starts at allocation, not an interrupted plan; every reissue receives
   const second = await ctx.store.generateImei('xiaomi', crypto.randomUUID(), ctx.actor);
   assert.equal(second.imei, first.imei);
   assert.equal(Date.parse(second.createdAt), start + 40 * 60000);
-  ctx.setTime(start + 49 * 60000);
-  assert.equal(ctx.rules.canCancelImei(second, ctx.actor.maNV, own, start + 49 * 60000), true);
+  ctx.setTime(start + 41 * 60000);
+  assert.equal(ctx.rules.canCancelImei(second, ctx.actor.maNV, own, start + 41 * 60000), true);
   assert.equal((await ctx.store.cancelImei(cancel, ctx.actor, own)).status, 'cancelled');
   assert.equal((await ctx.store.listImei(first.actor, false, 1, '')).items.find(item => item.requestId === second.requestId).status, 'active');
-  ctx.setTime(start + 50 * 60000);
+  ctx.setTime(start + 42 * 60000);
   await assert.rejects(ctx.store.cancelImei({ ...cancel, requestId: second.requestId }, ctx.actor, own), error => error.code === 'IMEI_CANCEL_EXPIRED');
 });
 
 test('server rechecks expiry after a failed CAS rather than allowing a request that began before the deadline', async () => {
   const ctx = setup(), start = Date.parse('2026-11-04T02:00:00Z'); ctx.setTime(start);
   const item = await ctx.store.generateImei('samsung', crypto.randomUUID(), ctx.actor);
-  ctx.setTime(start + 599999);
+  ctx.setTime(start + 119999);
   ctx.beforeUpdate(() => {
     const row = ctx.rows.find(row => row.type === 'IMEI_ACTIVE');
     row.value = JSON.stringify({ ...JSON.parse(row.value), revision: crypto.randomUUID() });
-    ctx.setTime(start + 600000);
+    ctx.setTime(start + 120000);
   });
   await assert.rejects(ctx.store.cancelImei({ requestId: item.requestId, actor: item.actor, reason: 'Thử cạnh tranh' }, ctx.actor, own), error => error.code === 'IMEI_CANCEL_EXPIRED');
   assert.equal((await ctx.store.listImei(item.actor, false, 1, '')).items[0].status, 'active');
@@ -257,4 +259,67 @@ test('shared cancellation rules fail closed for invalid times, future dates and 
   assert.equal(rules.canCancelImei({ ...item, createdAt: 'bad' }, item.actor, own, start), false);
   assert.equal(rules.canCancelImei({ ...item, status: 'cancelled' }, item.actor, all, start), false);
   assert.equal(rules.canCancelImei(item, '456', { canCancelOwn: false, canManageAll: true }, start + 6000000), true);
+});
+
+test('Apple serials use the confirmed 11/13 lengths, S99 prefix and uppercase letters/digits excluding O/I', async () => {
+  const ctx = setup(), codes = new Set();
+  for (const [brand, length] of [['apple-13-plus', 11], ['apple-other', 13]]) {
+    for (let index = 0; index < 120; index++) {
+      const item = await ctx.store.generateImei(brand, crypto.randomUUID(), ctx.actor);
+      assert.equal(item.status, 'active'); assert.equal(item.imei.length, length);
+      assert.match(item.imei, /^S99[0-9A-HJ-NP-Z]+$/); assert.doesNotMatch(item.imei, /[OI]/);
+      assert.equal(ctx.rules.validImeiCode(brand, item.imei), true);
+      assert.equal(ctx.rules.validImei(item.imei), false);
+      assert.equal(codes.has(item.imei), false); codes.add(item.imei);
+    }
+  }
+  assert.deepEqual(Object.keys(ctx.rules.IMEI_BRANDS), ['samsung', 'xiaomi', 'apple-13-plus', 'apple-other', 'other']);
+  assert.equal(ctx.rules.IMEI_BRANDS.other, 'Hãng còn lại');
+  assert.equal(ctx.rules.validImeiCode('apple-13-plus', 'S99ABCDEFGI'), false);
+  assert.equal(ctx.rules.validImeiCode('apple-13-plus', 'S99ABCDEFGO'), false);
+  assert.equal(ctx.rules.validImeiCode('apple-13-plus', 'S99abcdefgh'), false);
+  assert.equal(ctx.rules.validImeiCode('apple-other', 'S99ABCDEFGH'), false);
+});
+
+test('Apple retries allocate once, search accepts lowercase, history stays scoped, and reissues keep the correct length', async () => {
+  const ctx = setup(), id = crypto.randomUUID();
+  const results = await Promise.all(Array.from({ length: 8 }, () => ctx.store.generateImei('apple-13-plus', id, ctx.actor)));
+  assert.equal(new Set(results.map(item => item.imei)).size, 1);
+  const first = results[0];
+  assert.equal((await ctx.store.listImei(first.actor, false, 1, first.imei.toLowerCase())).total, 1);
+  assert.equal((await ctx.store.listImei('456', false, 1, first.imei)).total, 0);
+  await ctx.store.cancelImei({ requestId: id, actor: first.actor, reason: 'Thử cấp lại SN' }, ctx.actor, own);
+  const longer = await ctx.store.generateImei('apple-other', crypto.randomUUID(), ctx.actor);
+  assert.equal(longer.imei.length, 13); assert.notEqual(longer.imei, first.imei);
+  const reused = await ctx.store.generateImei('apple-13-plus', crypto.randomUUID(), ctx.actor);
+  assert.equal(reused.imei, first.imei);
+  assert.equal((await ctx.store.generateImei('apple-13-plus', id, ctx.actor)).status, 'cancelled');
+  const history = await ctx.store.listImei(first.actor, false, 1, first.imei);
+  assert.equal(history.total, 2); assert.equal(history.items.filter(item => item.status === 'active').length, 1);
+  await assert.rejects(ctx.store.listImei(first.actor, false, 1, 'S99ABCDO123'), rejectStatus(400));
+});
+
+test('Apple serials enforce the same two-minute cancellation deadline and manager override', async () => {
+  const ctx = setup(), start = Date.parse('2026-11-04T04:00:00Z'); ctx.setTime(start);
+  const item = await ctx.store.generateImei('apple-other', crypto.randomUUID(), ctx.actor);
+  const command = { requestId: item.requestId, actor: item.actor, reason: 'Hủy SN thử' };
+  ctx.setTime(start + 120000);
+  await assert.rejects(ctx.store.cancelImei(command, ctx.actor, own), error => error.code === 'IMEI_CANCEL_EXPIRED' && error.message === 'Liên Hệ Quản Lý: 37804 - Lê Thanh Sang');
+  assert.equal((await ctx.store.cancelImei(command, { maNV: '456', name: 'Quản lý' }, { canCancelOwn: false, canManageAll: true })).status, 'cancelled');
+});
+
+test('legacy Xiaomi issued codes remain recoverable, while new and unfinished requests use the new prefix', async () => {
+  const ctx = setup(), id = crypto.randomUUID(), createdAt = new Date().toISOString();
+  const legacy = ctx.rules.completeImei('86712345678901');
+  const plan = { revision: crypto.randomUUID(), requestId: id, imei: legacy, brand: 'xiaomi', prefix: '867', actor: ctx.actor.maNV, actorName: ctx.actor.name, createdAt };
+  const setting = (key, value, type) => ({ key, value: JSON.stringify(value), type, updated_at_text: createdAt, updated_by: ctx.actor.maNV });
+  ctx.rows.push(setting(`IMEI_V1_REQUEST_${ctx.actor.maNV}_${id}`, plan, 'IMEI_REQUEST'));
+  ctx.rows.push(setting('IMEI_V1_CODE_' + legacy, { revision: crypto.randomUUID(), imei: legacy, events: [{ requestId: id, actor: ctx.actor.maNV, createdAt }] }, 'IMEI_ACTIVE'));
+  assert.equal((await ctx.store.generateImei('xiaomi', id, ctx.actor)).imei, legacy);
+  await ctx.store.cancelImei({ requestId: id, actor: ctx.actor.maNV, reason: 'Hủy mã cũ thử' }, ctx.actor, own);
+  assert.equal((await ctx.store.listImei(ctx.actor.maNV, false, 1, legacy)).items[0].status, 'cancelled');
+  const pending = crypto.randomUUID();
+  ctx.rows.push(setting(`IMEI_V1_REQUEST_${ctx.actor.maNV}_${pending}`, { ...plan, requestId: pending }, 'IMEI_REQUEST'));
+  await assert.rejects(ctx.store.generateImei('xiaomi', pending, ctx.actor), error => error.code === 'IMEI_RULE_CHANGED');
+  assert.equal((await ctx.store.generateImei('xiaomi', crypto.randomUUID(), ctx.actor)).imei.startsWith('86799'), true);
 });

@@ -30,7 +30,7 @@ function termMatch(value,term) {
   if(op==='eq')return String(value)===pattern;
   if(op==='neq')return String(value)!==pattern;
   if(op==='imatch')return new RegExp(pattern,'i').test(String(value));
-  if(op==='like' || op==='ilike')return new RegExp('^'+pattern.split('*').map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('.*')+'$',op==='ilike'?'i':'').test(String(value));
+  if(op==='like' || op==='ilike')return new RegExp('^'+[...pattern].map(char=>char==='*'||char==='%'?'.*':char==='_'?'.':char.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('')+'$',op==='ilike'?'i':'').test(String(value));
   throw new Error('Unsupported fake filter '+term);
 }
 function matches(row,filters={}) {

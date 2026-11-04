@@ -25,7 +25,7 @@ test('MOD sees only granted groups, including standalone action grants', () => {
   assert.ok(!nav.visibleAdminScreens('mod', ['tools'], []).includes('system'));
 });
 test('ADMIN retains all functions under four non-overlapping groups', () => {
-  assert.deepEqual(nav.ADMIN_SECTIONS.map(section => section.label), ['Nội dung', 'Bảng giá', 'Tài khoản', 'Tạo IMEI']);
+  assert.deepEqual(nav.ADMIN_SECTIONS.map(section => section.label), ['Nội dung', 'Bảng giá', 'Tài khoản', 'Tạo IMEI / SN']);
   const screens = nav.visibleAdminScreens('admin', [], []);
   assert.equal(screens.length, new Set(screens).size);
   for (const expected of ['tcdm', 'quy-trinh-thu-cu', 'may-moi', 'may-cu', 'demo', 'people', 'imei']) assert.ok(screens.includes(expected));

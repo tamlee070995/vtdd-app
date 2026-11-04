@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const { admin, response } = await requireAdminApi(req);
   if (response) return response;
   const access = imeiAccess(admin!);
-  if (!access.canView) return json({ success: false, message: "Bạn chưa được cấp quyền dùng mục Tạo IMEI." }, 403);
+  if (!access.canView) return json({ success: false, message: "Bạn chưa được cấp quyền dùng mục Tạo IMEI / SN." }, 403);
   try {
     return json({ success: true, ...await listImei(admin!.maNV, access.canManageAll, req.nextUrl.searchParams.get("page"), req.nextUrl.searchParams.get("q")), access });
   } catch (error) { return failure(error); }
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (response) return response;
   if (!isSameOriginRequest(req)) return json({ success: false, message: "Yêu cầu chưa đúng nguồn." }, 403);
   const access = imeiAccess(admin!);
-  if (!access.canView) return json({ success: false, message: "Bạn chưa được cấp quyền dùng mục Tạo IMEI." }, 403);
+  if (!access.canView) return json({ success: false, message: "Bạn chưa được cấp quyền dùng mục Tạo IMEI / SN." }, 403);
   if (Number(req.headers.get("content-length") || 0) > 4096) return json({ success: false, message: "Yêu cầu quá dài." }, 413);
   try {
     const raw = await req.text();

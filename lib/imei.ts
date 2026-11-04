@@ -1,4 +1,4 @@
-export type ImeiBrand = "samsung" | "xiaomi" | "other";
+export type ImeiBrand = "samsung" | "xiaomi" | "apple-13-plus" | "apple-other" | "other";
 export type ImeiIssue = {
   requestId: string;
   imei: string | null;
@@ -16,8 +16,26 @@ export class ImeiError extends Error {
   constructor(message: string, public status = 400, public code = "IMEI_ERROR") { super(message); }
 }
 
-export const IMEI_BRANDS: Record<ImeiBrand, string> = { samsung: "Samsung", xiaomi: "Xiaomi", other: "Còn lại" };
-export const IMEI_CANCEL_WINDOW_MS = 10 * 60 * 1000;
+export const IMEI_BRANDS: Record<ImeiBrand, string> = {
+  samsung: "Samsung", xiaomi: "Xiaomi", "apple-13-plus": "Apple iPhone 13 trở lên", "apple-other": "Apple iPhone còn lại", other: "Hãng còn lại",
+};
+export const IMEI_CANCEL_WINDOW_MS = 2 * 60 * 1000;
+export const IMEI_CANCEL_CONTACT = "Liên Hệ Quản Lý: 37804 - Lê Thanh Sang";
+export const APPLE_SN_ALPHABET = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+export function isAppleSerial(brand: unknown) {
+  return brand === "apple-13-plus" || brand === "apple-other";
+}
+
+export function imeiCodeLength(brand: ImeiBrand) {
+  return brand === "apple-13-plus" ? 11 : brand === "apple-other" ? 13 : 15;
+}
+
+export function validImeiCode(brand: ImeiBrand, code: string) {
+  if (!Object.hasOwn(IMEI_BRANDS, brand)) return false;
+  if (isAppleSerial(brand)) return new RegExp(`^S99[0-9A-HJ-NP-Z]{${imeiCodeLength(brand) - 3}}$`).test(code);
+  return validImei(code);
+}
 
 export function imeiCancelUntil(createdAt: string) {
   return Date.parse(createdAt) + IMEI_CANCEL_WINDOW_MS;
@@ -33,7 +51,8 @@ export function canCancelImei(item: Pick<ImeiIssue, "status" | "actor" | "create
 
 export function imeiPrefix(brand: unknown, actor: string) {
   if (brand === "samsung") return "35399";
-  if (brand === "xiaomi") return "867";
+  if (brand === "xiaomi") return "86799";
+  if (isAppleSerial(brand)) return "S99";
   if (brand !== "other") throw new ImeiError("Xin chọn hãng máy.");
   if (!/^\d{1,13}$/.test(actor)) throw new ImeiError("Mã nhân viên phải gồm 1–13 số để chừa chỗ tạo mã và tính Luhn.");
   return actor;

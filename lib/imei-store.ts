@@ -1,7 +1,7 @@
 import "server-only";
 import { randomInt, randomUUID } from "node:crypto";
 import { countRows, insertRows, isSupabaseConfigured, selectRows, updateRows } from "@/lib/supabase-rest";
-import { canCancelImei, completeImei, imeiPrefix, ImeiError, validImei, validImeiRequestId, type ImeiBrand, type ImeiIssue } from "@/lib/imei";
+import { APPLE_SN_ALPHABET, canCancelImei, completeImei, imeiCodeLength, imeiPrefix, ImeiError, IMEI_CANCEL_CONTACT, isAppleSerial, validImeiCode, validImeiRequestId, type ImeiBrand, type ImeiIssue } from "@/lib/imei";
 
 const PREFIX = "IMEI_V1_";
 const REQUEST = PREFIX + "REQUEST_";
@@ -47,20 +47,24 @@ function issue(plan: Plan, ledger: Ledger | null): ImeiIssue {
     brand: plan.brand, actor: plan.actor, actorName: plan.actorName, createdAt: event?.createdAt || plan.createdAt, status,
     ...(event?.cancelledAt ? { cancelledAt: event.cancelledAt, cancelledBy: event.cancelledBy, reason: event.reason } : {}) };
 }
-function randomCode(prefix: string) {
+function randomCode(prefix: string, brand: ImeiBrand) {
   let digits = prefix;
+  if (isAppleSerial(brand)) {
+    while (digits.length < imeiCodeLength(brand)) digits += APPLE_SN_ALPHABET[randomInt(APPLE_SN_ALPHABET.length)];
+    return digits;
+  }
   while (digits.length < 14) digits += randomInt(10);
   return completeImei(digits);
 }
-async function candidate(prefix: string) {
-  const available = await selectRows<Setting>("system_settings", { select: "key,value", filters: { key: `like.${CODE}${prefix}*`, type: "eq.IMEI_AVAILABLE" }, order: "updated_at_text.asc,key.asc", limit: 1 });
+async function candidate(prefix: string, brand: ImeiBrand) {
+  const available = await selectRows<Setting>("system_settings", { select: "key,value", filters: { key: `like.${CODE}${prefix}${"_".repeat(imeiCodeLength(brand) - prefix.length)}`, type: "eq.IMEI_AVAILABLE" }, order: "updated_at_text.asc,key.asc", limit: 1 });
   if (available.length) {
     const imei = available[0].key.slice(CODE.length);
     const ledger = parseLedger(JSON.parse(available[0].value), imei);
-    if (validImei(imei) && !ledger!.events.some(event => !event.rejected && !event.cancelledAt)) return imei;
+    if (validImeiCode(brand, imei) && !ledger!.events.some(event => !event.rejected && !event.cancelledAt)) return imei;
   }
   for (let attempt = 0; attempt < 40; attempt++) {
-    const imei = randomCode(prefix);
+    const imei = randomCode(prefix, brand);
     const ledger = parseLedger(await read<Ledger>(CODE + imei), imei);
     if (!ledger || !ledger.events.some(event => !event.rejected && !event.cancelledAt)) return imei;
   }
@@ -74,17 +78,19 @@ export async function generateImei(brand: unknown, requestId: unknown, actor: Ac
   const id = requestId.toLowerCase(), prefix = imeiPrefix(brand, actor.maNV), key = requestKey(actor.maNV, id);
   let plan = await read<Plan>(key);
   if (!plan) {
-    const next: Plan = { revision: randomUUID(), requestId: id, imei: await candidate(prefix), brand: brand as ImeiBrand, prefix, actor: actor.maNV, actorName: actor.name, createdAt: new Date().toISOString() };
+    const next: Plan = { revision: randomUUID(), requestId: id, imei: await candidate(prefix, brand as ImeiBrand), brand: brand as ImeiBrand, prefix, actor: actor.maNV, actorName: actor.name, createdAt: new Date().toISOString() };
     try { await insertRows("system_settings", [row(key, next, "IMEI_REQUEST", actor.maNV, next.createdAt)]); plan = next; }
     catch (error) { if (!duplicate(error)) throw error; plan = await read<Plan>(key); }
   }
-  if (!plan || plan.actor !== actor.maNV || plan.brand !== brand || plan.prefix !== prefix || !validImei(plan.imei)) throw new ImeiError("Lượt tạo này không khớp. Xin tải lại lịch sử.", 409);
+  if (!plan || plan.actor !== actor.maNV || plan.brand !== brand || !plan.imei.startsWith(plan.prefix) || !validImeiCode(plan.brand, plan.imei)) throw new ImeiError("Lượt tạo này không khớp. Xin tải lại lịch sử.", 409);
   // The persisted candidate NEVER changes for a request, including after network failures.
   // This avoids a second allocation if an earlier response was lost.
   for (let attempt = 0; attempt < 16; attempt++) {
     const previous = parseLedger(await read<Ledger>(CODE + plan.imei), plan.imei);
     const existing = previous?.events.find(event => event.requestId === id && event.actor === actor.maNV);
     if (existing) { if (existing.rejected) throw conflict(); return issue(plan, previous); }
+    // Previously issued Xiaomi codes stay recoverable, but unfinished old plans cannot issue with the retired prefix.
+    if (plan.prefix !== prefix || !plan.imei.startsWith(prefix)) throw new ImeiError("Quy tắc mã đã đổi. Xin tạo một lượt mới.", 409, "IMEI_RULE_CHANGED");
     const busy = previous?.events.some(event => !event.rejected && !event.cancelledAt) || false;
     const event: Event = { requestId: id, actor: actor.maNV, createdAt: new Date().toISOString(), ...(busy ? { rejected: true } : {}) };
     const next: Ledger = { revision: randomUUID(), imei: plan.imei, events: [...(previous?.events || []), event] };
@@ -111,7 +117,7 @@ export async function cancelImei(input: { requestId?: unknown; actor?: unknown; 
     if (event.cancelledAt) return issue(plan, previous);
     // Recheck server time on every CAS attempt, including after a concurrent update.
     if (!canCancelImei(issue(plan, previous), by.maNV, access, Date.now())) {
-      throw new ImeiError("Đã hết hạn hủy 10 phút. Chỉ tài khoản có quyền Quản lý toàn bộ sổ IMEI mới hủy được mã này.", 403, "IMEI_CANCEL_EXPIRED");
+      throw new ImeiError(IMEI_CANCEL_CONTACT, 403, "IMEI_CANCEL_EXPIRED");
     }
     const next = { ...previous, revision: randomUUID(), events: previous.events.map(item => item === event ? { ...item, cancelledAt: new Date().toISOString(), cancelledBy: by.maNV, reason: input.reason!.toString().trim() } : item) };
     if (await saveLedger(previous, next, by.maNV)) return issue(plan, next);
@@ -122,8 +128,8 @@ export async function cancelImei(input: { requestId?: unknown; actor?: unknown; 
 export async function listImei(actor: string, canManageAll: boolean, pageInput: unknown, queryInput: unknown) {
   ready();
   const page = Math.max(1, Math.min(100000, Math.floor(Number(pageInput) || 1))), pageSize = 20;
-  const query = String(queryInput || "").trim();
-  if (query && !/^\d{15}$/.test(query)) throw new ImeiError("Xin nhập đủ 15 số để tìm mã.");
+  const query = String(queryInput || "").trim().toUpperCase();
+  if (query && !/^\d{15}$/.test(query) && !validImeiCode("apple-13-plus", query) && !validImeiCode("apple-other", query)) throw new ImeiError("Xin nhập đủ IMEI 15 số hoặc SN Apple 11/13 ký tự để tìm mã.");
   const filters: Record<string, string> = { key: `like.${REQUEST}*`, ...(!canManageAll ? { updated_by: `eq.${actor}` } : {}), ...(query ? { value: `like.*"imei":"${query}"*` } : {}) };
   const [plans, total] = await Promise.all([
     selectRows<Setting>("system_settings", { select: "value", filters, order: "updated_at_text.desc,key.desc", limit: pageSize, offset: (page - 1) * pageSize }),

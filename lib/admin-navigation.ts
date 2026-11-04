@@ -5,7 +5,7 @@ export const ADMIN_SECTIONS: Array<{ key: AdminSection; label: string; descripti
   { key: "content", label: "Nội dung", description: "Bài viết & hướng dẫn", icon: "▤", screens: ["quy-trinh-thu-cu", "may-moi", "may-cu", "demo"] },
   { key: "prices", label: "Bảng giá", description: "Đồng bộ & đóng/mở", icon: "₫", screens: ["tcdm"] },
   { key: "accounts", label: "Tài khoản", description: "Nhân viên & phân quyền", icon: "♙", screens: ["people"] },
-  { key: "imei", label: "Tạo IMEI", description: "Cấp mã & lịch sử", icon: "#", screens: ["imei"] },
+  { key: "imei", label: "Tạo IMEI / SN", description: "Cấp mã & lịch sử", icon: "#", screens: ["imei"] },
 ];
 
 export function visibleAdminScreens(role: string, modules: string[], actions: string[]): AdminScreen[] {

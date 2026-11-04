@@ -120,7 +120,7 @@ const ADMIN_MODULE_OPTIONS = [
   { key: "demo", label: "4 Trang demo" },
 
   { key: "people", label: "6 Quyền & Nhân sự" },
-  { key: "imei", label: "Tạo IMEI — xem lịch sử của mình" },
+  { key: "imei", label: "Tạo IMEI / SN — xem lịch sử của mình" },
 ];
 
 const ADMIN_ACTION_PREFIX = "action:";
@@ -139,9 +139,9 @@ const TCDM_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: str
 const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
   ...PERSONNEL_ACTION_OPTIONS,
   ...TCDM_ACTION_OPTIONS,
-  { key: "imei-create", label: "Tạo mã IMEI", desc: "Cấp mã 15 số có kiểm tra Luhn." },
-  { key: "imei-cancel-own", label: "Hủy mã của mình", desc: "Hủy mã của mình trong 10 phút kể từ lúc cấp." },
-  { key: "imei-manage-all", label: "Quản lý toàn bộ sổ IMEI", desc: "Xem và hủy mã của mọi người, kể cả sau 10 phút." },
+  { key: "imei-create", label: "Tạo mã IMEI / SN", desc: "Cấp IMEI 15 số hoặc SN Apple theo hãng máy mới." },
+  { key: "imei-cancel-own", label: "Hủy mã của mình", desc: "Hủy mã của mình trong 2 phút kể từ lúc cấp." },
+  { key: "imei-manage-all", label: "Quản lý toàn bộ sổ IMEI", desc: "Xem và hủy IMEI / SN của mọi người, kể cả sau 2 phút." },
 ];
 
 const PERSONNEL_ACTION_KEYS = new Set(PERSONNEL_ACTION_OPTIONS.map((item) => item.key));
@@ -150,7 +150,7 @@ const IMEI_ACTION_KEYS = new Set<AdminActionKey>(["imei-create", "imei-cancel-ow
 
 const PERMISSION_TREE = [
   {
-    title: "Tạo IMEI",
+    title: "Tạo IMEI / SN",
     desc: "Cấp mã, hủy mã và tra lại lịch sử.",
     module: "imei",
     children: ADMIN_ACTION_OPTIONS.filter(item => IMEI_ACTION_KEYS.has(item.key)),
@@ -2693,7 +2693,7 @@ const ADMIN_MODULES: Array<{
   desc: string;
   badge: string;
 }> = [
-  { key: "imei", no: "07", title: "Tạo IMEI", desc: "Cấp mã và giữ lịch sử hủy, cấp lại.", badge: "Sổ mã" },
+  { key: "imei", no: "07", title: "Tạo IMEI / SN", desc: "Cấp mã và giữ lịch sử hủy, cấp lại.", badge: "Sổ mã" },
   {
     key: "tcdm",
     no: "01",
