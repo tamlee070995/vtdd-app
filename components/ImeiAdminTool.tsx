@@ -1,18 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { IMEI_BRANDS, imeiPrefix, validImeiRequestId, type ImeiBrand, type ImeiIssue } from "@/lib/imei";
+import { canCancelImei, imeiCancelUntil, IMEI_BRANDS, imeiPrefix, validImeiRequestId, type ImeiBrand, type ImeiIssue } from "@/lib/imei";
 import { clientErrorMessage, requestJson } from "@/lib/client-request";
 import UiNotice from "@/components/UiNotice";
 import UiFeedbackDialog from "@/components/UiFeedbackDialog";
 import styles from "./ImeiAdminTool.module.css";
 
 type Access = { canView: boolean; canCreate: boolean; canCancelOwn: boolean; canManageAll: boolean };
-type Directory = { success: boolean; items: ImeiIssue[]; page: number; pages: number; total: number; access: Access };
+type Directory = { success: boolean; items: ImeiIssue[]; page: number; pages: number; total: number; access: Access; serverTime: number };
 type Pending = { requestId: string; brand: ImeiBrand };
 type Feedback = { tone: "loading" | "error" | "success"; text: string; retry?: () => void };
 const labels = { active: "Đã cấp", cancelled: "Đã hủy", pending: "Chưa xong", conflict: "Chưa cấp" };
 const date = (value: string) => new Date(value).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+function cancelTimeLeft(item: ImeiIssue, now: number) {
+  const seconds = Math.max(0, Math.ceil((imeiCancelUntil(item.createdAt) - now) / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
 function newRequestId() {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -28,7 +32,7 @@ async function post(body: object) {
     const data = await response.json().catch(() => null);
     if (data?.code === "STAFF_SETUP_REQUIRED") window.location.assign("/admin/setup");
     if (!response.ok || !data?.success) throw Object.assign(new Error(data?.message || "Chưa nhận được kết quả. Xin thử lại đúng lượt này."), { code: data?.code });
-    return data as { success: true; item: ImeiIssue; message: string };
+    return data as { success: true; item: ImeiIssue; message: string; serverTime: number };
   } finally { clearTimeout(timer); }
 }
 
@@ -41,22 +45,35 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
   const [result, setResult] = useState<ImeiIssue | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [cancel, setCancel] = useState<ImeiIssue | null>(null), [reason, setReason] = useState("");
+  const [now, setNow] = useState(0);
+  const clock = useRef<{ server: number; received: number } | null>(null);
   const busy = useRef(false), sequence = useRef({ value: 0 }), confirmation = useRef<HTMLDialogElement>(null), copyField = useRef<HTMLInputElement>(null);
   const storageKey = `vtdd-imei-pending-${actor}`;
   const access = directory?.access;
+  const syncClock = useCallback((serverTime: number) => {
+    if (!Number.isFinite(serverTime)) return;
+    clock.current = { server: serverTime, received: performance.now() }; setNow(serverTime);
+  }, []);
   const load = useCallback(async () => {
     const state = sequence.current, current = ++state.value;
     setLoading(true); setLoadError("");
     try {
       const data = await requestJson<Directory>(`/api/admin/imei?page=${page}&q=${encodeURIComponent(query)}`);
       if (state.value === current) {
+        syncClock(data.serverTime);
         setDirectory(data); if (data.page > data.pages) setPage(data.pages);
         setResult(previous => previous ? data.items.find(item => item.actor === previous.actor && item.requestId === previous.requestId) || previous : null);
       }
     } catch (error) { if (state.value === current) setLoadError(clientErrorMessage(error)); }
     finally { if (state.value === current) setLoading(false); }
-  }, [page, query]);
+  }, [page, query, syncClock]);
   useEffect(() => { const state = sequence.current; void load(); return () => { state.value++; }; }, [load]);
+  useEffect(() => {
+    const timer = window.setInterval(() => { const anchor = clock.current; if (anchor) setNow(anchor.server + performance.now() - anchor.received); }, 1000);
+    const onVisible = () => { if (document.visibilityState === "visible") void load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [load]);
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
@@ -80,6 +97,7 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
     setFeedback({ tone: "loading", text: "Đang cấp mã và ghi vào sổ…" });
     try {
       const response = await post({ action: "GENERATE", ...next });
+      syncClock(response.serverTime);
       remember(null); setResult(response.item);
       setFeedback({ tone: "success", text: response.message });
       void load();
@@ -92,15 +110,22 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
   }
   async function applyCancellation() {
     if (busy.current || !cancel || !reason.trim()) return;
+    const anchor = clock.current;
+    const checkedAt = anchor ? anchor.server + performance.now() - anchor.received : now;
+    if (!access || !canCancelImei(cancel, actor, access, checkedAt)) {
+      setCancel(null); setFeedback({ tone: "error", text: "Đã hết hạn hủy 10 phút. Xin liên lạc người có quyền Quản lý toàn bộ sổ IMEI." }); return;
+    }
     const target = cancel, note = reason.trim();
     busy.current = true; setCancel(null);
     setFeedback({ tone: "loading", text: "Đang hủy lượt cấp…" });
     try {
       const response = await post({ action: "CANCEL", requestId: target.requestId, actor: target.actor, reason: note });
+      syncClock(response.serverTime);
       if (result?.requestId === target.requestId && result.actor === target.actor) setResult(response.item);
       setFeedback({ tone: "success", text: response.message }); void load();
     } catch (error) {
-      setFeedback({ tone: "error", text: clientErrorMessage(error), retry: () => { setFeedback(null); setCancel(target); setReason(note); } }); void load();
+      const expired = (error as { code?: string })?.code === "IMEI_CANCEL_EXPIRED";
+      setFeedback({ tone: "error", text: clientErrorMessage(error), ...(!expired ? { retry: () => { setFeedback(null); setCancel(target); setReason(note); } } : {}) }); void load();
     } finally { busy.current = false; }
   }
   async function copy(value: string) {
@@ -110,7 +135,7 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
   let prefix = "";
   try { prefix = imeiPrefix(brand, actor); } catch { /* Explain an unsupported employee code inline. */ }
   return <div className={styles.tool}>
-    <header className={styles.heading}><div><span className={styles.eyebrow}>SỔ MÃ NỘI BỘ</span><h2>Tạo IMEI</h2><p>Mã 15 số có kiểm tra Luhn. Mã đã hủy có thể cấp lại.</p></div><span className={styles.badge}>Luhn ✓</span></header>
+    <header className={styles.heading}><div><span className={styles.eyebrow}>SỔ MÃ NỘI BỘ</span><h2>Tạo IMEI</h2><p>Mã 15 số có kiểm tra Luhn. Mã đã hủy có thể cấp lại.</p><p>Được hủy mã của mình trong 10 phút. Sau đó, cần quyền Quản lý toàn bộ sổ IMEI.</p></div><span className={styles.badge}>Luhn ✓</span></header>
     {loadError && <UiNotice onRetry={() => void load()} busy={loading}>{loadError}</UiNotice>}
     {loading && !directory && <UiNotice tone="loading">Đang tải sổ mã…</UiNotice>}
     {access && <>
@@ -132,18 +157,19 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
             <div className={styles.itemMain}><div className={styles.itemTop}><strong className={styles.number}>{item.imei || "Chưa cấp mã"}</strong><span className={styles.status} data-status={item.status}>{labels[item.status]}</span></div>
               <p>{IMEI_BRANDS[item.brand]} · {date(item.createdAt)}</p>{access.canManageAll && <p>{item.actorName} · NV {item.actor}</p>}
               {item.cancelledAt && <p className={styles.cancellation}>Hủy: {date(item.cancelledAt)} · NV {item.cancelledBy}<br />{item.reason}</p>}
+              {item.status === "active" && item.actor === actor && access.canCancelOwn && !access.canManageAll && <p className={styles.cancelWindow} data-expired={!canCancelImei(item, actor, access, now)}>{canCancelImei(item, actor, access, now) ? `Còn ${cancelTimeLeft(item, now)} để hủy` : "Đã hết 10 phút. Cần quyền Quản lý toàn bộ sổ IMEI để hủy."}</p>}
             </div>
             <div className={styles.actions}>
               {item.status === "active" && <button type="button" className={styles.secondary} onClick={() => void copy(item.imei!)}>Sao chép</button>}
               {item.status === "pending" && item.actor === actor && access.canCreate && <button type="button" className={styles.secondary} disabled={!!pending && pending.requestId !== item.requestId} onClick={() => void generate({ requestId: item.requestId, brand: item.brand })}>Tiếp tục</button>}
-              {item.status === "active" && (access.canManageAll || (access.canCancelOwn && item.actor === actor)) && <button type="button" className={styles.danger} onClick={() => { setCancel(item); setReason(""); }}>Hủy mã</button>}
+              {item.status === "active" && (access.canManageAll || (access.canCancelOwn && item.actor === actor)) && <button type="button" className={styles.danger} disabled={!canCancelImei(item, actor, access, now)} onClick={() => { setCancel(item); setReason(""); }}>Hủy mã</button>}
             </div>
           </article>)}
         </div>
         <nav className={styles.pagination} aria-label="Trang lịch sử"><button type="button" className={styles.secondary} disabled={loading || page <= 1} onClick={() => setPage(page - 1)}>Trước</button><span>Trang {directory.page} / {directory.pages}</span><button type="button" className={styles.secondary} disabled={loading || page >= directory.pages} onClick={() => setPage(page + 1)}>Sau</button></nav>
       </section>
     </>}
-    {cancel && <dialog ref={confirmation} className={styles.dialog} onCancel={() => setCancel(null)} aria-labelledby="imei-cancel-title"><form onSubmit={event => { event.preventDefault(); void applyCancellation(); }}><h2 id="imei-cancel-title">Hủy lượt cấp mã?</h2><strong className={styles.number}>{cancel.imei}</strong><p>Mã sẽ được phép cấp lại. Lịch sử lượt cấp này vẫn được giữ.</p><label htmlFor="imei-cancel-reason">Lý do hủy</label><textarea id="imei-cancel-reason" required maxLength={300} autoFocus value={reason} onChange={event => setReason(event.target.value)} /><div className={styles.dialogActions}><button type="button" className={styles.secondary} onClick={() => setCancel(null)}>Trở lại</button><button className={styles.danger} disabled={!reason.trim()}>Hủy mã</button></div></form></dialog>}
+    {cancel && <dialog ref={confirmation} className={styles.dialog} onCancel={() => setCancel(null)} aria-labelledby="imei-cancel-title"><form onSubmit={event => { event.preventDefault(); void applyCancellation(); }}><h2 id="imei-cancel-title">Hủy lượt cấp mã?</h2><strong className={styles.number}>{cancel.imei}</strong><p>Mã sẽ được phép cấp lại. Lịch sử lượt cấp này vẫn được giữ.</p>{access && !canCancelImei(cancel, actor, access, now) && <p role="alert">Đã hết hạn hủy 10 phút. Xin liên lạc người có quyền Quản lý toàn bộ sổ IMEI.</p>}<label htmlFor="imei-cancel-reason">Lý do hủy</label><textarea id="imei-cancel-reason" required maxLength={300} autoFocus value={reason} onChange={event => setReason(event.target.value)} /><div className={styles.dialogActions}><button type="button" className={styles.secondary} onClick={() => setCancel(null)}>Trở lại</button><button className={styles.danger} disabled={!reason.trim() || !access || !canCancelImei(cancel, actor, access, now)}>Hủy mã</button></div></form></dialog>}
     {feedback && <UiFeedbackDialog tone={feedback.tone} onDismiss={() => { if (feedback.tone !== "loading") setFeedback(null); }} onRetry={feedback.retry}>{feedback.text}</UiFeedbackDialog>}
   </div>;
 }

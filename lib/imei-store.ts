@@ -1,7 +1,7 @@
 import "server-only";
 import { randomInt, randomUUID } from "node:crypto";
 import { countRows, insertRows, isSupabaseConfigured, selectRows, updateRows } from "@/lib/supabase-rest";
-import { completeImei, imeiPrefix, ImeiError, validImei, validImeiRequestId, type ImeiBrand, type ImeiIssue } from "@/lib/imei";
+import { canCancelImei, completeImei, imeiPrefix, ImeiError, validImei, validImeiRequestId, type ImeiBrand, type ImeiIssue } from "@/lib/imei";
 
 const PREFIX = "IMEI_V1_";
 const REQUEST = PREFIX + "REQUEST_";
@@ -44,7 +44,7 @@ function issue(plan: Plan, ledger: Ledger | null): ImeiIssue {
   const event = ledger?.events.find(event => event.requestId === plan.requestId && event.actor === plan.actor);
   const status = !event ? "pending" : event.rejected ? "conflict" : event.cancelledAt ? "cancelled" : "active";
   return { requestId: plan.requestId, imei: status === "pending" || status === "conflict" ? null : plan.imei,
-    brand: plan.brand, actor: plan.actor, actorName: plan.actorName, createdAt: plan.createdAt, status,
+    brand: plan.brand, actor: plan.actor, actorName: plan.actorName, createdAt: event?.createdAt || plan.createdAt, status,
     ...(event?.cancelledAt ? { cancelledAt: event.cancelledAt, cancelledBy: event.cancelledBy, reason: event.reason } : {}) };
 }
 function randomCode(prefix: string) {
@@ -86,7 +86,7 @@ export async function generateImei(brand: unknown, requestId: unknown, actor: Ac
     const existing = previous?.events.find(event => event.requestId === id && event.actor === actor.maNV);
     if (existing) { if (existing.rejected) throw conflict(); return issue(plan, previous); }
     const busy = previous?.events.some(event => !event.rejected && !event.cancelledAt) || false;
-    const event: Event = { requestId: id, actor: actor.maNV, createdAt: plan.createdAt, ...(busy ? { rejected: true } : {}) };
+    const event: Event = { requestId: id, actor: actor.maNV, createdAt: new Date().toISOString(), ...(busy ? { rejected: true } : {}) };
     const next: Ledger = { revision: randomUUID(), imei: plan.imei, events: [...(previous?.events || []), event] };
     if (await saveLedger(previous, next, actor.maNV)) {
       // Persist a collision outcome too: retrying this old request must never allocate later.
@@ -109,6 +109,10 @@ export async function cancelImei(input: { requestId?: unknown; actor?: unknown; 
     const event = previous?.events.find(event => event.requestId === plan.requestId && event.actor === plan.actor);
     if (!previous || !event || event.rejected) throw new ImeiError("Lượt này chưa có mã để hủy.", 409);
     if (event.cancelledAt) return issue(plan, previous);
+    // Recheck server time on every CAS attempt, including after a concurrent update.
+    if (!canCancelImei(issue(plan, previous), by.maNV, access, Date.now())) {
+      throw new ImeiError("Đã hết hạn hủy 10 phút. Chỉ tài khoản có quyền Quản lý toàn bộ sổ IMEI mới hủy được mã này.", 403, "IMEI_CANCEL_EXPIRED");
+    }
     const next = { ...previous, revision: randomUUID(), events: previous.events.map(item => item === event ? { ...item, cancelledAt: new Date().toISOString(), cancelledBy: by.maNV, reason: input.reason!.toString().trim() } : item) };
     if (await saveLedger(previous, next, by.maNV)) return issue(plan, next);
   }

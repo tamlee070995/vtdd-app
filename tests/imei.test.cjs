@@ -10,7 +10,11 @@ const { matches, query } = require('./helpers/postgrest-fake.cjs');
 function setup({ fixedRandom = false } = {}) {
   const rows = [], cache = new Map(), reads = [];
   let actor = { maNV: '00123', name: 'Admin thử', permission: 'admin', modules: [], actions: [] };
-  let authenticated = true, dropReply = false, offline = false;
+  let authenticated = true, dropReply = false, offline = false, time = null, stopBeforeClaim = false, beforeUpdate = null;
+  class ClockDate extends Date {
+    constructor(...args) { if (args.length) super(...args); else super(time ?? Date.now()); }
+    static now() { return time ?? Date.now(); }
+  }
   const pause = () => new Promise(resolve => setImmediate(resolve));
   const db = {
     isSupabaseConfigured: () => true,
@@ -19,6 +23,7 @@ function setup({ fixedRandom = false } = {}) {
     countRows: async (_, filters) => { await pause(); return rows.filter(row => matches(row, filters)).length; },
     insertRows: async (_, records) => {
       await pause();
+      if (stopBeforeClaim && records.some(row => row.key.startsWith('IMEI_V1_CODE_'))) { stopBeforeClaim = false; throw new Error('Interrupted before claim'); }
       if (records.some(record => rows.some(row => row.key === record.key))) throw new Error('23505 duplicate key');
       rows.push(...structuredClone(records));
       if (dropReply && records.some(row => row.key.startsWith('IMEI_V1_CODE_'))) { dropReply = false; throw new Error('Lost response after commit'); }
@@ -26,6 +31,7 @@ function setup({ fixedRandom = false } = {}) {
     },
     updateRows: async (_, filters, patch) => {
       await pause();
+      if (beforeUpdate) { const callback = beforeUpdate; beforeUpdate = null; callback(); }
       const selected = rows.filter(row => matches(row, filters));
       selected.forEach(row => Object.assign(row, structuredClone(patch)));
       if (dropReply && selected.length) { dropReply = false; throw new Error('Lost response after commit'); }
@@ -44,12 +50,12 @@ function setup({ fixedRandom = false } = {}) {
     if (cache.has(file)) return cache.get(file);
     const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
     const m = { exports: {} };
-    new Function('require', 'module', 'exports', source)(name => Object.hasOwn(mocks, name) ? mocks[name] : name.startsWith('@/') ? load(name.slice(2) + '.ts') : require(name), m, m.exports);
+    new Function('require', 'module', 'exports', 'Date', source)(name => Object.hasOwn(mocks, name) ? mocks[name] : name.startsWith('@/') ? load(name.slice(2) + '.ts') : require(name), m, m.exports, ClockDate);
     cache.set(file, m.exports); return m.exports;
   }
   const store = load('lib/imei-store.ts'), rules = load('lib/imei.ts'), route = load('app/api/admin/imei/route.ts');
   const request = (body, origin = 'http://localhost') => new NextRequest('http://localhost/api/admin/imei', { method: 'POST', headers: { 'Content-Type': 'application/json', origin }, body: JSON.stringify(body) });
-  return { rows, reads, store, rules, route, request, actor, load, setActor: value => { actor = value; }, unauthorized: () => { authenticated = false; }, loseResponse: () => { dropReply = true; }, offline: () => { offline = true; } };
+  return { rows, reads, store, rules, route, request, actor, load, setActor: value => { actor = value; }, unauthorized: () => { authenticated = false; }, loseResponse: () => { dropReply = true; }, offline: () => { offline = true; }, setTime: value => { time = value; }, stopBeforeClaim: () => { stopBeforeClaim = true; }, beforeUpdate: callback => { beforeUpdate = callback; } };
 }
 const own = { canCancelOwn: true, canManageAll: false };
 const all = { canCancelOwn: true, canManageAll: true };
@@ -187,4 +193,68 @@ test('general page settings exclude the private register and pricing snapshot at
   assert.ok(Object.keys(settings).every(key => !key.startsWith('IMEI_V1_')));
   const options = ctx.reads.at(-1);
   assert.ok(query(ctx.rows, options).every(row => !row.key.startsWith('IMEI_V1_')));
+});
+
+test('own cancellation stops at exactly ten minutes; only manage-all bypasses the deadline on the API', async () => {
+  const start = Date.parse('2026-11-04T00:00:00Z');
+  for (const elapsed of [599999, 600000, 600001]) {
+    const ctx = setup(); ctx.setTime(start);
+    ctx.setActor({ ...ctx.actor, permission: 'mod', actions: ['imei-cancel-own'] });
+    const item = await ctx.store.generateImei('samsung', crypto.randomUUID(), ctx.actor);
+    ctx.setTime(start + elapsed);
+    const command = { action: 'CANCEL', requestId: item.requestId, actor: item.actor, reason: 'Thử hạn giờ', createdAt: new Date(start + elapsed).toISOString(), serverTime: start };
+    const result = await ctx.route.POST(ctx.request(command));
+    assert.equal(result.status, elapsed < 600000 ? 200 : 403);
+    if (elapsed >= 600000) {
+      assert.equal((await result.json()).code, 'IMEI_CANCEL_EXPIRED');
+      assert.equal((await ctx.store.listImei(item.actor, false, 1, '')).items[0].status, 'active');
+      ctx.setActor({ maNV: '456', name: 'Quản lý', permission: 'mod', actions: ['imei-manage-all'] });
+      assert.equal((await ctx.route.POST(ctx.request(command))).status, 200);
+    }
+  }
+});
+
+test('time starts at allocation, not an interrupted plan; every reissue receives its own ten-minute window', async () => {
+  const ctx = setup(), start = Date.parse('2026-11-04T01:00:00Z'), id = crypto.randomUUID();
+  ctx.setTime(start); ctx.stopBeforeClaim();
+  await assert.rejects(ctx.store.generateImei('xiaomi', id, ctx.actor), /Interrupted before claim/);
+  ctx.setTime(start + 20 * 60000);
+  const first = await ctx.store.generateImei('xiaomi', id, ctx.actor);
+  assert.equal(Date.parse(first.createdAt), start + 20 * 60000);
+  const cancel = { requestId: id, actor: first.actor, reason: 'Thử cấp lại' };
+  await ctx.store.cancelImei(cancel, ctx.actor, own);
+  ctx.setTime(start + 40 * 60000);
+  const second = await ctx.store.generateImei('xiaomi', crypto.randomUUID(), ctx.actor);
+  assert.equal(second.imei, first.imei);
+  assert.equal(Date.parse(second.createdAt), start + 40 * 60000);
+  ctx.setTime(start + 49 * 60000);
+  assert.equal(ctx.rules.canCancelImei(second, ctx.actor.maNV, own, start + 49 * 60000), true);
+  assert.equal((await ctx.store.cancelImei(cancel, ctx.actor, own)).status, 'cancelled');
+  assert.equal((await ctx.store.listImei(first.actor, false, 1, '')).items.find(item => item.requestId === second.requestId).status, 'active');
+  ctx.setTime(start + 50 * 60000);
+  await assert.rejects(ctx.store.cancelImei({ ...cancel, requestId: second.requestId }, ctx.actor, own), error => error.code === 'IMEI_CANCEL_EXPIRED');
+});
+
+test('server rechecks expiry after a failed CAS rather than allowing a request that began before the deadline', async () => {
+  const ctx = setup(), start = Date.parse('2026-11-04T02:00:00Z'); ctx.setTime(start);
+  const item = await ctx.store.generateImei('samsung', crypto.randomUUID(), ctx.actor);
+  ctx.setTime(start + 599999);
+  ctx.beforeUpdate(() => {
+    const row = ctx.rows.find(row => row.type === 'IMEI_ACTIVE');
+    row.value = JSON.stringify({ ...JSON.parse(row.value), revision: crypto.randomUUID() });
+    ctx.setTime(start + 600000);
+  });
+  await assert.rejects(ctx.store.cancelImei({ requestId: item.requestId, actor: item.actor, reason: 'Thử cạnh tranh' }, ctx.actor, own), error => error.code === 'IMEI_CANCEL_EXPIRED');
+  assert.equal((await ctx.store.listImei(item.actor, false, 1, '')).items[0].status, 'active');
+});
+
+test('shared cancellation rules fail closed for invalid times, future dates and missing ownership/rights', () => {
+  const { rules } = setup(), start = Date.parse('2026-11-04T03:00:00Z');
+  const item = { actor: '00123', status: 'active', createdAt: new Date(start).toISOString() };
+  assert.equal(rules.canCancelImei(item, item.actor, own, start), true);
+  assert.equal(rules.canCancelImei(item, item.actor, own, start - 1), false);
+  assert.equal(rules.canCancelImei(item, '456', own, start), false);
+  assert.equal(rules.canCancelImei({ ...item, createdAt: 'bad' }, item.actor, own, start), false);
+  assert.equal(rules.canCancelImei({ ...item, status: 'cancelled' }, item.actor, all, start), false);
+  assert.equal(rules.canCancelImei(item, '456', { canCancelOwn: false, canManageAll: true }, start + 6000000), true);
 });

@@ -17,6 +17,19 @@ export class ImeiError extends Error {
 }
 
 export const IMEI_BRANDS: Record<ImeiBrand, string> = { samsung: "Samsung", xiaomi: "Xiaomi", other: "Còn lại" };
+export const IMEI_CANCEL_WINDOW_MS = 10 * 60 * 1000;
+
+export function imeiCancelUntil(createdAt: string) {
+  return Date.parse(createdAt) + IMEI_CANCEL_WINDOW_MS;
+}
+
+export function canCancelImei(item: Pick<ImeiIssue, "status" | "actor" | "createdAt">, actor: string,
+  access: { canCancelOwn: boolean; canManageAll: boolean }, now: number) {
+  if (item.status !== "active") return false;
+  if (access.canManageAll) return true;
+  const started = Date.parse(item.createdAt);
+  return access.canCancelOwn && item.actor === actor && Number.isFinite(started) && now >= started && now < imeiCancelUntil(item.createdAt);
+}
 
 export function imeiPrefix(brand: unknown, actor: string) {
   if (brand === "samsung") return "35399";

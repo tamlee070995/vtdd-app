@@ -7,7 +7,7 @@ import { cancelImei, generateImei, listImei } from "@/lib/imei-store";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
-const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
+const json = (body: Record<string, unknown>, status = 200) => NextResponse.json({ ...body, serverTime: Date.now() }, { status, headers: { "Cache-Control": "private, no-store" } });
 function failure(error: unknown) {
   return json({ success: false, message: error instanceof ImeiError ? error.message : "Chưa nhận được kết quả từ sổ mã. Xin thử lại đúng lượt này để khỏi cấp dư mã.", code: error instanceof ImeiError ? error.code : "IMEI_UNAVAILABLE" }, error instanceof ImeiError ? error.status : 503);
 }

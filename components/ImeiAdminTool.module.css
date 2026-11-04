@@ -34,6 +34,8 @@
 .status[data-status=active] { background: #e9fbf3; color: #08735a; }
 .status[data-status=cancelled] { background: #f1f4f8; color: #596577; }
 .item .cancellation { color: #94602d; overflow-wrap: anywhere; }
+.item .cancelWindow { color: #0b7256; font-size: 13px; font-weight: 600; }
+.item .cancelWindow[data-expired=true] { color: #94602d; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .empty { padding: 26px 12px; text-align: center; color: #596c85; background: #f7f9fc; border-radius: 14px; }
 .pagination { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 14px; font-size: 14px; }

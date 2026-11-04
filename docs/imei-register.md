@@ -3,6 +3,7 @@
 - Samsung: `35399` + 9 số ngẫu nhiên + Luhn. Xiaomi: `867` + 11 số ngẫu nhiên + Luhn. Còn lại: mã tài khoản + số ngẫu nhiên cho đủ 14 số + Luhn.
 - Mã được kiểm tra Luhn; không xác nhận TAC do hãng cấp hay mã của thiết bị thật.
 - Mod cần quyền riêng: `imei` (xem sổ của mình), `action:imei-create`, `action:imei-cancel-own`, `action:imei-manage-all` (xem và hủy mã của mọi người). Admin giữ toàn quyền. API đọc lại quyền tài khoản ở mỗi yêu cầu.
+- Quyền hủy mã của mình chỉ có hiệu lực trong 10 phút kể từ lúc lượt cấp được ghi vào sổ. Đúng mốc 10 phút trở đi, chỉ quyền quản lý toàn bộ sổ (hoặc Admin toàn quyền) mới hủy được. Máy chủ xét giờ lại trước mỗi lần ghi. Gửi lại một lệnh hủy đã hoàn tất vẫn trả kết quả cũ, không đụng lượt cấp mới.
 
 ## Lưu và cấp mã
 

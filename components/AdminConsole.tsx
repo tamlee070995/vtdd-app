@@ -140,8 +140,8 @@ const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: st
   ...PERSONNEL_ACTION_OPTIONS,
   ...TCDM_ACTION_OPTIONS,
   { key: "imei-create", label: "Tạo mã IMEI", desc: "Cấp mã 15 số có kiểm tra Luhn." },
-  { key: "imei-cancel-own", label: "Hủy mã của mình", desc: "Hủy lượt cấp của mình để mã có thể được cấp lại." },
-  { key: "imei-manage-all", label: "Quản lý toàn bộ sổ IMEI", desc: "Xem và hủy mã của mọi người." },
+  { key: "imei-cancel-own", label: "Hủy mã của mình", desc: "Hủy mã của mình trong 10 phút kể từ lúc cấp." },
+  { key: "imei-manage-all", label: "Quản lý toàn bộ sổ IMEI", desc: "Xem và hủy mã của mọi người, kể cả sau 10 phút." },
 ];
 
 const PERSONNEL_ACTION_KEYS = new Set(PERSONNEL_ACTION_OPTIONS.map((item) => item.key));
