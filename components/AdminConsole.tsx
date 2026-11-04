@@ -11,6 +11,7 @@ import AdminSectionIcon from "@/components/AdminSectionIcon";
 import UiNotice from "@/components/UiNotice";
 import UiFeedbackDialog from "@/components/UiFeedbackDialog";
 import StaffDirectoryPanel from "@/components/StaffDirectoryPanel";
+import ImeiAdminTool from "@/components/ImeiAdminTool";
 import { clientErrorMessage, requestJson } from "@/lib/client-request";
 import { ADMIN_SECTIONS, visibleAdminScreens, type AdminScreen } from "@/lib/admin-navigation";
 
@@ -46,6 +47,9 @@ type StaffMeta = {
 
 type AdminRole = "admin" | "mod";
 type AdminActionKey =
+  | "imei-create"
+  | "imei-cancel-own"
+  | "imei-manage-all"
   | "staff-manage"
   | "staff-delete"
   | "staff-security"
@@ -116,6 +120,7 @@ const ADMIN_MODULE_OPTIONS = [
   { key: "demo", label: "4 Trang demo" },
 
   { key: "people", label: "6 Quyền & Nhân sự" },
+  { key: "imei", label: "Tạo IMEI — xem lịch sử của mình" },
 ];
 
 const ADMIN_ACTION_PREFIX = "action:";
@@ -134,12 +139,22 @@ const TCDM_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: str
 const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: string }> = [
   ...PERSONNEL_ACTION_OPTIONS,
   ...TCDM_ACTION_OPTIONS,
+  { key: "imei-create", label: "Tạo mã IMEI", desc: "Cấp mã 15 số có kiểm tra Luhn." },
+  { key: "imei-cancel-own", label: "Hủy mã của mình", desc: "Hủy lượt cấp của mình để mã có thể được cấp lại." },
+  { key: "imei-manage-all", label: "Quản lý toàn bộ sổ IMEI", desc: "Xem và hủy mã của mọi người." },
 ];
 
 const PERSONNEL_ACTION_KEYS = new Set(PERSONNEL_ACTION_OPTIONS.map((item) => item.key));
 const TCDM_ACTION_KEYS = new Set(TCDM_ACTION_OPTIONS.map((item) => item.key));
+const IMEI_ACTION_KEYS = new Set<AdminActionKey>(["imei-create", "imei-cancel-own", "imei-manage-all"]);
 
 const PERMISSION_TREE = [
+  {
+    title: "Tạo IMEI",
+    desc: "Cấp mã, hủy mã và tra lại lịch sử.",
+    module: "imei",
+    children: ADMIN_ACTION_OPTIONS.filter(item => IMEI_ACTION_KEYS.has(item.key)),
+  },
 
   {
     title: "Quản trị vận hành TCDM",
@@ -156,7 +171,7 @@ const PERMISSION_TREE = [
   {
     title: "Nội dung trang chủ",
     desc: "Các trang CMS gắn ngoài trang chủ.",
-    children: ADMIN_MODULE_OPTIONS.filter((item) => !["tcdm", "people"].includes(item.key)).map((item) => ({
+    children: ADMIN_MODULE_OPTIONS.filter((item) => !["tcdm", "people", "imei"].includes(item.key)).map((item) => ({
       module: item.key,
       label: item.label,
       desc: "Cho phép mở và chỉnh nội dung module này.",
@@ -2483,8 +2498,8 @@ function StaffAdminAccessBox({
   function toggleModule(key: string) {
     setAccessItems((current) => {
       if (!current.includes(key)) return [...current, key];
-      if (key === "tcdm" || key === "people") {
-        const actionKeys = key === "people" ? PERSONNEL_ACTION_KEYS : TCDM_ACTION_KEYS;
+      if (key === "tcdm" || key === "people" || key === "imei") {
+        const actionKeys = key === "people" ? PERSONNEL_ACTION_KEYS : key === "imei" ? IMEI_ACTION_KEYS : TCDM_ACTION_KEYS;
         return current.filter((item) => {
           if (item === key) return false;
           if (!item.startsWith(ADMIN_ACTION_PREFIX)) return true;
@@ -2502,7 +2517,7 @@ function StaffAdminAccessBox({
     setAccessItems((current) => {
       if (current.includes(token)) return current.filter((item) => item !== token);
 
-      const parentModule = PERSONNEL_ACTION_KEYS.has(key) ? "people" : "tcdm";
+      const parentModule = PERSONNEL_ACTION_KEYS.has(key) ? "people" : IMEI_ACTION_KEYS.has(key) ? "imei" : "tcdm";
       const next = current.includes(parentModule)
         ? [...current, token]
         : [parentModule, ...current, token];
@@ -2678,6 +2693,7 @@ const ADMIN_MODULES: Array<{
   desc: string;
   badge: string;
 }> = [
+  { key: "imei", no: "07", title: "Tạo IMEI", desc: "Cấp mã và giữ lịch sử hủy, cấp lại.", badge: "Sổ mã" },
   {
     key: "tcdm",
     no: "01",
@@ -3124,17 +3140,6 @@ export default function AdminConsole({
     <section className="admin-cms-shell-v5">
       <style suppressHydrationWarning>{ADMIN_CMS_STYLE}</style>
 
-      <div className="admin-cms-headline-v5">
-        <div>
-          <span>QUẢN TRỊ WEBSITE</span>
-          <h2>{activeGroup?.label || "Quản trị"}</h2>
-          <p>Tài khoản hiện tại: <b>{adminName}</b> · Quyền: <b>{adminRole.toUpperCase()}</b></p>
-        </div>
-        <div className="admin-cms-permission-summary">
-          {isAdmin ? "Toàn quyền hệ thống" : groups.length ? `Được cấp: ${groups.map(group => group.label).join(", ")}` : "Chưa được cấp chức năng"}
-        </div>
-      </div>
-
       <nav className="admin-group-tabs" role="tablist" aria-label="Nhóm quản trị">
         {groups.map((group, index) => <button key={group.key} type="button" role="tab" id={`admin-group-${group.key}`} aria-selected={activeGroup?.key === group.key} aria-controls="admin-workspace" tabIndex={activeGroup?.key === group.key ? 0 : -1}
           onClick={() => { if (activeGroup?.key !== group.key) setModule(group.screens.find(key => screens.includes(key))!); }}
@@ -3178,6 +3183,8 @@ export default function AdminConsole({
               canManage={isAdmin || allowedActions.includes("settings-write") || (!adminHasExplicitActions && allowedModules.includes("tcdm"))}
             />
           </>
+        ) : module === "imei" ? (
+          <ImeiAdminTool actor={adminCode} />
         ) : module === "people" ? (
           <>
             <div className="admin-cms-module-title-v5">

@@ -112,3 +112,16 @@ test('completed login goes straight to admin and revoked roles cannot reuse an o
   ctx.staff.permission = '';
   assert.equal(await ctx.auth.getCurrentAdmin(), null);
 });
+
+test('IMEI grants are read from current staff rights and revocation takes effect on an existing session', async () => {
+  const ctx = setup();
+  ctx.staff.modulePermissions = 'imei,action:imei-create,action:imei-cancel-own';
+  const granted = await ctx.auth.getCurrentAdmin();
+  assert.deepEqual(granted.modules, ['imei']);
+  assert.deepEqual(granted.actions, ['imei-create', 'imei-cancel-own']);
+  assert.equal(ctx.auth.adminHasAction(granted, 'imei-create'), true);
+  ctx.staff.modulePermissions = 'imei';
+  const revoked = await ctx.auth.getCurrentAdmin();
+  assert.equal(ctx.auth.adminHasAction(revoked, 'imei-create'), false);
+  assert.deepEqual(revoked.actions, []);
+});

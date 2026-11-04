@@ -6,8 +6,11 @@ import { findStaffByMaNV } from "@/lib/staff-store";
 import { shouldForceStaffPasswordChange, shouldForceStaffSetup } from "@/lib/staff-auth";
 
 export type AdminPermission = "admin" | "mod";
-export type AdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools" | "people";
+export type AdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools" | "people" | "imei";
 export type AdminActionKey =
+  | "imei-create"
+  | "imei-cancel-own"
+  | "imei-manage-all"
   | "staff-manage"
   | "staff-delete"
   | "staff-security"
@@ -26,8 +29,11 @@ export const ADMIN_NAME_COOKIE = "vtdd_admin_name";
 export const ADMIN_PERMISSION_COOKIE = "vtdd_admin_permission";
 export const ADMIN_MODULES_COOKIE = "vtdd_admin_modules";
 
-const MODULES: AdminModuleKey[] = ["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "people"];
+const MODULES: AdminModuleKey[] = ["tcdm", "quy-trinh-thu-cu", "may-moi", "may-cu", "demo", "people", "imei"];
 const ACTIONS: AdminActionKey[] = [
+  "imei-create",
+  "imei-cancel-own",
+  "imei-manage-all",
   "staff-manage",
   "staff-delete",
   "staff-security",

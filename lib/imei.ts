@@ -1,0 +1,56 @@
+export type ImeiBrand = "samsung" | "xiaomi" | "other";
+export type ImeiIssue = {
+  requestId: string;
+  imei: string | null;
+  brand: ImeiBrand;
+  actor: string;
+  actorName: string;
+  createdAt: string;
+  status: "active" | "cancelled" | "pending" | "conflict";
+  cancelledAt?: string;
+  cancelledBy?: string;
+  reason?: string;
+};
+
+export class ImeiError extends Error {
+  constructor(message: string, public status = 400, public code = "IMEI_ERROR") { super(message); }
+}
+
+export const IMEI_BRANDS: Record<ImeiBrand, string> = { samsung: "Samsung", xiaomi: "Xiaomi", other: "Còn lại" };
+
+export function imeiPrefix(brand: unknown, actor: string) {
+  if (brand === "samsung") return "35399";
+  if (brand === "xiaomi") return "867";
+  if (brand !== "other") throw new ImeiError("Xin chọn hãng máy.");
+  if (!/^\d{1,13}$/.test(actor)) throw new ImeiError("Mã nhân viên phải gồm 1–13 số để chừa chỗ tạo mã và tính Luhn.");
+  return actor;
+}
+
+export function completeImei(first14: string) {
+  if (!/^\d{14}$/.test(first14)) throw new ImeiError("Phải có đúng 14 số trước khi tính Luhn.");
+  const sum = [...first14].reduce((total, digit, index) => {
+    const value = Number(digit) * (index % 2 ? 2 : 1);
+    return total + (value > 9 ? value - 9 : value);
+  }, 0);
+  return first14 + ((10 - sum % 10) % 10);
+}
+
+export function validImei(value: string) {
+  return /^\d{15}$/.test(value) && completeImei(value.slice(0, 14)) === value;
+}
+
+export function validImeiRequestId(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+// No legacy module fallback: Mod needs an explicit grant for each write action.
+export function imeiAccess(admin: { permission: string; modules?: string[]; actions?: string[] }) {
+  const all = admin.permission === "admin";
+  const actions = admin.actions || [];
+  return {
+    canView: all || (admin.modules || []).includes("imei") || actions.some(action => ["imei-create", "imei-cancel-own", "imei-manage-all"].includes(action)),
+    canCreate: all || actions.includes("imei-create"),
+    canCancelOwn: all || actions.includes("imei-cancel-own"),
+    canManageAll: all || actions.includes("imei-manage-all"),
+  };
+}

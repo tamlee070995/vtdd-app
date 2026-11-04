@@ -305,8 +305,8 @@ export async function getSystemSettings() {
         key: string;
         value: string;
       }>("system_settings", {
-        // The large pricing snapshot has its own reader; keep it out of general page settings.
-        filters: { key: "neq.TRADEIN_PUBLIC_SNAPSHOT_V1" }, order: "key.asc",
+        // Pricing and the private IMEI register have dedicated readers, outside general page settings.
+        filters: { key: "neq.TRADEIN_PUBLIC_SNAPSHOT_V1", and: "(key.not.like.IMEI_V1_*)" }, order: "key.asc",
       });
       const settings: Record<string, string> = { ...DEFAULT_SYSTEM_SETTINGS };
 

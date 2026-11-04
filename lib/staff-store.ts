@@ -65,7 +65,7 @@ function normalizeStaffCodeSearch(value: any) {
 }
 
 export type StaffPermission = "admin" | "mod" | "";
-export type StaffAdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools" | "people";
+export type StaffAdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools" | "people" | "imei";
 export const STAFF_TOOL_CHECKIN_PERMISSION = "tool:checkin";
 const STAFF_TOOL_PERMISSION_KEYS = new Set([STAFF_TOOL_CHECKIN_PERMISSION]);
 
@@ -854,6 +854,10 @@ function normalizeModulePermissions(value: any) {
     "tools",
     "people",
     "action:staff-manage",
+    "imei",
+    "action:imei-create",
+    "action:imei-cancel-own",
+    "action:imei-manage-all",
     "action:staff-delete",
     "action:staff-security",
     "action:settings-write",
