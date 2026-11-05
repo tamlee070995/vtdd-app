@@ -13,7 +13,7 @@ import UiFeedbackDialog from "@/components/UiFeedbackDialog";
 import StaffDirectoryPanel from "@/components/StaffDirectoryPanel";
 import ImeiAdminTool from "@/components/ImeiAdminTool";
 import { clientErrorMessage, requestJson } from "@/lib/client-request";
-import { ADMIN_SECTIONS, visibleAdminScreens, type AdminScreen } from "@/lib/admin-navigation";
+import { ADMIN_SECTIONS, effectiveAdminAccessTokens, removeAdminActionToken, visibleAdminScreens, type AdminScreen } from "@/lib/admin-navigation";
 
 type AdminStaff = {
   rowNumber: number;
@@ -196,13 +196,13 @@ function parseAdminAccessItems(value: any) {
     ADMIN_ACTION_OPTIONS.map((item) => `${ADMIN_ACTION_PREFIX}${item.key}`)
   );
 
-  return String(value || "")
+  return effectiveAdminAccessTokens(String(value || "")
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter((item, index, arr) => {
       const allowed = moduleKeys.has(item) || actionKeys.has(item);
       return allowed && arr.indexOf(item) === index;
-    });
+    }));
 }
 
 function parseAdminActionItems(value: any) {
@@ -285,13 +285,12 @@ function PersonnelAdminConsole({
   const grantedActions = parseAdminActionItems(adminActions);
 
   const legacyPeopleAccess = !adminHasExplicitActions && grantedModules.includes("people");
-  const hasExplicitPeopleActions = grantedActions.some((action) => PERSONNEL_ACTION_KEYS.has(action));
 
   function canUseAction(action: AdminActionKey) {
     if (isFullAdmin || grantedActions.includes(action)) return true;
 
     if (PERSONNEL_ACTION_KEYS.has(action)) {
-      return legacyPeopleAccess || (grantedModules.includes("people") && !hasExplicitPeopleActions);
+      return legacyPeopleAccess;
     }
     return false;
   }
@@ -2499,7 +2498,7 @@ function StaffAdminAccessBox({
 
   function toggleModule(key: string) {
     setAccessItems((current) => {
-      if (!current.includes(key)) return [...current, key];
+      if (!current.includes(key)) return key === "people" ? [...current, key, ...PERSONNEL_ACTION_OPTIONS.map(item => adminActionToken(item.key))].filter((item, index, all) => all.indexOf(item) === index) : [...current, key];
       if (key === "tcdm" || key === "people" || key === "imei") {
         const actionKeys = key === "people" ? PERSONNEL_ACTION_KEYS : key === "imei" ? IMEI_ACTION_KEYS : TCDM_ACTION_KEYS;
         return current.filter((item) => {
@@ -2517,7 +2516,7 @@ function StaffAdminAccessBox({
     const token = `${ADMIN_ACTION_PREFIX}${key}`;
 
     setAccessItems((current) => {
-      if (current.includes(token)) return current.filter((item) => item !== token);
+      if (current.includes(token)) return removeAdminActionToken(current, key);
 
       const parentModule = PERSONNEL_ACTION_KEYS.has(key) ? "people" : IMEI_ACTION_KEYS.has(key) ? "imei" : "tcdm";
       const next = current.includes(parentModule)

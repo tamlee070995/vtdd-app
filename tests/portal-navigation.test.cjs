@@ -30,6 +30,17 @@ test('ADMIN retains all functions under four non-overlapping groups', () => {
   assert.equal(screens.length, new Set(screens).size);
   for (const expected of ['tcdm', 'quy-trinh-thu-cu', 'may-moi', 'may-cu', 'demo', 'people', 'imei']) assert.ok(screens.includes(expected));
 });
+
+test('stale people module with IMEI actions does not reveal personnel or reactivate broad rights on removal', () => {
+  for(const action of ['imei-create','imei-cancel-own','imei-manage-all','imei-report']) {
+    assert.deepEqual(nav.visibleAdminScreens('mod',['imei','people'],[action]), ['imei']);
+    assert.deepEqual(nav.effectiveAdminAccessTokens(['imei','people','action:'+action]), ['imei','action:'+action]);
+  }
+  assert.deepEqual(nav.visibleAdminScreens('mod',['people'],[]), ['people']);
+  assert.deepEqual(nav.visibleAdminScreens('mod',['people','imei'],['staff-manage','imei-report']), ['people','imei']);
+  assert.deepEqual(nav.removeAdminActionToken(['people','action:staff-security'],'staff-security'), []);
+  assert.deepEqual(nav.removeAdminActionToken(['people','imei','action:staff-manage','action:imei-report'],'staff-manage'), ['imei','action:imei-report']);
+});
 test('suggestions match separated tokens and accents without mixing storage or Plus variants', () => {
   const products = [
     { brand: 'Apple', model: 'IPHONE 15 PLUS_128G', storage: '128GB' },

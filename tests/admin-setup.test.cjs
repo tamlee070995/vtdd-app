@@ -125,3 +125,13 @@ test('IMEI grants are read from current staff rights and revocation takes effect
   assert.equal(ctx.auth.adminHasAction(revoked, 'imei-create'), false);
   assert.deepEqual(revoked.actions, []);
 });
+
+test('stale personnel module cannot grant staff APIs when a Mod only holds an explicit IMEI action', async () => {
+  const ctx=setup();
+  ctx.staff.modulePermissions='imei,people,action:imei-report';
+  const current=await ctx.auth.getCurrentAdmin();
+  assert.deepEqual(current.modules,['imei']);
+  assert.deepEqual(current.actions,['imei-report']);
+  for(const action of ['staff-manage','staff-delete','staff-security']) assert.equal(ctx.auth.adminHasAction(current,action,'people'),false);
+  assert.equal(ctx.auth.normalizeAdminAccess(ctx.staff.modulePermissions),'imei,action:imei-report');
+});

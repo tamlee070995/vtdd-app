@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createSignedSessionToken, verifySignedSessionToken } from "@/lib/auth-session";
 import { findStaffByMaNV } from "@/lib/staff-store";
 import { shouldForceStaffPasswordChange, shouldForceStaffSetup } from "@/lib/staff-auth";
+import { effectiveAdminAccessTokens } from "@/lib/admin-navigation";
 
 export type AdminPermission = "admin" | "mod";
 export type AdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo" | "tools" | "people" | "imei";
@@ -95,7 +96,7 @@ export function normalizeAdminAccess(value: any) {
 }
 
 function normalizeAdminAccessTokens(value: any) {
-  return String(value || "")
+  return effectiveAdminAccessTokens(String(value || "")
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .map((item) => {
@@ -105,7 +106,7 @@ function normalizeAdminAccessTokens(value: any) {
       const action = item.slice(ACTION_PREFIX.length) as AdminActionKey;
       return ACTIONS.includes(action) ? `${ACTION_PREFIX}${action}` : "";
     })
-    .filter((item, index, arr) => Boolean(item) && arr.indexOf(item) === index);
+    .filter((item, index, arr) => Boolean(item) && arr.indexOf(item) === index));
 }
 
 function parseAdminAccess(value: any) {

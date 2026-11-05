@@ -42,6 +42,8 @@
 .dialog { position: fixed; inset: 0; margin: auto; border: 1px solid #d9e2ef; border-radius: 22px; width: min(480px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(var(--ui-visual-height, 100dvh) - 32px); padding: 24px; box-sizing: border-box; color: #07111f; overflow: auto; overscroll-behavior: contain; }
 .dialog::backdrop { background: rgba(7,17,31,.6); }
 .dialog h2 { font-size: 23px; margin: 0 0 14px; }
+.tool .dialog label { display: grid; gap: 10px; margin-bottom: 16px; line-height: 1.5; }
+.tool .dialog :is(input, select, textarea):focus-visible { outline: 2px solid #e7b600; outline-offset: -2px; border-color: #e7b600; box-shadow: none; }
 .dialog p { font-size: 14px; line-height: 1.6; color: #596c85; }
 .dialog textarea { min-height: 100px; resize: vertical; }
 .dialogActions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
