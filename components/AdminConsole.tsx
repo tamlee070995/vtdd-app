@@ -11,6 +11,7 @@ import AdminSectionIcon from "@/components/AdminSectionIcon";
 import UiNotice from "@/components/UiNotice";
 import UiFeedbackDialog from "@/components/UiFeedbackDialog";
 import StaffDirectoryPanel from "@/components/StaffDirectoryPanel";
+import permissionStyles from "./PermissionDrawer.module.css";
 import ImeiAdminTool from "@/components/ImeiAdminTool";
 import { clientErrorMessage, requestJson } from "@/lib/client-request";
 import { ADMIN_SECTIONS, effectiveAdminAccessTokens, removeAdminActionToken, visibleAdminScreens, type AdminScreen } from "@/lib/admin-navigation";
@@ -721,7 +722,7 @@ function PersonnelAdminConsole({
               </div>
             ) : (
               staff.map((item) => (
-                <article className="adminx-permission-card-v3" key={`permission-${item.maNV}-${item.rowNumber}`}>
+                <article className={`adminx-permission-card-v3 ${permissionStyles.card}`} key={`permission-${item.maNV}-${item.rowNumber}`}>
                   <div className="adminx-permission-user-v3">
                     <span className={item.status === "Active" ? "adminx-badge active" : "adminx-badge standby"}>
                       {item.status || "Standby"}
@@ -730,7 +731,7 @@ function PersonnelAdminConsole({
                     <p>NV {item.maNV} · ST {item.maST || "—"} · {item.storeName || "Chưa có siêu thị"}</p>
                     <div className="adminx-staff-flags">
                       {item.permission ? <span>QUYỀN: {item.permission.toUpperCase()}</span> : <span>QUYỀN: USER THƯỜNG</span>}
-                      <span>PHẠM VI: {summarizeAdminAccess(item.modulePermissions)}</span>
+                      <span title={summarizeAdminAccess(item.modulePermissions)}>PHẠM VI: {summarizeAdminAccess(item.modulePermissions)}</span>
                     </div>
                   </div>
 
@@ -2483,6 +2484,23 @@ function StaffAdminAccessBox({
   disabled: boolean;
   onSave: (maNV: string, permission: string, modules: string) => Promise<void>;
 }) {
+  const [open, setOpen] = useState(false);
+  const [discard, setDiscard] = useState(false);
+  const [help, setHelp] = useState("");
+  const drawer = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const node = drawer.current;
+    const previous = document.activeElement;
+    const previousOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    node?.showModal();
+    return () => {
+      node?.close();
+      document.documentElement.style.overflow = previousOverflow;
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, [open]);
   const [permission, setPermission] = useState(item.permission || "");
   const [accessItems, setAccessItems] = useState<string[]>(parseAdminAccessItems(item.modulePermissions));
 
@@ -2491,6 +2509,21 @@ function StaffAdminAccessBox({
     setAccessItems(parseAdminAccessItems(item.modulePermissions));
   }, [item.permission, item.modulePermissions, item.maNV]);
 
+  const dirty = permission !== (item.permission || "") ||
+    [...accessItems].sort().join(",") !== parseAdminAccessItems(item.modulePermissions).sort().join(",");
+
+  function close() {
+    if (disabled) return;
+    if (dirty) { setDiscard(true); return; }
+    setOpen(false);
+  }
+
+  function resetClose() {
+    setPermission(item.permission || "");
+    setAccessItems(parseAdminAccessItems(item.modulePermissions));
+    setDiscard(false);
+    setOpen(false);
+  }
   function setRole(next: "" | "mod" | "admin") {
     setPermission(next);
     if (next !== "mod") setAccessItems([]);
@@ -2528,19 +2561,17 @@ function StaffAdminAccessBox({
   }
 
   return (
-    <div className="adminx-permission-box adminx-permission-box-v2">
+    <>
+    <button type="button" className={permissionStyles.trigger} disabled={disabled} onClick={()=>{setDiscard(false);setHelp("");setOpen(true);}}>Chỉnh quyền</button>
+    {open && <dialog ref={drawer} className={permissionStyles.drawer} aria-labelledby={"permission-title-"+item.maNV} onCancel={e=>{e.preventDefault();close();}}>
+      <header className={permissionStyles.header}><div><h2 id={"permission-title-"+item.maNV}>Chỉnh quyền</h2><p>{item.staffName} · NV {item.maNV} · ST {item.maST||"—"}</p></div><button type="button" disabled={disabled} onClick={close} aria-label="Đóng khung chỉnh quyền">×</button></header>
+      <div className={permissionStyles.scroll}><div className="adminx-permission-box adminx-permission-box-v2">
       <div className="adminx-permission-head adminx-permission-head-v2">
         <div>
           <b>Phân quyền tài khoản</b>
           <small>Trống = user thường · Mod = theo hạng mục · Admin = toàn quyền</small>
         </div>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onSave(item.maNV, permission, accessItems.join(","))}
-        >
-          {disabled ? "Đang lưu..." : "Lưu phân quyền"}
-        </button>
+
       </div>
 
       <div className="adminx-role-pills">
@@ -2561,112 +2592,41 @@ function StaffAdminAccessBox({
                 });
 
             return (
-              <section className={`adminx-tree-group ${groupActive ? "active" : ""}`} key={group.title}>
-                <button
-                  type="button"
-                  className="adminx-tree-head"
-                  disabled={disabled || !groupModule}
-                  onClick={() => {
-                    if (groupModule) toggleModule(groupModule);
-                  }}
-                >
-                  <i>{groupActive ? "✓" : "+"}</i>
-                  <span>
-                    <b>{group.title}</b>
-                    <small>{group.desc}</small>
-                  </span>
-                </button>
+              <details className={`adminx-tree-group ${groupActive ? "active" : ""}`} key={group.title}>
+                <summary className={permissionStyles.groupHead}><span className={permissionStyles.chevron} aria-hidden="true">›</span><b>{group.title}</b><span>{group.children.filter(child=>"key" in child ? accessItems.includes(adminActionToken(child.key)) : accessItems.includes(String(child.module))).length}/{group.children.length} quyền</span><button type="button" aria-label={"Giải thích nhóm "+group.title} onClick={e=>{e.preventDefault();e.stopPropagation();const details=e.currentTarget.closest("details");if(details)details.open=true;setHelp(help===group.title?"":group.title);}}>ⓘ</button></summary>
+                {help===group.title && <p className={permissionStyles.help}>{group.desc}</p>}
+                {groupModule && <label className={permissionStyles.moduleToggle}><input type="checkbox" disabled={disabled} checked={groupActive} onChange={()=>toggleModule(groupModule)}/> Cho phép truy cập nhóm này</label>}
+
 
                 <div className="adminx-tree-children">
                   {group.children.map((child) => {
-                    if ("key" in child) {
-                      const token = adminActionToken(child.key);
-
-                      return (
-                        <button
-                          key={child.key}
-                          type="button"
-                          disabled={disabled}
-                          className={accessItems.includes(token) ? "active" : ""}
-                          onClick={() => toggleAction(child.key)}
-                        >
+                    const key = "key" in child ? adminActionToken(child.key) : String(child.module);
+                    const selected = accessItems.includes(key);
+                    return <div className={permissionStyles.permissionRow} key={key}>
+                      <div className={permissionStyles.permissionControls}>
+                        <button type="button" disabled={disabled} aria-pressed={selected} className={selected ? "active" : ""} onClick={() => "key" in child ? toggleAction(child.key) : toggleModule(String(child.module))}>
                           <span>{child.label}</span>
-                          <small>{child.desc}</small>
                         </button>
-                      );
-                    }
-
-                    const moduleKey = String(child.module);
-
-                    return (
-                      <button
-                        key={`${moduleKey}-${child.label}`}
-                        type="button"
-                        disabled={disabled}
-                        className={accessItems.includes(moduleKey) ? "active" : ""}
-                        onClick={() => toggleModule(moduleKey)}
-                      >
-                        <span>{child.label}</span>
-                        <small>{child.desc}</small>
-                      </button>
-                    );
+                        <button type="button" className={permissionStyles.info} aria-label={"Giải thích " + child.label} aria-expanded={help === key} onClick={() => setHelp(help === key ? "" : key)}>ⓘ</button>
+                      </div>
+                      {help === key && <p className={permissionStyles.help}>{child.desc}</p>}
+                    </div>;
                   })}
                 </div>
-              </section>
+              </details>
             );
           })}
         </div>
       )}
 
-      {permission === "mod" && (
-        <>
-          <div className="adminx-permission-section-title">
-            <span>Hạng mục truy cập</span>
-            <small>Cho phép Mod mở từng khu vực quản trị.</small>
-          </div>
-          <div className="adminx-module-buttons">
-            {ADMIN_MODULE_OPTIONS.map((module) => (
-              <button
-                key={module.key}
-                type="button"
-                disabled={disabled}
-                className={accessItems.includes(module.key) ? "active" : ""}
-                onClick={() => toggleModule(module.key)}
-              >
-                <span>{module.label}</span>
-                <small>{module.key}</small>
-              </button>
-            ))}
-          </div>
-
-          <div className="adminx-permission-section-title">
-            <span>Quyền thao tác chi tiết</span>
-            <small>Chọn đúng quyền theo từng module. Module 06 dùng cho Nhân viên và Phân quyền.</small>
-          </div>
-          <div className="adminx-module-buttons adminx-action-buttons">
-            {ADMIN_ACTION_OPTIONS.map((action) => {
-              const token = `${ADMIN_ACTION_PREFIX}${action.key}`;
-
-              return (
-                <button
-                  key={action.key}
-                  type="button"
-                  disabled={disabled}
-                  className={accessItems.includes(token) ? "active" : ""}
-                  onClick={() => toggleAction(action.key)}
-                >
-                  <span>{action.label}</span>
-                  <small>{action.desc}</small>
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
       {permission === "admin" && <em>Admin có toàn quyền, không cần chọn hạng mục.</em>}
       {permission === "" && <em>User thường không được truy cập trang quản trị.</em>}
 
-    </div>
+    </div></div>
+    <footer className={permissionStyles.footer}>
+      {discard ? <><p>Bỏ các thay đổi chưa lưu?</p><button type="button" onClick={()=>setDiscard(false)}>Tiếp tục chỉnh</button><button type="button" onClick={resetClose}>Bỏ thay đổi</button></> : <><span>{dirty?"Có thay đổi chưa lưu":""}</span><button type="button" disabled={disabled} onClick={close}>Đóng</button><button type="button" className={permissionStyles.save} disabled={disabled||!dirty} onClick={()=>onSave(item.maNV,permission,accessItems.join(","))}>{disabled?"Đang lưu…":"Lưu thay đổi"}</button></>}
+    </footer></dialog>}
+    </>
   );
 }
 type CmsSlug = "quy-trinh-thu-cu" | "may-moi" | "may-cu" | "demo";
