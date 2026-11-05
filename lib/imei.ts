@@ -1,5 +1,7 @@
 export type ImeiBrand = "samsung" | "xiaomi" | "apple-13-plus" | "apple-other" | "other";
 export type ImeiIssue = {
+  recipient?: string;
+  storeCode?: string;
   requestId: string;
   imei: string | null;
   brand: ImeiBrand;
@@ -80,9 +82,10 @@ export function imeiAccess(admin: { permission: string; modules?: string[]; acti
   const all = admin.permission === "admin";
   const actions = admin.actions || [];
   return {
-    canView: all || (admin.modules || []).includes("imei") || actions.some(action => ["imei-create", "imei-cancel-own", "imei-manage-all"].includes(action)),
+    canView: all || (admin.modules || []).includes("imei") || actions.some(action => ["imei-create", "imei-cancel-own", "imei-manage-all", "imei-report"].includes(action)),
     canCreate: all || actions.includes("imei-create"),
     canCancelOwn: all || actions.includes("imei-cancel-own"),
     canManageAll: all || actions.includes("imei-manage-all"),
+    canReport: all || actions.includes("imei-report") || actions.includes("imei-manage-all"),
   };
 }

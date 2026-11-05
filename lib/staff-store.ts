@@ -858,6 +858,7 @@ function normalizeModulePermissions(value: any) {
     "action:imei-create",
     "action:imei-cancel-own",
     "action:imei-manage-all",
+    "action:imei-report",
     "action:staff-delete",
     "action:staff-security",
     "action:settings-write",

@@ -22,3 +22,7 @@ Dùng bảng `system_settings` đang có, với khóa chính `key`; không cần
 Giữ nguyên cả hai nhóm khóa khi sao lưu, phục hồi hoặc dọn dữ liệu. Không xóa riêng kế hoạch hay sổ mã. Phục hồi bản sao lưu cũ có thể làm mất các lượt cấp sau ngày sao lưu; phải đối chiếu trước khi mở lại chức năng. Không chỉnh sổ bằng API cấu hình chung.
 
 `node --test tests/imei.test.cjs tests/admin-setup.test.cjs tests/portal-navigation.test.cjs` kiểm tra Luhn, cấp đồng thời, phản hồi thất lạc, hủy/cấp lại, hủy nhầm lượt cũ, phân trang và quyền Mod.
+
+## Người nhận và báo cáo
+
+Mỗi lượt mới bắt buộc nhập User nhận mã và Mã siêu thị trước khi cấp. Giữ số 0 ở đầu; mã cũ không có dữ liệu này hiển thị Chưa ghi nhận. Quyền action:imei-report xem toàn bộ sổ và xuất .xlsx theo bộ lọc, không cấp quyền tạo hay hủy mã người khác. Ngày lọc theo giờ Việt Nam, nhân viên tìm theo người tạo hoặc User nhận. Báo cáo đọc tối đa 5.000 lượt trong phạm vi tra cứu; vượt mức báo lỗi, không xuất thiếu dòng. Khi tăng quy mô cần chuyển sang bảng riêng có chỉ mục.

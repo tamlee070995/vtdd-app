@@ -7,9 +7,9 @@ import UiNotice from "@/components/UiNotice";
 import UiFeedbackDialog from "@/components/UiFeedbackDialog";
 import styles from "./ImeiAdminTool.module.css";
 
-type Access = { canView: boolean; canCreate: boolean; canCancelOwn: boolean; canManageAll: boolean };
+type Access = { canView: boolean; canCreate: boolean; canCancelOwn: boolean; canManageAll: boolean; canReport: boolean };
 type Directory = { success: boolean; items: ImeiIssue[]; page: number; pages: number; total: number; access: Access; serverTime: number };
-type Pending = { requestId: string; brand: ImeiBrand };
+type Pending = { requestId: string; brand: ImeiBrand; recipient?: string; storeCode?: string };
 type Feedback = { tone: "loading" | "error" | "success"; text: string; retry?: () => void };
 const labels = { active: "Đã cấp", cancelled: "Đã hủy", pending: "Chưa xong", conflict: "Chưa cấp" };
 const date = (value: string) => new Date(value).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
@@ -37,6 +37,11 @@ async function post(body: object) {
 }
 
 export default function ImeiAdminTool({ actor }: { actor: string }) {
+  const [assigning,setAssigning]=useState(false),[recipient,setRecipient]=useState(""),[storeCode,setStoreCode]=useState("");
+  const assignment=useRef<HTMLDialogElement>(null);
+  const [filters,setFilters]=useState({from:"",to:"",employee:"",store:"",brand:"",status:""});
+  const [applied,setApplied]=useState(filters);
+  const filterQuery=new URLSearchParams(applied).toString();
   const [brand, setBrand] = useState<ImeiBrand>("samsung");
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [page, setPage] = useState(1), [search, setSearch] = useState(""), [query, setQuery] = useState("");
@@ -50,7 +55,7 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
   const busy = useRef(false), sequence = useRef({ value: 0 }), confirmation = useRef<HTMLDialogElement>(null), copyField = useRef<HTMLInputElement>(null);
   const storageKey = `vtdd-imei-pending-${actor}`;
   const access = directory?.access;
-  const visibleItems = directory?.items.filter(item => directory.access.canManageAll || item.status !== "cancelled") || [];
+  const visibleItems = directory?.items.filter(item => directory.access.canReport || item.status !== "cancelled") || [];
   const syncClock = useCallback((serverTime: number) => {
     if (!Number.isFinite(serverTime)) return;
     clock.current = { server: serverTime, received: performance.now() }; setNow(serverTime);
@@ -59,7 +64,7 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
     const state = sequence.current, current = ++state.value;
     setLoading(true); setLoadError("");
     try {
-      const data = await requestJson<Directory>(`/api/admin/imei?page=${page}&q=${encodeURIComponent(query)}`);
+      const data = await requestJson<Directory>(`/api/admin/imei?page=${page}&q=${encodeURIComponent(query)}&${filterQuery}`);
       if (state.value === current) {
         syncClock(data.serverTime);
         setDirectory(data); if (data.page > data.pages) setPage(data.pages);
@@ -67,7 +72,7 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
       }
     } catch (error) { if (state.value === current) setLoadError(clientErrorMessage(error)); }
     finally { if (state.value === current) setLoading(false); }
-  }, [page, query, syncClock]);
+  }, [page, query, syncClock, filterQuery]);
   useEffect(() => { const state = sequence.current; void load(); return () => { state.value++; }; }, [load]);
   useEffect(() => {
     const timer = window.setInterval(() => { const anchor = clock.current; if (anchor) setNow(anchor.server + performance.now() - anchor.received); }, 1000);
@@ -87,12 +92,21 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
     const dialog = confirmation.current; dialog?.showModal();
     return () => dialog?.close();
   }, [cancel]);
+  useEffect(()=>{if(assigning)assignment.current?.showModal();else assignment.current?.close();},[assigning]);
+  async function exportExcel(){
+    setFeedback({tone:"loading",text:"Đang xuất Excel theo bộ lọc…"});
+    try{const response=await fetch('/api/admin/imei/export?q='+encodeURIComponent(query)+'&'+filterQuery,{cache:"no-store"});
+    if(!response.ok){const data=await response.json();throw new Error(data.message||"Chưa xuất được Excel.")}
+    const url=URL.createObjectURL(await response.blob()),a=document.createElement('a');a.href=url;a.download='so-imei-sn.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);setFeedback(null);
+    }catch(e){setFeedback({tone:"error",text:clientErrorMessage(e)})}
+  }
   function remember(value: Pending | null) {
     setPending(value);
     try { if (value) localStorage.setItem(storageKey, JSON.stringify(value)); else localStorage.removeItem(storageKey); } catch { /* The in-memory request ID is still retained. */ }
   }
   async function generate(retry?: Pending) {
     if (busy.current || !access?.canCreate) return;
+    if(!(retry||pending)?.recipient || !(retry||pending)?.storeCode){setAssigning(true);return;}
     const next = retry || pending || { requestId: newRequestId(), brand };
     busy.current = true; remember(next); setBrand(next.brand);
     setFeedback({ tone: "loading", text: "Đang cấp mã và ghi vào sổ…" });
@@ -149,15 +163,25 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
         {!access.canCreate && <p className={styles.hint}>Bạn được xem sổ mã. Xin liên lạc Admin nếu cần quyền tạo mã.</p>}
       </section>
       {pending && <UiNotice>Một lượt tạo chưa nhận được kết quả. Bấm “Tiếp tục lượt chưa xong” để kiểm tra và nhận lại đúng mã.</UiNotice>}
-      {result?.imei && (access?.canManageAll || result.status !== "cancelled") && <section className={styles.result} aria-label="Kết quả cấp mã"><div><span>{labels[result.status]} · {isAppleSerial(result.brand) ? "SN" : "IMEI"} · {IMEI_BRANDS[result.brand]}</span><input ref={copyField} aria-label={isAppleSerial(result.brand) ? "SN vừa cấp" : "Mã IMEI vừa cấp"} readOnly value={result.imei} onFocus={event => event.currentTarget.select()} /></div><button type="button" className={styles.primary} disabled={result.status !== "active"} onClick={() => void copy(result.imei!)}>Sao chép</button></section>}
+      {result?.imei && (access?.canReport || result.status !== "cancelled") && <section className={styles.result} aria-label="Kết quả cấp mã"><div><span>{labels[result.status]} · {isAppleSerial(result.brand) ? "SN" : "IMEI"} · {IMEI_BRANDS[result.brand]}</span><input ref={copyField} aria-label={isAppleSerial(result.brand) ? "SN vừa cấp" : "Mã IMEI vừa cấp"} readOnly value={result.imei} onFocus={event => event.currentTarget.select()} /></div><button type="button" className={styles.primary} disabled={result.status !== "active"} onClick={() => void copy(result.imei!)}>Sao chép</button></section>}
       <section className={styles.history} aria-label="Lịch sử cấp mã">
-        <div className={styles.historyTop}><div><h3>Lịch sử cấp mã {access.canManageAll && <span>{directory.total}</span>}</h3><p>{access.canManageAll ? "Toàn bộ sổ mã" : "Các lượt cấp của bạn"}</p></div><button className={styles.secondary} type="button" disabled={loading} onClick={() => void load()}>Tải lại lịch sử</button></div>
+        <div className={styles.historyTop}><div><h3>Lịch sử cấp mã {access.canReport && <span>{directory.total}</span>}</h3><p>{access.canReport ? "Toàn bộ sổ mã" : "Các lượt cấp của bạn"}</p></div><button className={styles.secondary} type="button" disabled={loading} onClick={() => void load()}>Tải lại lịch sử</button></div>
+        {access.canReport && <form className={styles.search} onSubmit={e=>{e.preventDefault();setPage(1);setApplied({...filters});}}>
+          <label>Từ ngày<input type="date" value={filters.from} onChange={e=>setFilters({...filters,from:e.target.value})}/></label>
+          <label>Đến ngày<input type="date" value={filters.to} onChange={e=>setFilters({...filters,to:e.target.value})}/></label>
+          <label>Nhân viên tạo / User nhận<input value={filters.employee} onChange={e=>setFilters({...filters,employee:e.target.value})}/></label>
+          <label>Mã siêu thị<input value={filters.store} onChange={e=>setFilters({...filters,store:e.target.value})}/></label>
+          <label>Hãng<select value={filters.brand} onChange={e=>setFilters({...filters,brand:e.target.value})}><option value="">Tất cả hãng</option>{Object.entries(IMEI_BRANDS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+          <label>Tình trạng<select value={filters.status} onChange={e=>setFilters({...filters,status:e.target.value})}><option value="">Tất cả</option>{Object.entries(labels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+          <button className={styles.secondary}>Áp dụng bộ lọc</button><button type="button" className={styles.secondary} onClick={()=>void exportExcel()}>Xuất Excel theo bộ lọc</button>
+        </form>}
         <form className={styles.search} onSubmit={event => { event.preventDefault(); setPage(1); if (search === query) void load(); else setQuery(search); }}><input aria-label="Tìm IMEI hoặc SN" placeholder="Nhập đầy đủ IMEI hoặc SN" autoCapitalize="characters" spellCheck={false} value={search} maxLength={15} onChange={event => setSearch(event.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase())} /><button className={styles.secondary}>Tìm mã</button>{query && <button type="button" className={styles.secondary} onClick={() => { setSearch(""); setQuery(""); setPage(1); }}>Xem hết</button>}</form>
         <div className={styles.items} aria-busy={loading}>
           {!visibleItems.length && <p className={styles.empty}>{query ? "Không tìm thấy mã trong phạm vi bạn được xem." : "Trang này không có lượt cấp mã đang hiển thị."}</p>}
           {visibleItems.map(item => <article className={styles.item} key={`${item.actor}-${item.requestId}`}>
             <div className={styles.itemMain}><div className={styles.itemTop}><strong className={styles.number}>{item.imei || "Chưa cấp mã"}</strong><span className={styles.status} data-status={item.status}>{labels[item.status]}</span></div>
-              <p>{isAppleSerial(item.brand) ? "SN" : "IMEI"} · {IMEI_BRANDS[item.brand]} · {date(item.createdAt)}</p>{access.canManageAll && <p>{item.actorName} · NV {item.actor}</p>}
+              <p>{isAppleSerial(item.brand) ? "SN" : "IMEI"} · {IMEI_BRANDS[item.brand]} · {date(item.createdAt)}</p>{access.canReport && <p>{item.actorName} · NV {item.actor}</p>}
+              <p>User nhận: {item.recipient || "Chưa ghi nhận"} · Siêu thị: {item.storeCode || "Chưa ghi nhận"}</p>
               {item.cancelledAt && <p className={styles.cancellation}>Hủy: {date(item.cancelledAt)} · NV {item.cancelledBy}<br />{item.reason}</p>}
               {item.status === "active" && item.actor === actor && access.canCancelOwn && !access.canManageAll && <p className={styles.cancelWindow} data-expired={!canCancelImei(item, actor, access, now)}>{canCancelImei(item, actor, access, now) ? `Còn ${cancelTimeLeft(item, now)} để hủy` : IMEI_CANCEL_CONTACT}</p>}
             </div>
@@ -171,6 +195,7 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
         <nav className={styles.pagination} aria-label="Trang lịch sử"><button type="button" className={styles.secondary} disabled={loading || page <= 1} onClick={() => setPage(page - 1)}>Trước</button><span>Trang {directory.page} / {directory.pages}</span><button type="button" className={styles.secondary} disabled={loading || page >= directory.pages} onClick={() => setPage(page + 1)}>Sau</button></nav>
       </section>
     </>}
+    {assigning && <dialog ref={assignment} className={styles.dialog} onCancel={()=>setAssigning(false)} aria-labelledby="imei-recipient-title"><form onSubmit={e=>{e.preventDefault();if(!recipient.trim()||!storeCode.trim())return;setAssigning(false);void generate({requestId:pending?.requestId || newRequestId(),brand:pending?.brand || brand,recipient:recipient.trim(),storeCode:storeCode.trim()});}}><h2 id="imei-recipient-title">Nhân viên nhận IMEI / SN</h2><label>User nhận mã<input autoFocus required maxLength={50} pattern="[a-zA-Z0-9_.@-]+" value={recipient} onChange={e=>setRecipient(e.target.value)}/></label><label>Mã siêu thị<input required inputMode="numeric" pattern="[0-9]+" maxLength={15} value={storeCode} onChange={e=>setStoreCode(e.target.value)}/></label><div className={styles.dialogActions}><button type="button" className={styles.secondary} onClick={()=>setAssigning(false)}>Trở lại</button><button className={styles.primary}>Tạo mã</button></div></form></dialog>}
     {cancel && <dialog ref={confirmation} className={styles.dialog} onCancel={() => setCancel(null)} aria-labelledby="imei-cancel-title"><form onSubmit={event => { event.preventDefault(); void applyCancellation(); }}><h2 id="imei-cancel-title">Hủy lượt cấp mã?</h2><strong className={styles.number}>{cancel.imei}</strong><p>Mã sẽ được phép cấp lại. Lịch sử lượt cấp này vẫn được giữ.</p>{access && !canCancelImei(cancel, actor, access, now) && <p role="alert">{IMEI_CANCEL_CONTACT}</p>}<label htmlFor="imei-cancel-reason">Lý do hủy</label><textarea id="imei-cancel-reason" required maxLength={300} autoFocus value={reason} onChange={event => setReason(event.target.value)} /><div className={styles.dialogActions}><button type="button" className={styles.secondary} onClick={() => setCancel(null)}>Trở lại</button><button className={styles.danger} disabled={!reason.trim() || !access || !canCancelImei(cancel, actor, access, now)}>Hủy mã</button></div></form></dialog>}
     {feedback && <UiFeedbackDialog tone={feedback.tone} onDismiss={() => { if (feedback.tone !== "loading") setFeedback(null); }} onRetry={feedback.retry}>{feedback.text}</UiFeedbackDialog>}
   </div>;

@@ -7,7 +7,7 @@ const PREFIX = "IMEI_V1_";
 const REQUEST = PREFIX + "REQUEST_";
 const CODE = PREFIX + "CODE_";
 type Actor = { maNV: string; name: string };
-type Plan = { revision: string; requestId: string; imei: string; brand: ImeiBrand; prefix: string; actor: string; actorName: string; createdAt: string };
+type Plan = { recipient?: string; storeCode?: string; revision: string; requestId: string; imei: string; brand: ImeiBrand; prefix: string; actor: string; actorName: string; createdAt: string };
 type Event = { requestId: string; actor: string; createdAt: string; cancelledAt?: string; cancelledBy?: string; reason?: string; rejected?: boolean };
 type Ledger = { revision: string; imei: string; events: Event[] };
 type Setting = { key: string; value: string; type: string; updated_at_text: string; updated_by: string };
@@ -43,7 +43,7 @@ async function saveLedger(previous: Ledger | null, next: Ledger, actor: string) 
 function issue(plan: Plan, ledger: Ledger | null): ImeiIssue {
   const event = ledger?.events.find(event => event.requestId === plan.requestId && event.actor === plan.actor);
   const status = !event ? "pending" : event.rejected ? "conflict" : event.cancelledAt ? "cancelled" : "active";
-  return { requestId: plan.requestId, imei: status === "pending" || status === "conflict" ? null : plan.imei,
+  return { recipient: plan.recipient, storeCode: plan.storeCode, requestId: plan.requestId, imei: status === "pending" || status === "conflict" ? null : plan.imei,
     brand: plan.brand, actor: plan.actor, actorName: plan.actorName, createdAt: event?.createdAt || plan.createdAt, status,
     ...(event?.cancelledAt ? { cancelledAt: event.cancelledAt, cancelledBy: event.cancelledBy, reason: event.reason } : {}) };
 }
@@ -71,14 +71,17 @@ async function candidate(prefix: string, brand: ImeiBrand) {
   throw new ImeiError("Dãy số này đang đầy hoặc có nhiều người tạo cùng lúc. Xin thử lại.", 409, "IMEI_COLLISION");
 }
 
-export async function generateImei(brand: unknown, requestId: unknown, actor: Actor) {
+export async function generateImei(brand: unknown, requestId: unknown, actor: Actor, recipientInput?: { recipient?: unknown; storeCode?: unknown }) {
   ready();
   if (!/^[a-zA-Z0-9_-]{1,40}$/.test(actor.maNV)) throw new ImeiError("Mã tài khoản chưa dùng được với sổ mã này.");
   if (!validImeiRequestId(requestId)) throw new ImeiError("Mã lượt tạo chưa đúng. Xin tải lại trang.");
   const id = requestId.toLowerCase(), prefix = imeiPrefix(brand, actor.maNV), key = requestKey(actor.maNV, id);
   let plan = await read<Plan>(key);
   if (!plan) {
-    const next: Plan = { revision: randomUUID(), requestId: id, imei: await candidate(prefix, brand as ImeiBrand), brand: brand as ImeiBrand, prefix, actor: actor.maNV, actorName: actor.name, createdAt: new Date().toISOString() };
+    const recipient = String(recipientInput?.recipient || "").trim();
+    const storeCode = String(recipientInput?.storeCode || "").trim();
+    if (recipientInput && (!/^[a-zA-Z0-9_.@-]{1,50}$/.test(recipient) || !/^\d{1,15}$/.test(storeCode))) throw new ImeiError("Xin nhập User nhận mã và Mã siêu thị hợp lệ.");
+    const next: Plan = { recipient, storeCode, revision: randomUUID(), requestId: id, imei: await candidate(prefix, brand as ImeiBrand), brand: brand as ImeiBrand, prefix, actor: actor.maNV, actorName: actor.name, createdAt: new Date().toISOString() };
     try { await insertRows("system_settings", [row(key, next, "IMEI_REQUEST", actor.maNV, next.createdAt)]); plan = next; }
     catch (error) { if (!duplicate(error)) throw error; plan = await read<Plan>(key); }
   }

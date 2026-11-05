@@ -14,6 +14,6 @@ export function visibleAdminScreens(role: string, modules: string[], actions: st
   for (const key of ["quy-trinh-thu-cu", "may-moi", "may-cu", "demo"] as const) if (modules.includes(key)) result.push(key);
   if (modules.includes("tcdm") || actions.some(action => ["settings-write", "reload-data"].includes(action))) result.push("tcdm");
   if (modules.includes("people") || actions.some(action => ["staff-manage", "staff-delete", "staff-security"].includes(action))) result.push("people");
-  if (modules.includes("imei") || actions.some(action => ["imei-create", "imei-cancel-own", "imei-manage-all"].includes(action))) result.push("imei");
+  if (modules.includes("imei") || actions.some(action => ["imei-create", "imei-cancel-own", "imei-manage-all", "imei-report"].includes(action))) result.push("imei");
   return result;
 }

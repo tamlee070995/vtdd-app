@@ -54,7 +54,7 @@ function setup({ fixedRandom = false } = {}) {
     cache.set(file, m.exports); return m.exports;
   }
   const store = load('lib/imei-store.ts'), rules = load('lib/imei.ts'), route = load('app/api/admin/imei/route.ts');
-  const request = (body, origin = 'http://localhost') => new NextRequest('http://localhost/api/admin/imei', { method: 'POST', headers: { 'Content-Type': 'application/json', origin }, body: JSON.stringify(body) });
+  const request = (body, origin = 'http://localhost') => new NextRequest('http://localhost/api/admin/imei', { method: 'POST', headers: { 'Content-Type': 'application/json', origin }, body: JSON.stringify({recipient:"NV009",storeCode:"001",...body}) });
   return { rows, reads, store, rules, route, request, actor, load, setActor: value => { actor = value; }, unauthorized: () => { authenticated = false; }, loseResponse: () => { dropReply = true; }, offline: () => { offline = true; }, setTime: value => { time = value; }, stopBeforeClaim: () => { stopBeforeClaim = true; }, beforeUpdate: callback => { beforeUpdate = callback; } };
 }
 const own = { canCancelOwn: true, canManageAll: false };
@@ -177,10 +177,10 @@ test('API requires explicit Mod grants, rejects forged origin/body and enforces 
 
 test('create grant cannot manage everyone; full Admin and manage-all have the intended distinct rights', () => {
   const { rules } = setup();
-  assert.deepEqual(rules.imeiAccess({ permission: 'admin' }), { canView: true, canCreate: true, canCancelOwn: true, canManageAll: true });
-  assert.deepEqual(rules.imeiAccess({ permission: 'mod', actions: ['imei-create'] }), { canView: true, canCreate: true, canCancelOwn: false, canManageAll: false });
-  assert.deepEqual(rules.imeiAccess({ permission: 'mod', modules: ['imei'] }), { canView: true, canCreate: false, canCancelOwn: false, canManageAll: false });
-  assert.deepEqual(rules.imeiAccess({ permission: 'mod', actions: ['imei-manage-all'] }), { canView: true, canCreate: false, canCancelOwn: false, canManageAll: true });
+  assert.deepEqual(rules.imeiAccess({ permission: 'admin' }), { canView: true, canCreate: true, canCancelOwn: true, canManageAll: true, canReport: true });
+  assert.deepEqual(rules.imeiAccess({ permission: 'mod', actions: ['imei-create'] }), { canView: true, canCreate: true, canCancelOwn: false, canManageAll: false, canReport: false });
+  assert.deepEqual(rules.imeiAccess({ permission: 'mod', modules: ['imei'] }), { canView: true, canCreate: false, canCancelOwn: false, canManageAll: false, canReport: false });
+  assert.deepEqual(rules.imeiAccess({ permission: 'mod', actions: ['imei-manage-all'] }), { canView: true, canCreate: false, canCancelOwn: false, canManageAll: true, canReport: true });
 });
 
 test('general page settings exclude the private register and pricing snapshot at the database query', async () => {
@@ -327,3 +327,16 @@ test('legacy Xiaomi issued codes remain recoverable, while new and unfinished re
   await assert.rejects(ctx.store.generateImei('xiaomi', pending, ctx.actor), error => error.code === 'IMEI_RULE_CHANGED');
   assert.equal((await ctx.store.generateImei('xiaomi', crypto.randomUUID(), ctx.actor)).imei.startsWith('86799'), true);
 });
+
+ test('recipient is stored per issue and report filters retain leading zeros without granting cancellation',async()=>{
+ const ctx=setup();const first=await ctx.store.generateImei('samsung',crypto.randomUUID(),ctx.actor,{recipient:'NV009',storeCode:'001'});
+ assert.equal(first.recipient,'NV009');assert.equal(first.storeCode,'001');
+ await assert.rejects(ctx.store.generateImei('xiaomi',crypto.randomUUID(),ctx.actor,{recipient:'',storeCode:'001'}),e=>e.status===400);
+ await ctx.store.generateImei('xiaomi',crypto.randomUUID(),ctx.actor,{recipient:'NV010',storeCode:'002'});
+ const report=ctx.load('lib/imei-report.ts');
+ assert.equal((await report.imeiReport('',true,{store:'001',employee:'nv009',brand:'samsung',status:'active'})).length,1);
+ await ctx.store.cancelImei({requestId:first.requestId,actor:first.actor,reason:'Thử'},ctx.actor,all);
+ assert.equal((await report.imeiReport('',true,{store:'001',status:'cancelled'})).length,1);
+ assert.equal((await report.imeiReport(first.actor,false,{store:'001'})).length,0);
+ const rights=ctx.rules.imeiAccess({permission:'mod',actions:['imei-report']});assert.equal(rights.canReport,true);assert.equal(rights.canManageAll,false);assert.equal(rights.canCreate,false);
+ });

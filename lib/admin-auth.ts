@@ -10,6 +10,7 @@ export type AdminModuleKey = "tcdm" | "quy-trinh-thu-cu" | "may-moi" | "may-cu" 
 export type AdminActionKey =
   | "imei-create"
   | "imei-cancel-own"
+  | "imei-report"
   | "imei-manage-all"
   | "staff-manage"
   | "staff-delete"
@@ -34,6 +35,7 @@ const ACTIONS: AdminActionKey[] = [
   "imei-create",
   "imei-cancel-own",
   "imei-manage-all",
+  "imei-report",
   "staff-manage",
   "staff-delete",
   "staff-security",
