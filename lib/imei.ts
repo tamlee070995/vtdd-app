@@ -33,7 +33,7 @@ export function imeiCodeLength(brand: ImeiBrand) {
 
 export function validImeiCode(brand: ImeiBrand, code: string) {
   if (!Object.hasOwn(IMEI_BRANDS, brand)) return false;
-  if (isAppleSerial(brand)) return new RegExp(`^S99[0-9A-HJ-NP-Z]{${imeiCodeLength(brand) - 3}}$`).test(code);
+  if (isAppleSerial(brand)) return ["SWAP", "S99"].some(prefix => new RegExp(`^${prefix}[0-9A-HJ-NP-Z]{${imeiCodeLength(brand) - prefix.length}}$`).test(code));
   return validImei(code);
 }
 
@@ -52,7 +52,7 @@ export function canCancelImei(item: Pick<ImeiIssue, "status" | "actor" | "create
 export function imeiPrefix(brand: unknown, actor: string) {
   if (brand === "samsung") return "35399";
   if (brand === "xiaomi") return "86799";
-  if (isAppleSerial(brand)) return "S99";
+  if (isAppleSerial(brand)) return "SWAP";
   if (brand !== "other") throw new ImeiError("Xin chọn hãng máy.");
   if (!/^\d{1,13}$/.test(actor)) throw new ImeiError("Mã nhân viên phải gồm 1–13 số để chừa chỗ tạo mã và tính Luhn.");
   return actor;

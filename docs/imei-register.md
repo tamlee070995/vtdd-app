@@ -1,7 +1,7 @@
 # Sổ mã IMEI / SN nội bộ
 
 - Samsung: `35399` + 9 số ngẫu nhiên + Luhn. Xiaomi: `86799` + 9 số ngẫu nhiên + Luhn. Hãng còn lại: mã tài khoản + số ngẫu nhiên cho đủ 14 số + Luhn.
-- Apple iPhone 13 trở lên: `S99` + 8 ký tự ngẫu nhiên, tổng cộng 11 ký tự. Apple iPhone còn lại: `S99` + 10 ký tự ngẫu nhiên, tổng cộng 13 ký tự. Dùng chữ hoa và số, loại O và I. SN không tính Luhn. Đây là độ dài chủ trang đã chốt.
+- Apple iPhone 13 trở lên: `SWAP` + 7 ký tự ngẫu nhiên, tổng cộng 11 ký tự. Apple iPhone còn lại: `SWAP` + 9 ký tự ngẫu nhiên, tổng cộng 13 ký tự. Dùng chữ hoa và số, loại O và I. SN không tính Luhn. SN cũ đầu `S99` vẫn tra cứu, hủy và nhận lại theo lượt đã cấp; lượt tạo mới chỉ dùng `SWAP`.
 - IMEI được kiểm tra Luhn. IMEI / SN ở đây là mã nội bộ; không xác nhận mã do hãng cấp hay mã của thiết bị thật.
 - Mod cần quyền riêng: `imei` (xem sổ của mình), `action:imei-create`, `action:imei-cancel-own`, `action:imei-manage-all` (xem và hủy mã của mọi người). Admin giữ toàn quyền. API đọc lại quyền tài khoản ở mỗi yêu cầu.
 - Quyền hủy mã của mình chỉ có hiệu lực trong 2 phút kể từ lúc lượt cấp được ghi vào sổ. Đúng mốc 2 phút trở đi, chỉ quyền quản lý toàn bộ sổ (hoặc Admin toàn quyền) mới hủy được. Thông báo hết hạn: “Cần Hủy Mã Liên Hệ Quản Lý: 37804 - Lê Thanh Sang”. Máy chủ xét giờ lại trước mỗi lần ghi. Gửi lại một lệnh hủy đã hoàn tất vẫn trả kết quả cũ, không đụng lượt cấp mới.

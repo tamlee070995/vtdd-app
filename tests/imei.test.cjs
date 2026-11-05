@@ -261,13 +261,13 @@ test('shared cancellation rules fail closed for invalid times, future dates and 
   assert.equal(rules.canCancelImei(item, '456', { canCancelOwn: false, canManageAll: true }, start + 6000000), true);
 });
 
-test('Apple serials use the confirmed 11/13 lengths, S99 prefix and uppercase letters/digits excluding O/I', async () => {
+test('Apple serials use the confirmed 11/13 lengths, SWAP prefix and uppercase letters/digits excluding O/I', async () => {
   const ctx = setup(), codes = new Set();
   for (const [brand, length] of [['apple-13-plus', 11], ['apple-other', 13]]) {
     for (let index = 0; index < 120; index++) {
       const item = await ctx.store.generateImei(brand, crypto.randomUUID(), ctx.actor);
       assert.equal(item.status, 'active'); assert.equal(item.imei.length, length);
-      assert.match(item.imei, /^S99[0-9A-HJ-NP-Z]+$/); assert.doesNotMatch(item.imei, /[OI]/);
+      assert.match(item.imei, /^SWAP[0-9A-HJ-NP-Z]+$/); assert.doesNotMatch(item.imei, /[OI]/);
       assert.equal(ctx.rules.validImeiCode(brand, item.imei), true);
       assert.equal(ctx.rules.validImei(item.imei), false);
       assert.equal(codes.has(item.imei), false); codes.add(item.imei);
@@ -275,6 +275,10 @@ test('Apple serials use the confirmed 11/13 lengths, S99 prefix and uppercase le
   }
   assert.deepEqual(Object.keys(ctx.rules.IMEI_BRANDS), ['samsung', 'xiaomi', 'apple-13-plus', 'apple-other', 'other']);
   assert.equal(ctx.rules.IMEI_BRANDS.other, 'Hãng còn lại');
+  assert.equal(ctx.rules.validImeiCode('apple-13-plus', 'S99ABCDEFGH'), true);
+  assert.equal(ctx.rules.validImeiCode('apple-other', 'S99ABCDEFGH12'), true);
+  assert.equal(ctx.rules.validImeiCode('apple-13-plus', 'SWAPABCDEFG'), true);
+  assert.equal(ctx.rules.validImeiCode('apple-other', 'SWAPABCDEFG12'), true);
   assert.equal(ctx.rules.validImeiCode('apple-13-plus', 'S99ABCDEFGI'), false);
   assert.equal(ctx.rules.validImeiCode('apple-13-plus', 'S99ABCDEFGO'), false);
   assert.equal(ctx.rules.validImeiCode('apple-13-plus', 'S99abcdefgh'), false);
