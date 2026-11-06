@@ -1,6 +1,12 @@
 .tool { display: grid; gap: 22px; padding: 12px; color: #07111f; min-width: 0; }
 .heading, .historyTop, .itemTop, .result { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
 .heading h2 { margin: 5px 0 8px; font-size: clamp(26px, 3vw, 34px); letter-spacing: -.025em; }
+.heading { flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid #d9e2ef; }
+.headingTitle { min-width:0;flex:1 1 180px; }
+.headingActions { display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-left:auto; }
+.intro { margin:0;color:#596c85;font-size:14px;line-height:1.6; }
+.manageBrands { display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap; }
+.manageBrands svg { flex-shrink:0; }
 .heading p, .historyTop p, .item p { margin: 6px 0 0; color: #596c85; font-size: 14px; line-height: 1.6; }
 .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: #946000; }
 .badge { white-space: nowrap; background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; padding: 8px 12px; border-radius: 30px; font-size: 13px; font-weight: 700; }
@@ -17,11 +23,20 @@
 .danger { color: #b42318; background: #fff5f4; border: 1px solid #f5c5be; }
 .tool button:disabled { cursor: default; opacity: .5; }
 .tool option:disabled { color:#8b95a4;background:#f1f4f8; }
-.brandLocks { border:1px solid #e6d18b;border-radius:18px;padding:20px;background:#fffdf4;min-width:0; }
-.brandLocks h3 { margin:0;font-size:19px; }.brandLocks p { margin:10px 0;font-size:14px;line-height:1.6;color:#596c85; }
-.brandLockChoices { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin:16px 0; }
-.tool .brandLockChoices label { display:flex;align-items:flex-start;gap:10px;margin:0;padding:12px;border:1px solid #d7e0eb;border-radius:12px;background:#fff;line-height:1.5;cursor:pointer; }
-.tool .brandLockChoices input { width:18px;min-width:18px;height:18px;margin:1px 0 0;padding:0;accent-color:#946000; }
+.brandDrawer { position:fixed;inset:0;margin:0 0 0 auto;width:min(440px,100%);max-width:100%;height:100vh;height:100dvh;max-height:100dvh;padding:0;border:0;border-left:1px solid #d9e2ef;background:#fff;color:#07111f;box-sizing:border-box; }
+.brandDrawer[open] { display:flex;flex-direction:column; }
+.brandDrawer::backdrop { background:#07111f99; }
+.brandDrawerHeader { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:max(22px,env(safe-area-inset-top)) 24px 20px;border-bottom:1px solid #d9e2ef;flex-shrink:0; }
+.brandDrawerHeader h2 { font-size:23px;margin:5px 0 0; }
+.brandDrawerHeader>button { min-width:44px; }
+.brandDrawerBody { flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:20px 24px; }
+.brandDrawerBody p { margin:0 0 16px;font-size:14px;line-height:1.6;color:#596c85; }
+.brandDrawerFooter { display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;padding:18px 24px max(18px,env(safe-area-inset-bottom));border-top:1px solid #d9e2ef;flex-shrink:0; }
+.brandDrawerFooter p { flex-basis:100%;margin:0;font-size:14px;color:#946000; }
+.brandLockChoices { display:grid;grid-template-columns:minmax(0,1fr);margin:0 0 20px; }
+.tool .brandLockChoices label { display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0;padding:16px 0;border-bottom:1px solid #d9e2ef;line-height:1.5;cursor:pointer; }
+.tool .brandLockChoices input { width:19px;min-width:19px;height:19px;margin:0;padding:0;accent-color:#946000; }
+.tool .brandDrawer :is(input,button):focus-visible { outline:2px solid #b58b00;outline-offset:2px; }
 .brandLockChoices small { display:block;margin-top:3px;font-size:12px;color:#64748b;font-weight:400; }
 .result { padding: 22px; background: #fff9d9; border: 1px solid #e6c735; border-radius: 18px; }
 .result > div { min-width: 0; flex: 1; }
@@ -55,6 +70,10 @@
 .dialog textarea { min-height: 100px; resize: vertical; }
 .dialogActions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
 @media (max-width: 600px) {
+  .brandDrawer { width:100%; }
+  .brandDrawerHeader { padding-left:18px;padding-right:18px; }
+  .brandDrawerBody { padding:18px; }
+  .brandDrawerFooter { padding-left:18px;padding-right:18px; }
   .tool { padding: 6px; gap: 18px; }
   .heading { align-items: flex-start; }
   .badge { padding: 6px 9px; font-size: 11px; margin-top: 6px; }

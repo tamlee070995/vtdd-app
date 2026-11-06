@@ -171,12 +171,16 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
   const serial = isAppleSerial(brand);
   const brandLocked = policy?.lockedBrands.includes(brand) || false;
   return <div className={styles.tool}>
-    <header className={styles.heading}><div><span className={styles.eyebrow}>SỔ MÃ NỘI BỘ</span><h2>Tạo IMEI / SN</h2><p>Đối với máy cũ không lấy được IMEI thì không quan tâm Hãng nào. Chọn <b>Hãng</b> máy mới đổi lên thuộc các trường hợp dưới đây:</p></div><span className={styles.badge}>{serial ? "SN Apple" : "Luhn ✓"}</span></header>
+    <header className={styles.heading}><div className={styles.headingTitle}><span className={styles.eyebrow}>SỔ MÃ NỘI BỘ</span><h2>Tạo IMEI / SN</h2></div>
+      <div className={styles.headingActions}><span className={styles.badge}>{serial ? "SN Apple" : "Luhn ✓"}</span>
+        {policy && access?.canManageBrandLocks && <ImeiBrandLocksPanel policy={policy} onSaved={next => { setPolicy(next); setPolicyError(""); }} />}
+      </div>
+    </header>
+    <p className={styles.intro}>Đối với máy cũ không lấy được IMEI thì không quan tâm Hãng nào. Chọn <b>Hãng</b> máy mới đổi lên thuộc các trường hợp dưới đây:</p>
     {loadError && <UiNotice onRetry={() => void load()} busy={loading}>{loadError}</UiNotice>}
     {loading && !directory && <UiNotice tone="loading">Đang tải sổ mã…</UiNotice>}
     {access && <>
       {policyError && <UiNotice onRetry={() => void refreshPolicy()}>{policyError}</UiNotice>}
-      {policy && access.canManageBrandLocks && <ImeiBrandLocksPanel policy={policy} onSaved={next => { setPolicy(next); setPolicyError(""); }} />}
       <section className={styles.generator} aria-label="Tạo mã mới">
         <div><label htmlFor="imei-brand">Máy mới hãng</label><select id="imei-brand" value={brand} disabled={!!pending || !policy || !!policyError || feedback?.tone === "loading"} onChange={event => setBrand(event.target.value as ImeiBrand)}>
           {Object.entries(IMEI_BRANDS).map(([key, label]) => <option key={key} value={key} disabled={policy?.lockedBrands.includes(key as ImeiBrand)}>{policy?.lockedBrands.includes(key as ImeiBrand) ? imeiBrandLockedMessage(key as ImeiBrand) : label}</option>)}
