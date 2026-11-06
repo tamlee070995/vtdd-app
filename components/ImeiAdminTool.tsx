@@ -6,9 +6,11 @@ import { clientErrorMessage, requestJson } from "@/lib/client-request";
 import UiNotice from "@/components/UiNotice";
 import UiFeedbackDialog from "@/components/UiFeedbackDialog";
 import styles from "./ImeiAdminTool.module.css";
+import ImeiBrandLocksPanel from "./ImeiBrandLocksPanel";
+import { imeiBrandLockedMessage, type ImeiBrandLocks } from "@/lib/imei";
 
-type Access = { canView: boolean; canCreate: boolean; canCancelOwn: boolean; canManageAll: boolean; canReport: boolean };
-type Directory = { success: boolean; items: ImeiIssue[]; page: number; pages: number; total: number; access: Access; serverTime: number };
+type Access = { canView: boolean; canCreate: boolean; canCancelOwn: boolean; canManageAll: boolean; canReport: boolean; canManageBrandLocks: boolean };
+type Directory = { success: boolean; items: ImeiIssue[]; page: number; pages: number; total: number; access: Access; serverTime: number; policy: ImeiBrandLocks };
 type Pending = { requestId: string; brand: ImeiBrand; recipient?: string; storeCode?: string };
 type Feedback = { tone: "loading" | "error" | "success"; text: string; retry?: () => void };
 const labels = { active: "Đã cấp", cancelled: "Đã hủy", pending: "Chưa xong", conflict: "Chưa cấp" };
@@ -44,6 +46,7 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
   const filterQuery=new URLSearchParams(applied).toString();
   const [brand, setBrand] = useState<ImeiBrand>("samsung");
   const [directory, setDirectory] = useState<Directory | null>(null);
+  const [policy, setPolicy] = useState<ImeiBrandLocks | null>(null), [policyError, setPolicyError] = useState("");
   const [page, setPage] = useState(1), [search, setSearch] = useState(""), [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState("");
   const [pending, setPending] = useState<Pending | null>(null), [restored, setRestored] = useState(false);
@@ -67,6 +70,7 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
       const data = await requestJson<Directory>(`/api/admin/imei?page=${page}&q=${encodeURIComponent(query)}&${filterQuery}`);
       if (state.value === current) {
         syncClock(data.serverTime);
+        setPolicy(data.policy); setPolicyError("");
         setDirectory(data); if (data.page > data.pages) setPage(data.pages);
         setResult(previous => previous ? data.items.find(item => item.actor === previous.actor && item.requestId === previous.requestId) || previous : null);
       }
@@ -74,6 +78,17 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
     finally { if (state.value === current) setLoading(false); }
   }, [page, query, syncClock, filterQuery]);
   useEffect(() => { const state = sequence.current; void load(); return () => { state.value++; }; }, [load]);
+  const refreshPolicy = useCallback(async () => {
+    try {
+      const data = await requestJson<{ success: boolean; policy: ImeiBrandLocks; access: Access }>("/api/admin/imei/brand-locks");
+      setPolicy(data.policy); setPolicyError("");
+      setDirectory(previous => previous ? { ...previous, access: data.access } : previous);
+    } catch (error) { setPolicyError(clientErrorMessage(error)); }
+  }, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refreshPolicy(); }, 30000);
+    return () => clearInterval(timer);
+  }, [refreshPolicy]);
   useEffect(() => {
     const timer = window.setInterval(() => { const anchor = clock.current; if (anchor) setNow(anchor.server + performance.now() - anchor.received); }, 1000);
     const onVisible = () => { if (document.visibilityState === "visible") void load(); };
@@ -106,6 +121,10 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
   }
   async function generate(retry?: Pending) {
     if (busy.current || !access?.canCreate) return;
+    const selectedBrand = (retry || pending)?.brand || brand;
+    if (!policy || policyError || (policy.lockedBrands.includes(selectedBrand) && !(retry || pending))) {
+      setFeedback({ tone: "error", text: policy?.lockedBrands.includes(selectedBrand) ? imeiBrandLockedMessage(selectedBrand) : "Chưa đọc được tình trạng khóa hãng. Xin tải lại rồi thử lại." }); return;
+    }
     if(!(retry||pending)?.recipient || !(retry||pending)?.storeCode){setAssigning(true);return;}
     const next = retry || pending || { requestId: newRequestId(), brand };
     busy.current = true; remember(next); setBrand(next.brand);
@@ -117,7 +136,7 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
       setFeedback({ tone: "success", text: response.message });
       void load();
     } catch (error) {
-      const collision = ["IMEI_COLLISION", "IMEI_RULE_CHANGED"].includes((error as { code?: string })?.code || "");
+      const collision = ["IMEI_COLLISION", "IMEI_RULE_CHANGED", "IMEI_BRAND_LOCKED"].includes((error as { code?: string })?.code || "");
       if (collision) remember(null);
       setFeedback({ tone: "error", text: clientErrorMessage(error), ...(!collision ? { retry: () => { void generate(next); } } : {}) });
       void load();
@@ -150,16 +169,20 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
   let prefix = "";
   try { prefix = imeiPrefix(brand, actor); } catch { /* Explain an unsupported employee code inline. */ }
   const serial = isAppleSerial(brand);
+  const brandLocked = policy?.lockedBrands.includes(brand) || false;
   return <div className={styles.tool}>
     <header className={styles.heading}><div><span className={styles.eyebrow}>SỔ MÃ NỘI BỘ</span><h2>Tạo IMEI / SN</h2><p>Đối với máy cũ không lấy được IMEI thì không quan tâm Hãng nào. Chọn <b>Hãng</b> máy mới đổi lên thuộc các trường hợp dưới đây:</p></div><span className={styles.badge}>{serial ? "SN Apple" : "Luhn ✓"}</span></header>
     {loadError && <UiNotice onRetry={() => void load()} busy={loading}>{loadError}</UiNotice>}
     {loading && !directory && <UiNotice tone="loading">Đang tải sổ mã…</UiNotice>}
     {access && <>
+      {policyError && <UiNotice onRetry={() => void refreshPolicy()}>{policyError}</UiNotice>}
+      {policy && access.canManageBrandLocks && <ImeiBrandLocksPanel policy={policy} onSaved={next => { setPolicy(next); setPolicyError(""); }} />}
       <section className={styles.generator} aria-label="Tạo mã mới">
-        <div><label htmlFor="imei-brand">Máy mới hãng</label><select id="imei-brand" value={brand} disabled={!access.canCreate || !!pending || feedback?.tone === "loading"} onChange={event => setBrand(event.target.value as ImeiBrand)}>
-          {Object.entries(IMEI_BRANDS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        <div><label htmlFor="imei-brand">Máy mới hãng</label><select id="imei-brand" value={brand} data-locked={brandLocked} disabled={!access.canCreate || !!pending || !policy || !!policyError || feedback?.tone === "loading"} onChange={event => setBrand(event.target.value as ImeiBrand)}>
+          {Object.entries(IMEI_BRANDS).map(([key, label]) => <option key={key} value={key} disabled={policy?.lockedBrands.includes(key as ImeiBrand)}>{policy?.lockedBrands.includes(key as ImeiBrand) ? imeiBrandLockedMessage(key as ImeiBrand) : label}</option>)}
         </select><p className={styles.syntax}>{prefix ? serial ? <>SN {imeiCodeLength(brand)} ký tự: <b>{prefix}</b> + {imeiCodeLength(brand) - prefix.length} ký tự ngẫu nhiên (số và chữ). Không dùng O và I.</> : <>Đầu mã <b>{prefix}</b> + {14 - prefix.length} số ngẫu nhiên + 1 số Luhn</> : "Mã nhân viên phải gồm 1–13 số để tạo mã theo tài khoản."}</p></div>
-        <button className={styles.primary} type="button" disabled={!restored || !prefix || !access.canCreate || feedback?.tone === "loading"} onClick={() => void generate()}>{pending ? "Tiếp tục lượt chưa xong" : "Tạo mã"}</button>
+        <button className={styles.primary} type="button" disabled={!restored || !prefix || !access.canCreate || !policy || !!policyError || (brandLocked && !pending) || feedback?.tone === "loading"} onClick={() => void generate()}>{pending ? "Tiếp tục lượt chưa xong" : "Tạo mã"}</button>
+        {brandLocked && <p className={styles.lockedNotice} role="status">{imeiBrandLockedMessage(brand)}. Xin chọn hãng đang mở.</p>}
         {!access.canCreate && <p className={styles.hint}>Bạn được xem sổ mã. Xin liên lạc Admin nếu cần quyền tạo mã.</p>}
       </section>
       {pending && <UiNotice>Một lượt tạo chưa nhận được kết quả. Bấm “Tiếp tục lượt chưa xong” để kiểm tra và nhận lại đúng mã.</UiNotice>}

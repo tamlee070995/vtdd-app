@@ -52,6 +52,7 @@ type AdminActionKey =
   | "imei-cancel-own"
   | "imei-report"
   | "imei-manage-all"
+  | "imei-brand-lock"
   | "staff-manage"
   | "staff-delete"
   | "staff-security"
@@ -144,12 +145,13 @@ const ADMIN_ACTION_OPTIONS: Array<{ key: AdminActionKey; label: string; desc: st
   { key: "imei-create", label: "Tạo mã IMEI / SN", desc: "Cấp IMEI 15 số hoặc SN Apple theo hãng máy mới." },
   { key: "imei-cancel-own", label: "Hủy mã của mình", desc: "Hủy mã của mình trong 2 phút kể từ lúc cấp." },
   { key: "imei-manage-all", label: "Quản lý toàn bộ sổ IMEI", desc: "Xem và hủy IMEI / SN của mọi người, kể cả sau 2 phút." },
+  { key: "imei-brand-lock", label: "Khóa tạo IMEI máy cũ theo hãng", desc: "Quyền con của Quản lý toàn bộ sổ IMEI. Cho phép khóa hoặc mở lại từng hãng cho mọi người tạo mã." },
   { key: "imei-report", label: "Tra cứu & xuất Excel", desc: "Xem toàn bộ sổ, lọc và xuất Excel; không cấp quyền hủy mã người khác." },
 ];
 
 const PERSONNEL_ACTION_KEYS = new Set(PERSONNEL_ACTION_OPTIONS.map((item) => item.key));
 const TCDM_ACTION_KEYS = new Set(TCDM_ACTION_OPTIONS.map((item) => item.key));
-const IMEI_ACTION_KEYS = new Set<AdminActionKey>(["imei-create", "imei-cancel-own", "imei-manage-all", "imei-report"]);
+const IMEI_ACTION_KEYS = new Set<AdminActionKey>(["imei-create", "imei-cancel-own", "imei-manage-all", "imei-report", "imei-brand-lock"]);
 
 const PERMISSION_TREE = [
   {
@@ -2600,6 +2602,7 @@ function StaffAdminAccessBox({
 
                 <div className="adminx-tree-children">
                   {group.children.map((child) => {
+                    if ("key" in child && child.key === "imei-brand-lock") return null;
                     const key = "key" in child ? adminActionToken(child.key) : String(child.module);
                     const selected = accessItems.includes(key);
                     return <div className={permissionStyles.permissionRow} key={key}>
@@ -2610,6 +2613,11 @@ function StaffAdminAccessBox({
                         <button type="button" className={permissionStyles.info} aria-label={"Giải thích " + child.label} aria-expanded={help === key} onClick={() => setHelp(help === key ? "" : key)}>ⓘ</button>
                       </div>
                       {help === key && <p className={permissionStyles.help}>{child.desc}</p>}
+                      {"key" in child && child.key === "imei-manage-all" && <label className={permissionStyles.childPermission}>
+                        <input type="checkbox" checked={accessItems.includes(adminActionToken("imei-brand-lock"))}
+                          disabled={disabled || !selected} onChange={() => toggleAction("imei-brand-lock")} />
+                        <span>Khóa tạo IMEI máy cũ theo hãng</span>
+                      </label>}
                     </div>;
                   })}
                 </div>

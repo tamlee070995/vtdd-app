@@ -61,6 +61,73 @@ const own = { canCancelOwn: true, canManageAll: false };
 const all = { canCancelOwn: true, canManageAll: true };
 const rejectStatus = status => error => error.status === status;
 
+test('brand locking is a separate child grant: manage-all alone and orphan child grants cannot change locks', async () => {
+  const ctx = setup(), locks = ctx.load('app/api/admin/imei/brand-locks/route.ts');
+  const request = (body, origin = 'http://localhost') => new NextRequest('http://localhost/api/admin/imei/brand-locks', { method: 'POST', headers: { origin }, body: JSON.stringify(body) });
+  const command = { revision: 'initial', lockedBrands: ['samsung'] };
+  for (const actions of [['imei-manage-all'], ['imei-brand-lock'], ['imei-create'], ['imei-report']]) {
+    ctx.setActor({ ...ctx.actor, permission: 'mod', modules: ['imei'], actions });
+    assert.equal(ctx.rules.imeiAccess({permission:'mod',actions}).canManageBrandLocks, false);
+    assert.equal((await locks.POST(request(command))).status, 403);
+  }
+  ctx.setActor({ ...ctx.actor, permission: 'mod', actions: ['imei-manage-all','imei-brand-lock'] });
+  assert.equal((await locks.POST(request(command, 'https://wrong.test'))).status, 403);
+  const response = await locks.POST(request(command));
+  assert.equal(response.status, 200);
+  const policy = (await response.json()).policy;
+  assert.deepEqual(policy.lockedBrands, ['samsung']);
+  assert.equal(policy.updatedBy, ctx.actor.maNV);
+  // Revoking just the child permission takes effect on the next authenticated request.
+  ctx.setActor({ ...ctx.actor, permission: 'mod', actions: ['imei-manage-all'] });
+  assert.equal((await locks.POST(request({ revision: policy.revision, lockedBrands: [] }))).status, 403);
+  const read = await locks.GET(new NextRequest('http://localhost/api/admin/imei/brand-locks'));
+  assert.match(read.headers.get('Cache-Control'), /no-store/);
+  assert.deepEqual((await read.json()).policy.lockedBrands, ['samsung']);
+});
+
+test('multiple locked brands reject direct API creation including Admin, while old issues remain recoverable and cancellation stays available', async () => {
+  const ctx = setup(), locks = ctx.load('lib/imei-brand-lock-store.ts');
+  const issued = await ctx.store.generateImei('samsung', crypto.randomUUID(), ctx.actor);
+  ctx.stopBeforeClaim();
+  const pending = crypto.randomUUID();
+  await assert.rejects(ctx.store.generateImei('apple-13-plus', pending, ctx.actor), /Interrupted/);
+  const policy = await locks.writeImeiBrandLocks({revision:'initial',lockedBrands:['samsung','apple-13-plus']}, ctx.actor.maNV);
+  for (const brand of ['samsung', 'apple-13-plus']) {
+    const response = await ctx.route.POST(ctx.request({action:'GENERATE',brand,requestId:crypto.randomUUID()}));
+    assert.equal(response.status,403);assert.equal((await response.json()).code,'IMEI_BRAND_LOCKED');
+  }
+  await assert.rejects(ctx.store.generateImei('apple-13-plus', pending, ctx.actor), error => error.code === 'IMEI_BRAND_LOCKED');
+  assert.equal((await ctx.store.generateImei('samsung', issued.requestId, ctx.actor)).imei, issued.imei);
+  assert.equal((await ctx.store.cancelImei({requestId:issued.requestId,actor:issued.actor,reason:'Hủy sau khi khóa hãng'},ctx.actor,all)).status,'cancelled');
+  assert.equal((await ctx.store.generateImei('xiaomi',crypto.randomUUID(),ctx.actor)).status,'active');
+  const page = await ctx.route.GET(new NextRequest('http://localhost/api/admin/imei'));
+  assert.deepEqual((await page.json()).policy.lockedBrands,['samsung','apple-13-plus']);
+  await locks.writeImeiBrandLocks({revision:policy.revision,lockedBrands:[]},ctx.actor.maNV);
+  assert.equal((await ctx.store.generateImei('apple-13-plus',pending,ctx.actor)).status,'active');
+});
+
+test('concurrent lock edits cannot overwrite each other; malformed or unavailable policy cannot open generation', async () => {
+  const ctx = setup(), locks = ctx.load('lib/imei-brand-lock-store.ts');
+  const edits = await Promise.allSettled([
+    locks.writeImeiBrandLocks({revision:'initial',lockedBrands:['samsung']},'001'),
+    locks.writeImeiBrandLocks({revision:'initial',lockedBrands:['xiaomi']},'002'),
+  ]);
+  assert.equal(edits.filter(result=>result.status==='fulfilled').length,1);
+  assert.equal(edits.find(result=>result.status==='rejected').reason.status,409);
+  const previous = await locks.getImeiBrandLocks();
+  await assert.rejects(locks.writeImeiBrandLocks({revision:previous.revision,lockedBrands:['bad']},'001'),rejectStatus(400));
+  const results = await Promise.allSettled([
+    locks.writeImeiBrandLocks({revision:previous.revision,lockedBrands:[]},'001'),
+    locks.writeImeiBrandLocks({revision:previous.revision,lockedBrands:['other']},'002'),
+  ]);
+  assert.equal(results.filter(result=>result.status==='fulfilled').length,1);
+  ctx.rows.find(row=>row.key==='IMEI_V1_BRAND_LOCKS').value='{}';
+  await assert.rejects(ctx.store.generateImei('samsung',crypto.randomUUID(),ctx.actor),rejectStatus(503));
+  assert.equal(ctx.rows.filter(row=>row.type==='IMEI_REQUEST').length,0);
+  ctx.offline();
+  assert.equal((await ctx.route.POST(ctx.request({action:'GENERATE',brand:'xiaomi',requestId:crypto.randomUUID()}))).status,503);
+});
+
 test('Luhn matches an independent known vector; all brands preserve exact prefixes and 15 decimal digits', async () => {
   const ctx = setup();
   assert.equal(ctx.rules.completeImei('49015420323751'), '490154203237518');
@@ -177,10 +244,10 @@ test('API requires explicit Mod grants, rejects forged origin/body and enforces 
 
 test('create grant cannot manage everyone; full Admin and manage-all have the intended distinct rights', () => {
   const { rules } = setup();
-  assert.deepEqual(rules.imeiAccess({ permission: 'admin' }), { canView: true, canCreate: true, canCancelOwn: true, canManageAll: true, canReport: true });
-  assert.deepEqual(rules.imeiAccess({ permission: 'mod', actions: ['imei-create'] }), { canView: true, canCreate: true, canCancelOwn: false, canManageAll: false, canReport: false });
-  assert.deepEqual(rules.imeiAccess({ permission: 'mod', modules: ['imei'] }), { canView: true, canCreate: false, canCancelOwn: false, canManageAll: false, canReport: false });
-  assert.deepEqual(rules.imeiAccess({ permission: 'mod', actions: ['imei-manage-all'] }), { canView: true, canCreate: false, canCancelOwn: false, canManageAll: true, canReport: true });
+  assert.deepEqual(rules.imeiAccess({ permission: 'admin' }), { canView: true, canCreate: true, canCancelOwn: true, canManageAll: true, canReport: true, canManageBrandLocks: true });
+  assert.deepEqual(rules.imeiAccess({ permission: 'mod', actions: ['imei-create'] }), { canView: true, canCreate: true, canCancelOwn: false, canManageAll: false, canReport: false, canManageBrandLocks: false });
+  assert.deepEqual(rules.imeiAccess({ permission: 'mod', modules: ['imei'] }), { canView: true, canCreate: false, canCancelOwn: false, canManageAll: false, canReport: false, canManageBrandLocks: false });
+  assert.deepEqual(rules.imeiAccess({ permission: 'mod', actions: ['imei-manage-all'] }), { canView: true, canCreate: false, canCancelOwn: false, canManageAll: true, canReport: true, canManageBrandLocks: false });
 });
 
 test('general page settings exclude the private register and pricing snapshot at the database query', async () => {

@@ -87,6 +87,17 @@ for (const permission of ['mod', 'admin']) {
   });
 }
 
+test('brand-lock grant survives session normalization only with manage-all, and revocation is immediate', async () => {
+  const ctx = setup('mod'), rules = ctx.load('lib/imei.ts');
+  ctx.staff.modulePermissions = 'imei,action:imei-manage-all';
+  assert.equal(rules.imeiAccess(await ctx.auth.getCurrentAdmin()).canManageBrandLocks, false);
+  ctx.staff.modulePermissions += ',action:imei-brand-lock';
+  assert.equal(rules.imeiAccess(await ctx.auth.getCurrentAdmin()).canManageBrandLocks, true);
+  ctx.staff.modulePermissions = 'imei,action:imei-brand-lock';
+  assert.equal(rules.imeiAccess(await ctx.auth.getCurrentAdmin()).canManageBrandLocks, false);
+  assert.equal(ctx.auth.normalizeAdminAccess(ctx.staff.modulePermissions), 'imei');
+});
+
 test('missing security and legacy/default passwords also require setup without the flag', () => {
   const { staff, staffAuth, security } = setup();
   assert.equal(staffAuth.shouldForceStaffSetup(staff, '', ''), false);

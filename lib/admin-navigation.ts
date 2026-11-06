@@ -12,6 +12,7 @@ export const PERSONNEL_ACTIONS = ["staff-manage", "staff-delete", "staff-securit
 
 // Once explicit actions exist, the old broad people module cannot grant personnel access.
 export function effectiveAdminAccessTokens(tokens: string[]) {
+  if (!tokens.includes("action:imei-manage-all")) tokens = tokens.filter(token => token !== "action:imei-brand-lock");
   const actions = tokens.filter(token => token.startsWith("action:")).map(token => token.slice(7));
   if (actions.length && !actions.some(action => PERSONNEL_ACTIONS.includes(action))) return tokens.filter(token => token !== "people");
   return tokens;

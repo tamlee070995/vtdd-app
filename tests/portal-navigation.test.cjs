@@ -31,6 +31,14 @@ test('ADMIN retains all functions under four non-overlapping groups', () => {
   for (const expected of ['tcdm', 'quy-trinh-thu-cu', 'may-moi', 'may-cu', 'demo', 'people', 'imei']) assert.ok(screens.includes(expected));
 });
 
+test('IMEI brand-lock child is optional and removed when its parent is absent or revoked', () => {
+  assert.deepEqual(nav.effectiveAdminAccessTokens(['imei','action:imei-brand-lock']),['imei']);
+  const tokens=['imei','action:imei-manage-all','action:imei-brand-lock'];
+  assert.deepEqual(nav.effectiveAdminAccessTokens(tokens),tokens);
+  assert.deepEqual(nav.removeAdminActionToken(tokens,'imei-manage-all'),['imei']);
+  assert.deepEqual(nav.removeAdminActionToken(tokens,'imei-brand-lock'),['imei','action:imei-manage-all']);
+});
+
 test('stale people module with IMEI actions does not reveal personnel or reactivate broad rights on removal', () => {
   for(const action of ['imei-create','imei-cancel-own','imei-manage-all','imei-report']) {
     assert.deepEqual(nav.visibleAdminScreens('mod',['imei','people'],[action]), ['imei']);

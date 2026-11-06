@@ -1,5 +1,6 @@
 import "server-only";
 import { randomInt, randomUUID } from "node:crypto";
+import { assertImeiBrandOpen } from "@/lib/imei-brand-lock-store";
 import { countRows, insertRows, isSupabaseConfigured, selectRows, updateRows } from "@/lib/supabase-rest";
 import { APPLE_SN_ALPHABET, canCancelImei, completeImei, imeiCodeLength, imeiPrefix, ImeiError, IMEI_CANCEL_CONTACT, isAppleSerial, validImeiCode, validImeiRequestId, type ImeiBrand, type ImeiIssue } from "@/lib/imei";
 
@@ -78,6 +79,7 @@ export async function generateImei(brand: unknown, requestId: unknown, actor: Ac
   const id = requestId.toLowerCase(), prefix = imeiPrefix(brand, actor.maNV), key = requestKey(actor.maNV, id);
   let plan = await read<Plan>(key);
   if (!plan) {
+    await assertImeiBrandOpen(brand as ImeiBrand);
     const recipient = String(recipientInput?.recipient || "").trim();
     const storeCode = String(recipientInput?.storeCode || "").trim();
     if (recipientInput && (!/^[a-zA-Z0-9_.@-]{1,50}$/.test(recipient) || !/^\d{1,15}$/.test(storeCode))) throw new ImeiError("Xin nhập User nhận mã và Mã siêu thị hợp lệ.");
@@ -92,6 +94,8 @@ export async function generateImei(brand: unknown, requestId: unknown, actor: Ac
     const previous = parseLedger(await read<Ledger>(CODE + plan.imei), plan.imei);
     const existing = previous?.events.find(event => event.requestId === id && event.actor === actor.maNV);
     if (existing) { if (existing.rejected) throw conflict(); return issue(plan, previous); }
+    // Recover an already committed issue above; every new claim must read the current lock policy.
+    await assertImeiBrandOpen(plan.brand);
     // Previously issued Xiaomi codes stay recoverable, but unfinished old plans cannot issue with the retired prefix.
     if (plan.prefix !== prefix || !plan.imei.startsWith(prefix)) throw new ImeiError("Quy tắc mã đã đổi. Xin tạo một lượt mới.", 409, "IMEI_RULE_CHANGED");
     const busy = previous?.events.some(event => !event.rejected && !event.cancelledAt) || false;

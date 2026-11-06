@@ -13,6 +13,7 @@ export type AdminActionKey =
   | "imei-cancel-own"
   | "imei-report"
   | "imei-manage-all"
+  | "imei-brand-lock"
   | "staff-manage"
   | "staff-delete"
   | "staff-security"
@@ -36,6 +37,7 @@ const ACTIONS: AdminActionKey[] = [
   "imei-create",
   "imei-cancel-own",
   "imei-manage-all",
+  "imei-brand-lock",
   "imei-report",
   "staff-manage",
   "staff-delete",

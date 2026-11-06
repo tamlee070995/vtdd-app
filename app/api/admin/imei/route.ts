@@ -3,6 +3,7 @@ import { requireAdminApi } from "@/lib/admin-auth";
 import { isSameOriginRequest } from "@/lib/request-origin";
 import { imeiAccess, ImeiError } from "@/lib/imei";
 import { imeiReport } from "@/lib/imei-report";
+import { getImeiBrandLocks } from "@/lib/imei-brand-lock-store";
 import { cancelImei, generateImei, listImei } from "@/lib/imei-store";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +22,9 @@ export async function GET(req: NextRequest) {
     const filters = Object.fromEntries(["from","to","employee","store","brand","status","q"].map(key=>[key,req.nextUrl.searchParams.get(key)||""]));
     const all = access.canReport;
     if (!all && ["from","to","employee","store","brand","status"].some(key=>filters[key])) return json({success:false,message:"Bạn chưa được cấp quyền lọc toàn bộ sổ."},403);
-    const items = await imeiReport(admin!.maNV, all, filters);
+    const [items, policy] = await Promise.all([imeiReport(admin!.maNV, all, filters), getImeiBrandLocks()]);
     const page = Math.max(1, Math.floor(Number(req.nextUrl.searchParams.get("page"))||1));
-    return json({ success:true, items:items.slice((page-1)*20,page*20),total:items.length,page,pages:Math.max(1,Math.ceil(items.length/20)),access });
+    return json({ success:true, items:items.slice((page-1)*20,page*20),total:items.length,page,pages:Math.max(1,Math.ceil(items.length/20)),access,policy });
   } catch (error) { return failure(error); }
 }
 export async function POST(req: NextRequest) {
