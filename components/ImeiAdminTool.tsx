@@ -178,11 +178,10 @@ export default function ImeiAdminTool({ actor }: { actor: string }) {
       {policyError && <UiNotice onRetry={() => void refreshPolicy()}>{policyError}</UiNotice>}
       {policy && access.canManageBrandLocks && <ImeiBrandLocksPanel policy={policy} onSaved={next => { setPolicy(next); setPolicyError(""); }} />}
       <section className={styles.generator} aria-label="Tạo mã mới">
-        <div><label htmlFor="imei-brand">Máy mới hãng</label><select id="imei-brand" value={brand} data-locked={brandLocked} disabled={!access.canCreate || !!pending || !policy || !!policyError || feedback?.tone === "loading"} onChange={event => setBrand(event.target.value as ImeiBrand)}>
+        <div><label htmlFor="imei-brand">Máy mới hãng</label><select id="imei-brand" value={brand} disabled={!!pending || !policy || !!policyError || feedback?.tone === "loading"} onChange={event => setBrand(event.target.value as ImeiBrand)}>
           {Object.entries(IMEI_BRANDS).map(([key, label]) => <option key={key} value={key} disabled={policy?.lockedBrands.includes(key as ImeiBrand)}>{policy?.lockedBrands.includes(key as ImeiBrand) ? imeiBrandLockedMessage(key as ImeiBrand) : label}</option>)}
         </select><p className={styles.syntax}>{prefix ? serial ? <>SN {imeiCodeLength(brand)} ký tự: <b>{prefix}</b> + {imeiCodeLength(brand) - prefix.length} ký tự ngẫu nhiên (số và chữ). Không dùng O và I.</> : <>Đầu mã <b>{prefix}</b> + {14 - prefix.length} số ngẫu nhiên + 1 số Luhn</> : "Mã nhân viên phải gồm 1–13 số để tạo mã theo tài khoản."}</p></div>
         <button className={styles.primary} type="button" disabled={!restored || !prefix || !access.canCreate || !policy || !!policyError || (brandLocked && !pending) || feedback?.tone === "loading"} onClick={() => void generate()}>{pending ? "Tiếp tục lượt chưa xong" : "Tạo mã"}</button>
-        {brandLocked && <p className={styles.lockedNotice} role="status">{imeiBrandLockedMessage(brand)}. Xin chọn hãng đang mở.</p>}
         {!access.canCreate && <p className={styles.hint}>Bạn được xem sổ mã. Xin liên lạc Admin nếu cần quyền tạo mã.</p>}
       </section>
       {pending && <UiNotice>Một lượt tạo chưa nhận được kết quả. Bấm “Tiếp tục lượt chưa xong” để kiểm tra và nhận lại đúng mã.</UiNotice>}
